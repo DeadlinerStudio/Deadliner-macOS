@@ -47,8 +47,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var model: AppModel?
     private(set) var startupError: String?
 
+    /// 作为单元测试的宿主运行时为 true。此时不打开正式数据库、不启动同步，
+    /// 避免测试读到用户的同步设置而连接真实的 WebDAV。
+    static var isRunningTests: Bool { ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil }
+
     override init() {
         super.init()
+        guard !Self.isRunningTests else {
+            startupError = "测试运行中"
+            return
+        }
         do {
             model = AppModel(container: try MacCoreContainer.makeDefault())
         } catch {

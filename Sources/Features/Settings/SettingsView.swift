@@ -113,7 +113,15 @@ struct SettingsView: View {
         MiuixGroup(title: "同步状态") {
             MiuixRow(title: statusText, systemImage: statusIcon, tint: statusTint) {
                 MiuixButton(title: "立即同步", kind: .primary) { sync.syncNow() }
-                    .disabled(sync.status == .disabled || sync.status == .syncing)
+                    .disabled(sync.status == .disabled || sync.status == .syncing || sync.status == .backingUp)
+            }
+            if let backup = sync.lastBackup {
+                Text("启用前已备份云端数据：\(backup.lastPathComponent)")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(t.onSurfaceVariant)
+                    .textSelection(.enabled)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 4)
             }
             ForEach(sync.log.prefix(8)) { entry in
                 HStack(spacing: 10) {
@@ -176,6 +184,7 @@ struct SettingsView: View {
     private var statusText: String {
         switch sync.status {
         case .disabled: "同步未启用"
+        case .backingUp: "正在备份云端数据…"
         case .idle: "等待同步"
         case .syncing: "正在同步…"
         case .succeeded(let date): "上次同步：\(date.formatted(date: .omitted, time: .shortened))"
@@ -186,7 +195,7 @@ struct SettingsView: View {
     private var statusIcon: String {
         switch sync.status {
         case .disabled: "icloud.slash"
-        case .idle, .syncing: "arrow.triangle.2.circlepath"
+        case .idle, .syncing, .backingUp: "arrow.triangle.2.circlepath"
         case .succeeded: "checkmark.icloud"
         case .failed: "exclamationmark.icloud"
         }
@@ -194,7 +203,7 @@ struct SettingsView: View {
 
     private var statusTint: Color {
         switch sync.status {
-        case .disabled, .idle, .syncing: t.secondary
+        case .disabled, .idle, .syncing, .backingUp: t.secondary
         case .succeeded: Color(hex: 0x10B981)
         case .failed: t.error
         }

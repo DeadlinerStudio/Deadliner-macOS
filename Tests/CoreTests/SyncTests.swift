@@ -185,6 +185,32 @@ final class SyncSettingsTests: XCTestCase {
         XCTAssertEqual(controller.status, .disabled)
     }
 
+    func testEnablingSyncBacksUpCloudFileFirst() async throws {
+        MockDavServer.reset(ignoresIfNoneMatch: true, etagOnHead: false)
+        MockDavServer.seed(path: "/dav/Deadliner/kmp-changelog-v1.json", data: Data("{\"formatVersion\":6}".utf8))
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockDavServer.self]
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("deadliner-backup-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let container = MacCoreContainer(databaseURL: directory.appendingPathComponent("db"), deviceId: "t")
+        defer { container.close() }
+        let keychain = KeychainPasswordStore(service: "com.deadliner.macos.tests.\(UUID().uuidString)")
+        defer { keychain.deletePassword(url: "https://dav.example.test/dav/", username: "me") }
+        let controller = SyncController(
+            database: container.database, keychain: keychain,
+            defaults: UserDefaults(suiteName: "deadliner-backup-\(UUID().uuidString)")!,
+            backupSession: URLSession(configuration: configuration),
+            backupDirectory: { directory.appendingPathComponent("backups") }
+        ) {}
+        defer { controller.stop() }
+        try controller.save(SyncSettings(serverURL: "https://dav.example.test/dav/", username: "me", enabled: true), password: "test-only")
+        let deadline = Date().addingTimeInterval(5)
+        while controller.lastBackup == nil && Date() < deadline { try await _Concurrency.Task.sleep(nanoseconds: 20_000_000) }
+        let backup = try XCTUnwrap(controller.lastBackup, "启用同步前应先备份云端文件")
+        XCTAssertEqual(try String(contentsOf: backup, encoding: .utf8), "{\"formatVersion\":6}")
+    }
+
     func testProbeAgainstNutstoreLikeServer() async {
         MockDavServer.reset(ignoresIfNoneMatch: true, etagOnHead: false)
         let configuration = URLSessionConfiguration.ephemeral
@@ -229,6 +255,11 @@ final class MockDavServer: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) private static var version = 0
     nonisolated(unsafe) static var touchedSyncFile = false
 
+    static func seed(path: String, data: Data) {
+        version += 1
+        files[path] = (data, version)
+    }
+
     static func reset(ignoresIfNoneMatch: Bool, etagOnHead: Bool, rejectAuth: Bool = false) {
         files = [:]
         directories = ["/dav"]
@@ -250,7 +281,8 @@ final class MockDavServer: URLProtocol, @unchecked Sendable {
         let (status, headers) = handle(method: request.httpMethod ?? "GET", path: path, body: bodyData())
         let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Data())
+        let body = (request.httpMethod ?? "GET") == "GET" && (200..<300).contains(status) ? Self.files[path]?.0 ?? Data() : Data()
+        client?.urlProtocol(self, didLoad: body)
         client?.urlProtocolDidFinishLoading(self)
     }
 

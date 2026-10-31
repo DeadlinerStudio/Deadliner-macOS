@@ -10,6 +10,7 @@ import Shared
 final class SyncController {
     enum Status: Equatable {
         case disabled
+        case backingUp
         case idle
         case syncing
         case succeeded(Date)
@@ -40,6 +41,8 @@ final class SyncController {
     private(set) var status: Status = .disabled
     private(set) var log: [LogEntry] = []
     private(set) var settings: SyncSettings
+    /// 最近一次启用同步前保存的云端备份。
+    private(set) var lastBackup: URL?
 
     @ObservationIgnored private let database: DeadlinerDatabase
     @ObservationIgnored private let keychain: KeychainPasswordStore
@@ -47,12 +50,17 @@ final class SyncController {
     @ObservationIgnored private let didApplyRemoteChanges: () -> Void
     @ObservationIgnored private var monitor: NWPathMonitor?
     @ObservationIgnored private var configured = false
+    @ObservationIgnored private let backupSession: URLSession
+    @ObservationIgnored private let backupDirectory: () throws -> URL
 
     init(database: DeadlinerDatabase, keychain: KeychainPasswordStore = .init(), defaults: UserDefaults = .standard,
+         backupSession: URLSession = .shared, backupDirectory: @escaping () throws -> URL = RemoteBackup.defaultDirectory,
          didApplyRemoteChanges: @escaping () -> Void) {
         self.database = database
         self.keychain = keychain
         self.defaults = defaults
+        self.backupSession = backupSession
+        self.backupDirectory = backupDirectory
         self.didApplyRemoteChanges = didApplyRemoteChanges
         settings = SyncSettings.load(from: defaults)
     }
@@ -68,6 +76,7 @@ final class SyncController {
     }
 
     /// 保存设置。`password` 为 nil 表示保留钥匙串中已有的密码。
+    /// 启用同步时，先把云端同步文件备份到本机，备份成功后才开始同步。
     func save(_ newSettings: SyncSettings, password: String?) throws {
         if newSettings.enabled, let error = newSettings.validationError { throw SyncError.invalid(error) }
         if let password, !password.isEmpty {
@@ -78,8 +87,21 @@ final class SyncController {
         settings = newSettings
         newSettings.save(to: defaults)
         if newSettings.enabled {
-            guard hasPassword else { throw SyncError.invalid("请填写应用密码") }
-            applyConfiguration()
+            guard let stored = keychain.password(url: newSettings.normalizedURL, username: newSettings.username) else {
+                throw SyncError.invalid("请填写应用密码")
+            }
+            disable()
+            status = .backingUp
+            let backup = RemoteBackup(settings: newSettings, password: stored, session: backupSession,
+                                      directory: (try? backupDirectory()) ?? FileManager.default.temporaryDirectory)
+            _Concurrency.Task {
+                do {
+                    if case .saved(let file) = try await backup.run() { lastBackup = file }
+                    applyConfiguration()
+                } catch {
+                    status = .failed(error.localizedDescription)
+                }
+            }
         } else {
             disable()
         }

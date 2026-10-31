@@ -63,6 +63,7 @@ struct Sidebar: View {
         case .disabled: ("icloud.slash", "未启用同步", t.onSurfaceVariant)
         case .idle: ("icloud", "等待同步", t.onSurfaceVariant)
         case .syncing: ("arrow.triangle.2.circlepath", "正在同步…", t.primary)
+        case .backingUp: ("arrow.down.doc", "正在备份云端…", t.primary)
         case .succeeded(let date): ("checkmark.icloud", "已同步 \(date.formatted(date: .omitted, time: .shortened))", Color(hex: 0x10B981))
         case .failed: ("exclamationmark.icloud", "同步失败", t.error)
         }
