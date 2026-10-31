@@ -9,9 +9,21 @@ final class AppModel {
     enum Page: String, CaseIterable, Identifiable {
         case tasks, habits, focus, archive, settings
         var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .tasks: "任务"
+            case .habits: "习惯"
+            case .focus: "专注"
+            case .archive: "存档"
+            case .settings: "设置"
+            }
+        }
     }
 
     var page: Page = .tasks
+    /// 每次 +1 时，当前页面的搜索框获得焦点（⌘F）。
+    var searchFocusRequest = 0
 
     @ObservationIgnored let container: MacCoreContainer
     @ObservationIgnored private(set) var taskList: TaskListStore!

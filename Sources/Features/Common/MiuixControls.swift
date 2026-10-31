@@ -209,3 +209,39 @@ struct MiuixToggleStyle: ToggleStyle {
 extension ToggleStyle where Self == MiuixToggleStyle {
     static var miuix: MiuixToggleStyle { MiuixToggleStyle() }
 }
+
+/// MIUIX 分段控件：浅色轨道、选中项为浮起的胶囊。
+struct MiuixSegmented<Value: Hashable>: View {
+    @Binding var selection: Value
+    let options: [(value: Value, label: String)]
+    @Environment(\.miuix) private var t
+    @Namespace private var namespace
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(options.indices, id: \.self) { index in
+                let option = options[index]
+                let selected = option.value == selection
+                Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { selection = option.value } } label: {
+                    Text(option.label)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(selected ? t.onSurface : t.onSurfaceVariant)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 30)
+                        .background {
+                            if selected {
+                                Capsule()
+                                    .fill(t.segmentedSelected)
+                                    .shadow(color: .black.opacity(t.isDark ? 0 : 0.12), radius: 2, y: 1)
+                                    .matchedGeometryEffect(id: "selection", in: namespace)
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .background(t.segmentedBg, in: Capsule())
+    }
+}

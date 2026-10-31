@@ -3,9 +3,15 @@ import SwiftUI
 /// MIUIX 风格窄侧栏（宽 208）：无分割线，选中项为圆角胶囊。
 struct Sidebar: View {
     @Binding var page: AppModel.Page
+    /// 底部的同步状态；为 nil 时不显示。
+    var syncStatus: SyncController.Status?
     @Environment(\.miuix) private var t
 
     static let width: CGFloat = 208
+
+    /// 直接读取包内图标，不依赖 LaunchServices 是否已登记本应用。
+    static let appIcon: NSImage = Bundle.main.url(forResource: "AppIcon", withExtension: "icns")
+        .flatMap(NSImage.init(contentsOf:)) ?? NSApp.applicationIconImage
 
     private struct Item: Identifiable {
         let page: AppModel.Page
@@ -25,7 +31,7 @@ struct Sidebar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                Image(nsImage: NSApp.applicationIconImage)
+                Image(nsImage: Self.appIcon)
                     .resizable()
                     .frame(width: 28, height: 28)
                 Text("Deadliner")
@@ -44,11 +50,36 @@ struct Sidebar: View {
                 }
             }
             Spacer()
+            if let syncStatus { syncFooter(syncStatus) }
         }
         .padding(.horizontal, 12)
         .frame(width: Self.width)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(t.pageBg)
+    }
+
+    private func syncFooter(_ status: SyncController.Status) -> some View {
+        let (icon, text, tint): (String, String, Color) = switch status {
+        case .disabled: ("icloud.slash", "未启用同步", t.onSurfaceVariant)
+        case .idle: ("icloud", "等待同步", t.onSurfaceVariant)
+        case .syncing: ("arrow.triangle.2.circlepath", "正在同步…", t.primary)
+        case .succeeded(let date): ("checkmark.icloud", "已同步 \(date.formatted(date: .omitted, time: .shortened))", Color(hex: 0x10B981))
+        case .failed: ("exclamationmark.icloud", "同步失败", t.error)
+        }
+        return Button { page = .settings } label: {
+            HStack(spacing: 8) {
+                Image(systemName: icon).font(.system(size: 13, weight: .semibold))
+                Text(text).font(.system(size: 12.5, weight: .medium)).lineLimit(1)
+                Spacer()
+            }
+            .foregroundStyle(tint)
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .background(t.groupBg, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help("打开同步设置")
+        .padding(.bottom, 16)
     }
 
     private func row(_ item: Item) -> some View {

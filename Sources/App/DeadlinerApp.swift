@@ -16,6 +16,20 @@ struct DeadlinerApp: App {
                 Button("新建任务") { appDelegate.model?.newTask() }
                     .keyboardShortcut("n", modifiers: [.command])
             }
+            CommandGroup(replacing: .appSettings) {
+                Button("设置…") { appDelegate.model?.page = .settings }
+                    .keyboardShortcut(",", modifiers: [.command])
+            }
+            CommandGroup(after: .textEditing) {
+                Button("搜索") { appDelegate.model?.searchFocusRequest += 1 }
+                    .keyboardShortcut("f", modifiers: [.command])
+            }
+            CommandMenu("前往") {
+                ForEach(Array(AppModel.Page.allCases.enumerated()), id: \.element) { index, page in
+                    Button(page.title) { appDelegate.model?.page = page }
+                        .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: [.command])
+                }
+            }
             CommandGroup(after: .toolbar) {
                 Button("立即同步") {
                     appDelegate.model?.refreshAll()
@@ -85,11 +99,12 @@ struct MainView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            Sidebar(page: $model.page)
+            Sidebar(page: $model.page, syncStatus: model.sync.status)
             Group {
                 switch model.page {
                 case .tasks:
-                    TaskListView(store: model.taskList, commands: model.taskCommands, categoryCommands: model.categoryCommands)
+                    TaskListView(store: model.taskList, commands: model.taskCommands, categoryCommands: model.categoryCommands,
+                                 onSetupSync: model.sync.status == .disabled ? { model.page = .settings } : nil)
                 case .habits:
                     HabitsView(store: model.habitList, commands: model.habitCommands, categories: model.taskList.categories)
                 case .focus:
@@ -102,6 +117,10 @@ struct MainView: View {
             }
             .padding(.top, 24)
             .background(t.pageBg)
+            .id(model.page)
+            .transition(.opacity.combined(with: .offset(y: 6)))
+            .animation(.easeOut(duration: 0.18), value: model.page)
+            .environment(\.searchFocusRequest, model.searchFocusRequest)
         }
         .background(t.pageBg)
         .ignoresSafeArea(.container, edges: .top)

@@ -95,13 +95,9 @@ struct HabitEditorSheet: View {
 
     private var scheduleGroup: some View {
         MiuixGroup(title: "打卡周期") {
-            Picker("", selection: $draft.scheduleKind) {
-                Text("按星期").tag(HabitDraft.ScheduleKind.weeklyDays)
-                Text("一次").tag(HabitDraft.ScheduleKind.once)
-                Text("复习计划").tag(HabitDraft.ScheduleKind.algorithm)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            MiuixSegmented(selection: $draft.scheduleKind, options: [
+                (.weeklyDays, "按星期"), (.once, "一次"), (.algorithm, "复习计划"),
+            ])
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
 
@@ -149,12 +145,7 @@ struct HabitEditorSheet: View {
 
     private var goalGroup: some View {
         MiuixGroup(title: "目标与记录方式") {
-            Picker("", selection: $draft.trackingMode) {
-                Text("打卡").tag(HabitDraft.TrackingMode.checkOff)
-                Text("计量").tag(HabitDraft.TrackingMode.quantity)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            MiuixSegmented(selection: $draft.trackingMode, options: [(.checkOff, "打卡"), (.quantity, "计量")])
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
 

@@ -5,6 +5,8 @@ struct TaskListView: View {
     @Bindable var store: TaskListStore
     let commands: TaskCommands
     let categoryCommands: CategoryCommands
+    /// 同步未启用时，空列表上显示「配置同步」入口。
+    var onSetupSync: (() -> Void)?
 
     @State private var pendingDelete: TaskItem?
     @State private var errorMessage: String?
@@ -20,7 +22,8 @@ struct TaskListView: View {
                 searchText: $store.searchText,
                 sortOrder: $store.sortOrder,
                 now: context.date,
-                actionsFor: actions(for:)
+                actionsFor: actions(for:),
+                onSetupSync: onSetupSync
             )
         }
         .overlay(alignment: .bottomTrailing) {
@@ -79,6 +82,7 @@ struct TaskListContent: View {
     @Binding var sortOrder: TaskListStore.SortOrder
     let now: Date
     var actionsFor: ((TaskItem) -> TaskCard.Actions)?
+    var onSetupSync: (() -> Void)?
     @Environment(\.miuix) private var t
 
     var body: some View {
@@ -146,6 +150,10 @@ struct TaskListContent: View {
                 .font(.system(size: 36))
             Text(searchText.isEmpty ? "还没有任务。点右下角的 + 新建，或配置同步后从手机拉取。" : "没有找到匹配的任务")
                 .font(.callout)
+            if searchText.isEmpty, let onSetupSync {
+                MiuixButton(title: "配置同步", kind: .primary, action: onSetupSync)
+                    .padding(.top, 6)
+            }
         }
         .foregroundStyle(t.onSurfaceVariant)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -157,6 +165,7 @@ struct SearchPill: View {
     @Binding var text: String
     let placeholder: String
     @Environment(\.miuix) private var t
+    @Environment(\.searchFocusRequest) private var focusRequest
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -174,5 +183,18 @@ struct SearchPill: View {
         .frame(height: 40)
         .background(t.searchBg, in: Capsule())
         .overlay(Capsule().strokeBorder(t.primary.opacity(focused ? 0.35 : 0), lineWidth: 2))
+        .onChange(of: focusRequest) { focused = true }
+    }
+}
+
+private struct SearchFocusRequestKey: EnvironmentKey {
+    static let defaultValue = 0
+}
+
+extension EnvironmentValues {
+    /// ⌘F 计数，变化时搜索框获得焦点。
+    var searchFocusRequest: Int {
+        get { self[SearchFocusRequestKey.self] }
+        set { self[SearchFocusRequestKey.self] = newValue }
     }
 }

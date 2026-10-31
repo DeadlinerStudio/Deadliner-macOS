@@ -185,6 +185,52 @@ final class TaskListSnapshotTests: XCTestCase {
         }
     }
 
+    /// 整窗截图：真实的 AppModel + 临时数据库（占位数据），逐页截取。
+    func testRenderFullWindowPages() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("deadliner-window-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(container: MacCoreContainer(databaseURL: directory.appendingPathComponent("db.sqlite"), deviceId: "window"))
+        defer { model.stop() }
+
+        let categories = model.categoryCommands.list()
+        let calendar = Calendar.current
+        let inDays = { (days: Double) in Date().addingTimeInterval(days * 86400) }
+        let drafts: [TaskDraft] = [
+            TaskDraft(title: "示例任务 A", note: "示例备注", dueAt: inDays(3), categoryId: categories[0].id, isStarred: true,
+                      subtasks: [.init(id: "s1", content: "一", isCompleted: true), .init(id: "s2", content: "二", isCompleted: false)]),
+            TaskDraft(title: "示例任务 B", dueAt: inDays(0.2), categoryId: categories[1].id),
+            TaskDraft(title: "示例任务 C", dueAt: inDays(-1), categoryId: categories[2].id),
+            TaskDraft(title: "示例任务 D", startAt: inDays(2), dueAt: inDays(9)),
+            TaskDraft(title: "示例任务 E", dueAt: inDays(14)),
+        ]
+        for draft in drafts { try model.taskCommands.save(draft) }
+        var habit = HabitDraft()
+        habit.name = "示例习惯 A"
+        habit.startOn = calendar.date(byAdding: .day, value: -7, to: Date())!
+        try model.habitCommands.save(habit)
+        habit.name = "示例习惯 B"
+        habit.trackingMode = .quantity
+        habit.unit = "ml"
+        habit.defaultIncrement = 250
+        habit.targetCount = 2000
+        try model.habitCommands.save(habit)
+        model.start()
+
+        for (scheme, tokens) in [(ColorScheme.light, MiuixTokens.light), (ColorScheme.dark, MiuixTokens.dark)] {
+            for page in [AppModel.Page.tasks, .habits, .settings] {
+                model.page = page
+                RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+                try capture(
+                    MainView(model: model).environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                    size: NSSize(width: 1280, height: 760), scheme: scheme,
+                    name: "window-\(page.rawValue)-\(scheme == .dark ? "dark" : "light")"
+                )
+            }
+        }
+    }
+
     private func capture<V: View>(_ view: V, size: NSSize, scheme: ColorScheme, name: String) throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("deadliner-snapshots", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

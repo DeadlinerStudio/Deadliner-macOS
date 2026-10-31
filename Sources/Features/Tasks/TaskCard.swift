@@ -59,6 +59,7 @@ struct TaskCard: View {
                             .lineLimit(1)
                             .fixedSize()
                     }
+
                 }
                 Spacer(minLength: 0)
                 HStack(spacing: 6) {
@@ -77,6 +78,26 @@ struct TaskCard: View {
         .padding(.vertical, MiuixCard.padY)
         .frame(height: MiuixCard.height)
         .background { CardBackground(colors: colors, progress: progress) }
+        .overlay(alignment: .bottomTrailing) {
+            if let actions, hovering {
+                // 悬停时浮在右下角的「更多」按钮，与右键菜单相同；不占用卡片布局。
+                Menu { menu(actions) } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(t.onSurface)
+                        .frame(width: 26, height: 20)
+                        .background(.regularMaterial, in: Capsule())
+                        .contentShape(Capsule())
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .padding(.trailing, 12)
+                .padding(.bottom, 10)
+                .help("更多操作")
+                .transition(.opacity)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: MiuixRadius.card, style: .continuous))
         .shadow(color: .black.opacity(t.isDark ? 0 : (hovering ? 0.08 : 0.04)), radius: hovering ? 7 : 1, y: hovering ? 4 : 1)
         .offset(y: hovering ? -1 : 0)
