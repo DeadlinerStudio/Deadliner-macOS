@@ -1,0 +1,77 @@
+import XCTest
+import SwiftUI
+@testable import Deadliner_for_macOS
+
+/// 用占位数据渲染任务页截图（浅色 / 深色），供人工对照手机界面。
+/// 截图保存在测试进程临时目录下的 `deadliner-snapshots/`，路径会打印到测试日志。
+@MainActor
+final class TaskListSnapshotTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    func testRenderTaskListLightAndDark() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("deadliner-snapshots", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        for (name, tokens, scheme) in [("tasks-light", MiuixTokens.light, ColorScheme.light), ("tasks-dark", MiuixTokens.dark, ColorScheme.dark)] {
+            let view = TaskListContent(
+                tasks: TaskListStore.sorted(sampleTasks, by: .dueDate),
+                totalCount: sampleTasks.count,
+                categories: sampleCategories,
+                isLoading: false,
+                errorMessage: nil,
+                searchText: .constant(""),
+                sortOrder: .constant(.dueDate),
+                now: now
+            )
+            .environment(\.miuix, tokens)
+            .environment(\.colorScheme, scheme)
+
+            // ImageRenderer 画不出 ScrollView / TextField，改为放进屏幕外的真实窗口后抓取位图。
+            let size = NSSize(width: 1180, height: 560)
+            let hosting = NSHostingView(rootView: view)
+            hosting.frame = NSRect(origin: .zero, size: size)
+            let window = NSWindow(contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+            window.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+            window.contentView = hosting
+            window.setFrameOrigin(NSPoint(x: -10_000, y: -10_000))
+            window.orderBack(nil)
+            hosting.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+            hosting.layoutSubtreeIfNeeded()
+
+            let rep = try XCTUnwrap(hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds))
+            hosting.cacheDisplay(in: hosting.bounds, to: rep)
+            window.orderOut(nil)
+            let png = try XCTUnwrap(rep.representation(using: .png, properties: [:]))
+            let url = directory.appendingPathComponent("\(name).png")
+            try png.write(to: url)
+            print("SNAPSHOT \(url.path)")
+        }
+    }
+
+    private var sampleCategories: [String: CategoryItem] {
+        [
+            "c1": CategoryItem(id: "c1", name: "工作", iconKey: "briefcase", colorHex: "#4A90E2", sortOrder: 0),
+            "c2": CategoryItem(id: "c2", name: "学习", iconKey: "book", colorHex: "#7ED321", sortOrder: 1),
+            "c3": CategoryItem(id: "c3", name: "生活", iconKey: "home", colorHex: "#F5A623", sortOrder: 2),
+        ]
+    }
+
+    private var sampleTasks: [TaskItem] {
+        func make(_ id: String, _ title: String, note: String = "", due: TimeInterval?, start: TimeInterval? = nil,
+                  state: TaskItem.State = .active, starred: Bool = false, category: String? = nil, sub: (Int, Int) = (0, 0)) -> TaskItem {
+            TaskItem(id: id, title: title, note: note, startAt: start.map { now.addingTimeInterval($0) },
+                     dueAt: due.map { now.addingTimeInterval($0) }, state: state, isStarred: starred, categoryId: category,
+                     subtaskDone: sub.0, subtaskTotal: sub.1, createdAt: now.addingTimeInterval(-86400 * 6), updatedAt: nil)
+        }
+        return [
+            make("1", "示例任务 A", note: "示例备注", due: 86400 * 3, starred: true, category: "c1", sub: (1, 3)),
+            make("2", "示例任务 B", due: 3600 * 5, category: "c2"),
+            make("3", "示例任务 C", note: "这是一段比较长的示例备注，用来检查单行截断是否正常", due: -3600 * 26, category: "c3"),
+            make("4", "示例任务 D", due: 86400 * 12, start: 86400 * 2),
+            make("5", "示例任务 E：标题很长很长很长很长很长很长很长很长很长", due: 86400 * 1.5, category: "c1", sub: (2, 2)),
+            make("6", "示例任务 F", due: nil),
+            make("7", "示例任务 G", due: -86400, state: .completed, category: "c2"),
+            make("8", "示例任务 H", due: 86400, state: .abandoned),
+        ]
+    }
+}
