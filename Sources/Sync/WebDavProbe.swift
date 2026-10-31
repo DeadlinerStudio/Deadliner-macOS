@@ -3,7 +3,7 @@ import Foundation
 /// 「检测服务器」：逐项确认 WebDAV 服务器满足 Core 同步需要的能力。
 ///
 /// 只读写一个临时探测文件 `Deadliner/.mac-probe-<随机>.txt`，结束时删除；
-/// 不会读取或改动同步文件 `Deadliner/kmp-changelog-v1.json`。
+/// 对同步文件 `Deadliner/kmp-changelog-v1.json` 只做一次 HEAD 确认是否存在，不读取内容、不改动。
 struct WebDavProbe {
     struct Check: Identifiable, Equatable {
         enum State: Equatable { case ok, warning, failed }
@@ -57,7 +57,19 @@ struct WebDavProbe {
         }
         guard checks.last?.state == .ok else { return checks }
 
-        // 3. 写入与条件写入
+        // 3. 同步文件是否已存在（只读）。不存在多半说明地址与手机不一致。
+        let syncFile = directory.appendingPathComponent("kmp-changelog-v1.json")
+        let syncStatus = await send("HEAD", syncFile)?.status ?? 0
+        if (200..<300).contains(syncStatus) {
+            checks.append(Check(id: "syncFile", title: "同步文件", state: .ok, detail: "已找到 kmp-changelog-v1.json"))
+        } else if syncStatus == 404 {
+            checks.append(Check(id: "syncFile", title: "同步文件", state: .warning,
+                                detail: "这里还没有同步文件。如果手机已经在同步，请检查地址是否与手机一致"))
+        } else {
+            checks.append(Check(id: "syncFile", title: "同步文件", state: .warning, detail: "无法确认（HTTP \(syncStatus)）"))
+        }
+
+        // 4. 写入与条件写入
         let probe = directory.appendingPathComponent(".mac-probe-\(UUID().uuidString.prefix(8)).txt")
         defer { Task { _ = await send("DELETE", probe) } }
         let created = await send("PUT", probe, body: Data("probe-1".utf8), headers: ["If-None-Match": "*"])?.status ?? 0
@@ -73,7 +85,7 @@ struct WebDavProbe {
             : Check(id: "createOnly", title: "仅新建（If-None-Match）", state: .warning,
                     detail: "服务器忽略了 If-None-Match（HTTP \(duplicate)）。坚果云就是这样；只影响两台设备同时首次上传的极端情况"))
 
-        // 4. 版本号（ETag）。部分服务器只在 GET 时返回 ETag。
+        // 5. 版本号（ETag）。部分服务器只在 GET 时返回 ETag。
         let head = await send("HEAD", probe)
         let get = await send("GET", probe)
         guard let etag = head?.etag ?? get?.etag else {
@@ -82,7 +94,7 @@ struct WebDavProbe {
         }
         checks.append(Check(id: "etag", title: "版本号（ETag）", state: .ok, detail: head?.etag == nil ? "仅 GET 返回 ETag" : "支持"))
 
-        // 5. 按版本号写入（If-Match）
+        // 6. 按版本号写入（If-Match）
         let stale = await send("PUT", probe, body: Data("probe-3".utf8), headers: ["If-Match": "\"deadliner-stale-version\""])?.status ?? 0
         checks.append(stale == 412
             ? Check(id: "ifMatch", title: "冲突检测（If-Match）", state: .ok, detail: "过期版本的写入会被拒绝")

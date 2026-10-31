@@ -11,6 +11,8 @@ final class SyncController {
     enum Status: Equatable {
         case disabled
         case backingUp
+        /// 云端没有同步文件，等待用户确认是否新建（多半是服务器地址不对）。
+        case awaitingConfirmation
         case idle
         case syncing
         case succeeded(Date)
@@ -96,8 +98,14 @@ final class SyncController {
                                       directory: (try? backupDirectory()) ?? FileManager.default.temporaryDirectory)
             _Concurrency.Task {
                 do {
-                    if case .saved(let file) = try await backup.run() { lastBackup = file }
-                    applyConfiguration()
+                    switch try await backup.run() {
+                    case .saved(let file):
+                        lastBackup = file
+                        applyConfiguration()
+                    case .nothingToBackUp:
+                        // 不直接开始同步：Core 会在这个位置新建同步文件，而手机可能正用着另一个地址。
+                        status = .awaitingConfirmation
+                    }
                 } catch {
                     status = .failed(error.localizedDescription)
                 }
@@ -106,6 +114,23 @@ final class SyncController {
             disable()
         }
     }
+
+    /// 用户确认云端确实还没有同步文件，由这台 Mac 新建。
+    func confirmCreatingRemoteFile() {
+        guard status == .awaitingConfirmation else { return }
+        applyConfiguration()
+    }
+
+    /// 用户选择先检查地址：关闭同步，不写云端。
+    func cancelPendingSync() {
+        guard status == .awaitingConfirmation else { return }
+        settings.enabled = false
+        settings.save(to: defaults)
+        disable()
+    }
+
+    /// 云端同步文件的完整地址（用于提示）。
+    var remoteFileURL: String { settings.normalizedURL + RemoteBackup.remotePath }
 
     /// 立即同步（「立即同步」按钮、⌘R）。
     func syncNow() {

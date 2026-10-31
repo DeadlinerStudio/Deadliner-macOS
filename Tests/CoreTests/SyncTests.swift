@@ -211,6 +211,35 @@ final class SyncSettingsTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: backup, encoding: .utf8), "{\"formatVersion\":6}")
     }
 
+    func testMissingCloudFileAsksBeforeCreating() async throws {
+        MockDavServer.reset(ignoresIfNoneMatch: true, etagOnHead: false)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockDavServer.self]
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("deadliner-confirm-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let container = MacCoreContainer(databaseURL: directory.appendingPathComponent("db"), deviceId: "t")
+        defer { container.close() }
+        let keychain = KeychainPasswordStore(service: "com.deadliner.macos.tests.\(UUID().uuidString)")
+        defer { keychain.deletePassword(url: "https://dav.example.test/dav/", username: "me") }
+        let defaults = UserDefaults(suiteName: "deadliner-confirm-\(UUID().uuidString)")!
+        let controller = SyncController(database: container.database, keychain: keychain, defaults: defaults,
+                                        backupSession: URLSession(configuration: configuration),
+                                        backupDirectory: { directory.appendingPathComponent("backups") }) {}
+        defer { controller.stop() }
+
+        try controller.save(SyncSettings(serverURL: "https://dav.example.test/dav/", username: "me", enabled: true), password: "test-only")
+        let deadline = Date().addingTimeInterval(5)
+        while controller.status != .awaitingConfirmation && Date() < deadline { try await _Concurrency.Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertEqual(controller.status, .awaitingConfirmation, "云端没有同步文件时不应直接开始同步")
+        XCTAssertEqual(controller.remoteFileURL, "https://dav.example.test/dav/Deadliner/kmp-changelog-v1.json")
+
+        controller.cancelPendingSync()
+        XCTAssertEqual(controller.status, .disabled)
+        XCTAssertFalse(SyncSettings.load(from: defaults).enabled, "选择先检查地址后应关闭同步")
+        XCTAssertFalse(MockDavServer.wroteSyncFile)
+    }
+
     func testProbeAgainstNutstoreLikeServer() async {
         MockDavServer.reset(ignoresIfNoneMatch: true, etagOnHead: false)
         let configuration = URLSessionConfiguration.ephemeral
@@ -229,7 +258,8 @@ final class SyncSettingsTests: XCTestCase {
         XCTAssertEqual(states["etag"], .ok)
         XCTAssertEqual(states["ifMatch"], .ok)
         XCTAssertEqual(states["matchWrite"], .ok)
-        XCTAssertFalse(MockDavServer.touchedSyncFile, "检测不应读写同步文件")
+        XCTAssertEqual(states["syncFile"], .warning, "云端没有同步文件时应提示检查地址")
+        XCTAssertFalse(MockDavServer.wroteSyncFile, "检测不应写入同步文件")
     }
 
     func testProbeReportsWrongPassword() async {
@@ -253,7 +283,7 @@ final class MockDavServer: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) private static var etagOnHead = true
     nonisolated(unsafe) private static var rejectAuth = false
     nonisolated(unsafe) private static var version = 0
-    nonisolated(unsafe) static var touchedSyncFile = false
+    nonisolated(unsafe) static var wroteSyncFile = false
 
     static func seed(path: String, data: Data) {
         version += 1
@@ -267,7 +297,7 @@ final class MockDavServer: URLProtocol, @unchecked Sendable {
         self.etagOnHead = etagOnHead
         self.rejectAuth = rejectAuth
         version = 0
-        touchedSyncFile = false
+        wroteSyncFile = false
     }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -277,7 +307,7 @@ final class MockDavServer: URLProtocol, @unchecked Sendable {
     override func startLoading() {
         var path = request.url!.path(percentEncoded: false)
         while path.count > 1 && path.hasSuffix("/") { path.removeLast() }
-        if path.contains("kmp-changelog") { Self.touchedSyncFile = true }
+        if path.contains("kmp-changelog"), !["HEAD", "GET", "PROPFIND"].contains(request.httpMethod ?? "GET") { Self.wroteSyncFile = true }
         let (status, headers) = handle(method: request.httpMethod ?? "GET", path: path, body: bodyData())
         let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

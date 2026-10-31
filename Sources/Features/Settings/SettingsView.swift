@@ -56,6 +56,18 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(t.pageBg)
         .onAppear { form = sync.settings }
+        .alert("云端没有找到同步文件", isPresented: Binding(
+            get: { sync.status == .awaitingConfirmation }, set: { _ in }
+        )) {
+            Button("先检查地址", role: .cancel) {
+                sync.cancelPendingSync()
+                form = sync.settings
+                message = "同步已关闭，请确认服务器地址与手机一致"
+            }
+            Button("新建同步文件") { sync.confirmCreatingRemoteFile() }
+        } message: {
+            Text(verbatim: "在 \(sync.remoteFileURL) 没有找到同步文件。\n\n如果手机已经在使用同步，通常是服务器地址不一致（例如少了一层文件夹）。请对照手机「云与同步 → WebDAV」中的地址。\n\n只有这是第一台开始同步的设备时，才选择「新建同步文件」。")
+        }
     }
 
     // MARK: - Groups
@@ -185,6 +197,7 @@ struct SettingsView: View {
         switch sync.status {
         case .disabled: "同步未启用"
         case .backingUp: "正在备份云端数据…"
+        case .awaitingConfirmation: "等待确认：云端没有找到同步文件"
         case .idle: "等待同步"
         case .syncing: "正在同步…"
         case .succeeded(let date): "上次同步：\(date.formatted(date: .omitted, time: .shortened))"
@@ -196,6 +209,7 @@ struct SettingsView: View {
         switch sync.status {
         case .disabled: "icloud.slash"
         case .idle, .syncing, .backingUp: "arrow.triangle.2.circlepath"
+        case .awaitingConfirmation: "questionmark.circle"
         case .succeeded: "checkmark.icloud"
         case .failed: "exclamationmark.icloud"
         }
@@ -204,6 +218,7 @@ struct SettingsView: View {
     private var statusTint: Color {
         switch sync.status {
         case .disabled, .idle, .syncing, .backingUp: t.secondary
+        case .awaitingConfirmation: Color(hex: 0xF59E0B)
         case .succeeded: Color(hex: 0x10B981)
         case .failed: t.error
         }
