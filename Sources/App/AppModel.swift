@@ -18,6 +18,7 @@ final class AppModel {
     @ObservationIgnored private(set) var habitList: HabitListStore!
     @ObservationIgnored private(set) var archive: ArchiveStore!
     @ObservationIgnored private(set) var focus: FocusStore!
+    @ObservationIgnored private(set) var sync: SyncController!
     @ObservationIgnored private(set) var taskCommands: TaskCommands!
     @ObservationIgnored private(set) var categoryCommands: CategoryCommands!
     @ObservationIgnored private(set) var habitCommands: HabitCommands!
@@ -29,6 +30,7 @@ final class AppModel {
         habitList = HabitListStore(database: database) { [unowned self] in refreshAll(except: .habits) }
         archive = ArchiveStore(database: database) { [unowned self] in refreshAll() }
         focus = FocusStore(database: database)
+        sync = SyncController(database: database) { [unowned self] in refreshAll() }
         taskCommands = TaskCommands(database: database) { [unowned self] in refreshAll() }
         categoryCommands = CategoryCommands(database: database) { [unowned self] in refreshAll() }
         habitCommands = HabitCommands(database: database) { [unowned self] in refreshAll() }
@@ -39,6 +41,7 @@ final class AppModel {
         habitList.start()
         archive.refresh()
         focus.refresh()
+        sync.start()
     }
 
     func refreshAll(except skipped: Page? = nil) {
@@ -54,6 +57,7 @@ final class AppModel {
     }
 
     func stop() {
+        sync.stop()
         taskList.stop()
         habitList.stop()
         container.close()

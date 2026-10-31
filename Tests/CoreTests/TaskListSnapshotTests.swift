@@ -164,6 +164,27 @@ final class TaskListSnapshotTests: XCTestCase {
         }
     }
 
+    /// 设置页截图（隔离的 UserDefaults 与钥匙串，不含任何真实服务器信息）。
+    func testRenderSettings() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("deadliner-snapshot-db-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let container = MacCoreContainer(databaseURL: directory.appendingPathComponent("db.sqlite"), deviceId: "snapshot")
+        defer { container.close() }
+        let defaults = UserDefaults(suiteName: "deadliner-snapshot-\(UUID().uuidString)")!
+        SyncSettings(serverURL: "https://dav.example.com/dav/", username: "user@example.com", enabled: false).save(to: defaults)
+        let sync = SyncController(database: container.database,
+                                  keychain: KeychainPasswordStore(service: "com.deadliner.macos.snapshot.\(UUID().uuidString)"),
+                                  defaults: defaults) {}
+        for (scheme, tokens) in [(ColorScheme.light, MiuixTokens.light), (ColorScheme.dark, MiuixTokens.dark)] {
+            try capture(
+                SettingsView(sync: sync).environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                size: NSSize(width: 820, height: 900), scheme: scheme, name: "settings-\(scheme == .dark ? "dark" : "light")"
+            )
+        }
+    }
+
     private func capture<V: View>(_ view: V, size: NSSize, scheme: ColorScheme, name: String) throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("deadliner-snapshots", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

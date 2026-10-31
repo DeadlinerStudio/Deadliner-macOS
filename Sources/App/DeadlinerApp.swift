@@ -17,8 +17,11 @@ struct DeadlinerApp: App {
                     .keyboardShortcut("n", modifiers: [.command])
             }
             CommandGroup(after: .toolbar) {
-                Button("刷新") { appDelegate.model?.refreshAll() }
-                    .keyboardShortcut("r", modifiers: [.command])
+                Button("立即同步") {
+                    appDelegate.model?.refreshAll()
+                    appDelegate.model?.sync.syncNow()
+                }
+                .keyboardShortcut("r", modifiers: [.command])
             }
         }
     }
@@ -41,6 +44,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         model?.refreshAll()
+        model?.sync.setForeground(true)
+    }
+
+    func applicationDidResignActive(_ notification: Notification) {
+        model?.sync.setForeground(false)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -50,9 +58,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 struct RootView: View {
     let appDelegate: AppDelegate
+    @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @Environment(\.miuix) private var t
 
     var body: some View {
+        content.preferredColorScheme(AppearanceMode(rawValue: appearance)?.colorScheme)
+    }
+
+    @ViewBuilder
+    private var content: some View {
         if let model = appDelegate.model {
             MainView(model: model)
                 .onAppear { model.start() }
@@ -83,10 +97,7 @@ struct MainView: View {
                 case .archive:
                     ArchiveView(store: model.archive, commands: model.taskCommands)
                 case .settings:
-                    Text("同步设置将在下一步完成")
-                        .foregroundStyle(t.onSurfaceVariant)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(t.pageBg)
+                    SettingsView(sync: model.sync)
                 }
             }
             .padding(.top, 24)
