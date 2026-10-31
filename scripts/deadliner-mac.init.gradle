@@ -1,0 +1,12 @@
+// Mac 宿主构建 Core 时使用：不修改 Core 仓库，仅在本次构建中导出 macOS framework。
+// Lifi 走 Core 自带的 -PlifiMode=stub 公开回退实现。
+allprojects {
+    if (path == ':shared') {
+        pluginManager.withPlugin('org.jetbrains.kotlin.multiplatform') {
+            def kmp = extensions.getByName('kotlin')
+            kmp.targets.matching { it.name == 'macosArm64' }.configureEach { t ->
+                t.binaries.framework { baseName = 'Shared' }
+            }
+        }
+    }
+}

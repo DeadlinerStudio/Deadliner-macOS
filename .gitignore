@@ -1,0 +1,8 @@
+# 由 project.yml 生成：xcodegen generate
+*.xcodeproj/
+# 由 scripts/build-core.sh 从 DeadlinerCore 构建
+Frameworks/
+build/
+DerivedData/
+.DS_Store
+*.xcresult
