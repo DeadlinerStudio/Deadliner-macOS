@@ -17,7 +17,8 @@ struct Sidebar: View {
     private let groups: [[Item]] = [
         [Item(page: .tasks, title: "任务", systemImage: "checklist"),
          Item(page: .habits, title: "习惯", systemImage: "target")],
-        [Item(page: .archive, title: "存档", systemImage: "archivebox")],
+        [Item(page: .focus, title: "专注", systemImage: "timer"),
+         Item(page: .archive, title: "存档", systemImage: "archivebox")],
         [Item(page: .settings, title: "设置", systemImage: "gearshape")],
     ]
 

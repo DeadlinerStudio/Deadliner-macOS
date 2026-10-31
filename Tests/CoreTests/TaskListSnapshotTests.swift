@@ -122,6 +122,48 @@ final class TaskListSnapshotTests: XCTestCase {
         }
     }
 
+    /// 习惯编辑器与专注页截图（占位数据）。
+    func testRenderHabitEditorAndFocus() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("deadliner-snapshot-db-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let container = MacCoreContainer(databaseURL: directory.appendingPathComponent("db.sqlite"), deviceId: "snapshot")
+        defer { container.close() }
+        var draft = HabitDraft()
+        draft.id = "preview"
+        draft.name = "示例习惯 A"
+        draft.colorHex = "#10B981"
+        draft.weekdaysMask = 0b001_0101
+        draft.trackingMode = .quantity
+        draft.unit = "ml"
+        draft.defaultIncrement = 250
+        draft.targetCount = 2000
+        draft.reminderEnabled = true
+        let categories = CategoryCommands(database: container.database) {}.list()
+        let sessions: [FocusStore.Session] = (0..<5).map { index in
+            let start = now.addingTimeInterval(Double(-index) * 9000)
+            return .init(id: "\(index)", title: "示例任务 \(index + 1)", isHabit: index == 2, isCountdown: index % 2 == 0,
+                         startedAt: start, endedAt: start.addingTimeInterval(1500), durationSeconds: 1500,
+                         completionKind: index == 0 ? "FOCUS_AND_TASK_COMPLETED" : "FOCUS_ONLY")
+        }
+        for (scheme, tokens) in [(ColorScheme.light, MiuixTokens.light), (ColorScheme.dark, MiuixTokens.dark)] {
+            let suffix = scheme == .dark ? "dark" : "light"
+            try capture(
+                HabitEditorSheet(commands: HabitCommands(database: container.database) {}, categories: categories, draft: draft) {}
+                    .environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                size: NSSize(width: 540, height: 700), scheme: scheme, name: "habit-editor-\(suffix)"
+            )
+            try capture(
+                FocusContent(today: .init(totalSeconds: 3000, sessionCount: 2), thisWeek: .init(totalSeconds: 27000, sessionCount: 14),
+                             thisMonth: .init(totalSeconds: 90000, sessionCount: 51), allTime: .init(totalSeconds: 540000, sessionCount: 300),
+                             sessions: sessions)
+                    .environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                size: NSSize(width: 1000, height: 640), scheme: scheme, name: "focus-\(suffix)"
+            )
+        }
+    }
+
     private func capture<V: View>(_ view: V, size: NSSize, scheme: ColorScheme, name: String) throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("deadliner-snapshots", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

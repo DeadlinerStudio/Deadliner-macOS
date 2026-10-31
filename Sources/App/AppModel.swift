@@ -7,7 +7,7 @@ import Observation
 @Observable
 final class AppModel {
     enum Page: String, CaseIterable, Identifiable {
-        case tasks, habits, archive, settings
+        case tasks, habits, focus, archive, settings
         var id: String { rawValue }
     }
 
@@ -17,8 +17,10 @@ final class AppModel {
     @ObservationIgnored private(set) var taskList: TaskListStore!
     @ObservationIgnored private(set) var habitList: HabitListStore!
     @ObservationIgnored private(set) var archive: ArchiveStore!
+    @ObservationIgnored private(set) var focus: FocusStore!
     @ObservationIgnored private(set) var taskCommands: TaskCommands!
     @ObservationIgnored private(set) var categoryCommands: CategoryCommands!
+    @ObservationIgnored private(set) var habitCommands: HabitCommands!
 
     init(container: MacCoreContainer) {
         self.container = container
@@ -26,20 +28,24 @@ final class AppModel {
         taskList = TaskListStore(database: database)
         habitList = HabitListStore(database: database) { [unowned self] in refreshAll(except: .habits) }
         archive = ArchiveStore(database: database) { [unowned self] in refreshAll() }
+        focus = FocusStore(database: database)
         taskCommands = TaskCommands(database: database) { [unowned self] in refreshAll() }
         categoryCommands = CategoryCommands(database: database) { [unowned self] in refreshAll() }
+        habitCommands = HabitCommands(database: database) { [unowned self] in refreshAll() }
     }
 
     func start() {
         taskList.start()
         habitList.start()
         archive.refresh()
+        focus.refresh()
     }
 
     func refreshAll(except skipped: Page? = nil) {
         if skipped != .tasks { taskList.refresh() }
         if skipped != .habits { habitList.refresh() }
         archive.refresh()
+        focus.refresh()
     }
 
     func newTask() {

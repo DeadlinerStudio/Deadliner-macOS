@@ -77,7 +77,9 @@ struct MainView: View {
                 case .tasks:
                     TaskListView(store: model.taskList, commands: model.taskCommands, categoryCommands: model.categoryCommands)
                 case .habits:
-                    HabitsView(store: model.habitList, categories: model.taskList.categories)
+                    HabitsView(store: model.habitList, commands: model.habitCommands, categories: model.taskList.categories)
+                case .focus:
+                    FocusView(store: model.focus)
                 case .archive:
                     ArchiveView(store: model.archive, commands: model.taskCommands)
                 case .settings:

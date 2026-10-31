@@ -3,7 +3,11 @@ import SwiftUI
 /// 习惯页：所选日期的完成度圆环 + 一周日期条 + 分组的习惯卡片。
 struct HabitsView: View {
     @Bindable var store: HabitListStore
+    let commands: HabitCommands
     let categories: [String: CategoryItem]
+
+    @State private var pendingDelete: HabitItem?
+    @State private var errorMessage: String?
 
     var body: some View {
         HabitsContent(
@@ -17,8 +21,41 @@ struct HabitsView: View {
             errorMessage: store.errorMessage,
             searchText: $store.searchText,
             onSelectDate: store.select(date:),
-            onPrimaryAction: store.applyPrimaryAction
+            onPrimaryAction: store.applyPrimaryAction,
+            onOpen: open,
+            onArchive: { habit in run { try commands.archive(habit.id) } },
+            onDelete: { pendingDelete = $0 }
         )
+        .overlay(alignment: .bottomTrailing) {
+            AccentFab(label: "新建习惯") { store.editor = .init(draft: HabitDraft()) }
+                .padding(28)
+        }
+        .sheet(item: $store.editor) { request in
+            HabitEditorSheet(commands: commands, categories: categories.values.sorted { $0.sortOrder < $1.sortOrder }, draft: request.draft) {
+                store.editor = nil
+            }
+            .miuixTheme()
+        }
+        .confirmationDialog("确定要删除习惯「\(pendingDelete?.name ?? "")」吗？", isPresented: Binding(
+            get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }
+        ), presenting: pendingDelete) { habit in
+            Button("删除", role: .destructive) { commands.delete(habit.id) }
+        } message: { _ in
+            Text("打卡记录会一并删除。启用同步后，删除也会同步到手机。")
+        }
+        .alert("操作失败", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    private func open(_ habit: HabitItem) {
+        if let draft = commands.draft(for: habit.id) { store.editor = .init(draft: draft) }
+    }
+
+    private func run(_ body: () throws -> Void) {
+        do { try body() } catch { errorMessage = error.localizedDescription }
     }
 }
 
@@ -35,6 +72,9 @@ struct HabitsContent: View {
     @Binding var searchText: String
     var onSelectDate: ((String) -> Void)?
     var onPrimaryAction: ((HabitItem) -> Void)?
+    var onOpen: ((HabitItem) -> Void)?
+    var onArchive: ((HabitItem) -> Void)?
+    var onDelete: ((HabitItem) -> Void)?
     @Environment(\.miuix) private var t
 
     private var selectedDay: HabitDay? { week.first { $0.date == selectedDate } }
@@ -56,7 +96,7 @@ struct HabitsContent: View {
                     section("即将复习", upcoming)
                 }
                 .padding(.horizontal, 32)
-                .padding(.bottom, 32)
+                .padding(.bottom, 100)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -109,6 +149,16 @@ struct HabitsContent: View {
                     ForEach(items) { habit in
                         HabitCard(habit: habit, category: habit.categoryId.flatMap { categories[$0] }) {
                             onPrimaryAction?(habit)
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: MiuixRadius.card))
+                        .onTapGesture { onOpen?(habit) }
+                        .contextMenu {
+                            if onOpen != nil {
+                                Button("编辑", systemImage: "pencil") { onOpen?(habit) }
+                                Button("归档", systemImage: "archivebox") { onArchive?(habit) }
+                                Divider()
+                                Button("删除", systemImage: "trash", role: .destructive) { onDelete?(habit) }
+                            }
                         }
                     }
                 }

@@ -17,6 +17,13 @@ final class HabitListStore {
     private(set) var isLoading = true
     private(set) var errorMessage: String?
     var searchText = ""
+    /// 正在打开的习惯编辑器（新建或编辑）。
+    var editor: EditorRequest?
+
+    struct EditorRequest: Identifiable {
+        let id = UUID()
+        let draft: HabitDraft
+    }
 
     @ObservationIgnored private let database: DeadlinerDatabase
     @ObservationIgnored private var bridge: IosHabitListStateBridge?
