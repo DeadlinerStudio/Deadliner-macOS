@@ -24,7 +24,7 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
 struct SettingsView: View {
     let sync: SyncController
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     @State private var form = SyncSettings(serverURL: "", username: "", enabled: false)
     @State private var password = ""

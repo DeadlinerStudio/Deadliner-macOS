@@ -19,7 +19,7 @@ struct FocusContent: View {
     let thisMonth: FocusStore.Summary
     let allTime: FocusStore.Summary
     let sessions: [FocusStore.Session]
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

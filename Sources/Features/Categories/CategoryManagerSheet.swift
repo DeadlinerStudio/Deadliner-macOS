@@ -9,7 +9,7 @@ struct CategoryManagerSheet: View {
     @State private var editing: CategoryForm?
     @State private var pendingDelete: CategoryItem?
     @State private var errorMessage: String?
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     struct CategoryForm: Identifiable {
         var id: String?
@@ -116,7 +116,7 @@ struct CategoryManagerSheet: View {
 /// 新建 / 编辑分类的表单：名称、图标、颜色。
 private struct CategoryFormView: View {
     @Binding var form: CategoryManagerSheet.CategoryForm
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     var body: some View {
         ScrollView {

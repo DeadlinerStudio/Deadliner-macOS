@@ -4,7 +4,7 @@ import SwiftUI
 struct MiuixGroup<Content: View>: View {
     var title: String?
     @ViewBuilder var content: Content
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -27,7 +27,7 @@ struct MiuixRow<Trailing: View>: View {
     var systemImage: String?
     var tint: Color?
     @ViewBuilder var trailing: Trailing
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     var body: some View {
         HStack(spacing: 12) {
@@ -55,7 +55,7 @@ struct MiuixTextField: View {
     @Binding var text: String
     var axis: Axis = .horizontal
     var font: Font = .system(size: 14)
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -81,7 +81,7 @@ struct MiuixButton: View {
     let title: String
     var kind: Kind = .secondary
     var action: () -> Void
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
     @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
@@ -119,7 +119,7 @@ struct MiuixButton: View {
 struct AccentFab: View {
     let label: String
     var action: () -> Void
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
     @State private var hovering = false
 
     var body: some View {
@@ -128,8 +128,8 @@ struct AccentFab: View {
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 56, height: 56)
-                .background(t.accentFab, in: Circle())
-                .shadow(color: t.accentFab.opacity(0.4), radius: 12, y: 8)
+                .deadlinerGlass(in: Circle(), tint: t.accentFab, interactive: true)
+                .shadow(color: t.accentFab.opacity(0.35), radius: 12, y: 6)
                 .scaleEffect(hovering ? 1.05 : 1)
         }
         .buttonStyle(.plain)
@@ -185,7 +185,7 @@ struct FlowLayout: Layout {
 
 /// MIUIX 开关：50×30，开启时轨道为主题色。
 struct MiuixToggleStyle: ToggleStyle {
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     func makeBody(configuration: Configuration) -> some View {
         Button { configuration.isOn.toggle() } label: {
@@ -214,7 +214,7 @@ extension ToggleStyle where Self == MiuixToggleStyle {
 struct MiuixSegmented<Value: Hashable>: View {
     @Binding var selection: Value
     let options: [(value: Value, label: String)]
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
     @Namespace private var namespace
 
     var body: some View {

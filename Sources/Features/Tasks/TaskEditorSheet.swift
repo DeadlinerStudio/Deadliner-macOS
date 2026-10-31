@@ -14,7 +14,7 @@ struct TaskEditorSheet: View {
     @State private var errorMessage: String?
     @State private var confirmDelete = false
     @State private var managingCategories = false
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     init(commands: TaskCommands, categoryCommands: CategoryCommands, draft: TaskDraft, onClose: @escaping () -> Void) {
         self.commands = commands
@@ -65,7 +65,7 @@ struct TaskEditorSheet: View {
         .onAppear { categories = categoryCommands.list() }
         .sheet(isPresented: $managingCategories, onDismiss: { categories = categoryCommands.list() }) {
             CategoryManagerSheet(commands: categoryCommands) { managingCategories = false }
-                .miuixTheme()
+                .deadlinerTheme()
         }
         .confirmationDialog("确定要删除这个任务吗？", isPresented: $confirmDelete) {
             Button("删除", role: .destructive) { perform { try commands.delete(draft.id!) } }

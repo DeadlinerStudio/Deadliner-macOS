@@ -34,7 +34,7 @@ struct HabitsView: View {
             HabitEditorSheet(commands: commands, categories: categories.values.sorted { $0.sortOrder < $1.sortOrder }, draft: request.draft) {
                 store.editor = nil
             }
-            .miuixTheme()
+            .deadlinerTheme()
         }
         .confirmationDialog("确定要删除习惯「\(pendingDelete?.name ?? "")」吗？", isPresented: Binding(
             get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }
@@ -75,7 +75,7 @@ struct HabitsContent: View {
     var onOpen: ((HabitItem) -> Void)?
     var onArchive: ((HabitItem) -> Void)?
     var onDelete: ((HabitItem) -> Void)?
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     private var selectedDay: HabitDay? { week.first { $0.date == selectedDate } }
 
@@ -182,7 +182,7 @@ struct HabitCard: View {
     let habit: HabitItem
     let category: CategoryItem?
     var onPrimaryAction: (() -> Void)?
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
     @State private var hovering = false
 
     var body: some View {
@@ -264,7 +264,7 @@ struct HabitCard: View {
 struct ProgressRing: View {
     let fraction: Double
     var size: CGFloat = 92
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     var body: some View {
         ZStack {
@@ -287,7 +287,7 @@ private struct WeekDayCell: View {
     let day: HabitDay
     let selected: Bool
     var action: () -> Void
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     var body: some View {
         let today = HabitDates.isToday(day.date)

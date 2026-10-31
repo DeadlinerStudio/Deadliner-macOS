@@ -10,7 +10,7 @@ struct HabitEditorSheet: View {
     @State private var draft: HabitDraft
     @State private var errorMessage: String?
     @State private var confirmDelete = false
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     init(commands: HabitCommands, categories: [CategoryItem], draft: HabitDraft, onClose: @escaping () -> Void) {
         self.commands = commands

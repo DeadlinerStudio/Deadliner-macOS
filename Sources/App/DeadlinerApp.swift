@@ -7,7 +7,7 @@ struct DeadlinerApp: App {
     var body: some Scene {
         WindowGroup("Deadliner") {
             RootView(appDelegate: appDelegate)
-                .miuixTheme()
+                .deadlinerTheme()
                 .frame(minWidth: 820, minHeight: 520)
         }
         .windowStyle(.hiddenTitleBar)
@@ -81,7 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct RootView: View {
     let appDelegate: AppDelegate
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     var body: some View {
         content.preferredColorScheme(AppearanceMode(rawValue: appearance)?.colorScheme)
@@ -103,7 +103,7 @@ struct RootView: View {
 
 struct MainView: View {
     @Bindable var model: AppModel
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     var body: some View {
         HStack(spacing: 0) {

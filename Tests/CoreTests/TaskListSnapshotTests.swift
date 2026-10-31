@@ -11,7 +11,7 @@ final class TaskListSnapshotTests: XCTestCase {
     func testRenderTaskListLightAndDark() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("deadliner-snapshots", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        for (name, tokens, scheme) in [("tasks-light", MiuixTokens.light, ColorScheme.light), ("tasks-dark", MiuixTokens.dark, ColorScheme.dark)] {
+        for (name, tokens, scheme) in [("tasks-light", DeadlinerPalette.light, ColorScheme.light), ("tasks-dark", DeadlinerPalette.dark, ColorScheme.dark)] {
             let view = TaskListContent(
                 tasks: TaskListStore.sorted(sampleTasks, by: .dueDate),
                 totalCount: sampleTasks.count,
@@ -22,7 +22,7 @@ final class TaskListSnapshotTests: XCTestCase {
                 sortOrder: .constant(.dueDate),
                 now: now
             )
-            .environment(\.miuix, tokens)
+            .environment(\.palette, tokens)
             .environment(\.colorScheme, scheme)
 
             // ImageRenderer 画不出 ScrollView / TextField，改为放进屏幕外的真实窗口后抓取位图。
@@ -63,16 +63,16 @@ final class TaskListSnapshotTests: XCTestCase {
             categoryId: categoryCommands.list().first?.id, isStarred: true,
             subtasks: [.init(id: "1", content: "子任务一", isCompleted: true), .init(id: "2", content: "子任务二", isCompleted: false)]
         )
-        for (scheme, tokens) in [(ColorScheme.light, MiuixTokens.light), (ColorScheme.dark, MiuixTokens.dark)] {
+        for (scheme, tokens) in [(ColorScheme.light, DeadlinerPalette.light), (ColorScheme.dark, DeadlinerPalette.dark)] {
             let suffix = scheme == .dark ? "dark" : "light"
             try capture(
                 TaskEditorSheet(commands: commands, categoryCommands: categoryCommands, draft: draft) {}
-                    .environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                    .environment(\.palette, tokens).environment(\.colorScheme, scheme),
                 size: NSSize(width: 520, height: 660), scheme: scheme, name: "editor-\(suffix)"
             )
             try capture(
                 CategoryManagerSheet(commands: categoryCommands) {}
-                    .environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                    .environment(\.palette, tokens).environment(\.colorScheme, scheme),
                 size: NSSize(width: 480, height: 560), scheme: scheme, name: "categories-\(suffix)"
             )
         }
@@ -108,15 +108,15 @@ final class TaskListSnapshotTests: XCTestCase {
             habits: [.init(id: "h", name: "示例习惯 F", colorHex: "#10B981", categoryId: nil)],
             categories: sampleCategories
         )
-        for (scheme, tokens) in [(ColorScheme.light, MiuixTokens.light), (ColorScheme.dark, MiuixTokens.dark)] {
+        for (scheme, tokens) in [(ColorScheme.light, DeadlinerPalette.light), (ColorScheme.dark, DeadlinerPalette.dark)] {
             let suffix = scheme == .dark ? "dark" : "light"
             try capture(
                 HStack(spacing: 0) { Sidebar(page: .constant(.habits)); habitsView }
-                    .environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                    .environment(\.palette, tokens).environment(\.colorScheme, scheme),
                 size: NSSize(width: 1240, height: 680), scheme: scheme, name: "habits-\(suffix)"
             )
             try capture(
-                archiveView.environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                archiveView.environment(\.palette, tokens).environment(\.colorScheme, scheme),
                 size: NSSize(width: 1000, height: 480), scheme: scheme, name: "archive-\(suffix)"
             )
         }
@@ -147,18 +147,18 @@ final class TaskListSnapshotTests: XCTestCase {
                          startedAt: start, endedAt: start.addingTimeInterval(1500), durationSeconds: 1500,
                          completionKind: index == 0 ? "FOCUS_AND_TASK_COMPLETED" : "FOCUS_ONLY")
         }
-        for (scheme, tokens) in [(ColorScheme.light, MiuixTokens.light), (ColorScheme.dark, MiuixTokens.dark)] {
+        for (scheme, tokens) in [(ColorScheme.light, DeadlinerPalette.light), (ColorScheme.dark, DeadlinerPalette.dark)] {
             let suffix = scheme == .dark ? "dark" : "light"
             try capture(
                 HabitEditorSheet(commands: HabitCommands(database: container.database) {}, categories: categories, draft: draft) {}
-                    .environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                    .environment(\.palette, tokens).environment(\.colorScheme, scheme),
                 size: NSSize(width: 540, height: 700), scheme: scheme, name: "habit-editor-\(suffix)"
             )
             try capture(
                 FocusContent(today: .init(totalSeconds: 3000, sessionCount: 2), thisWeek: .init(totalSeconds: 27000, sessionCount: 14),
                              thisMonth: .init(totalSeconds: 90000, sessionCount: 51), allTime: .init(totalSeconds: 540000, sessionCount: 300),
                              sessions: sessions)
-                    .environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                    .environment(\.palette, tokens).environment(\.colorScheme, scheme),
                 size: NSSize(width: 1000, height: 640), scheme: scheme, name: "focus-\(suffix)"
             )
         }
@@ -177,9 +177,9 @@ final class TaskListSnapshotTests: XCTestCase {
         let sync = SyncController(database: container.database,
                                   keychain: KeychainPasswordStore(service: "com.deadliner.macos.snapshot.\(UUID().uuidString)"),
                                   defaults: defaults) {}
-        for (scheme, tokens) in [(ColorScheme.light, MiuixTokens.light), (ColorScheme.dark, MiuixTokens.dark)] {
+        for (scheme, tokens) in [(ColorScheme.light, DeadlinerPalette.light), (ColorScheme.dark, DeadlinerPalette.dark)] {
             try capture(
-                SettingsView(sync: sync).environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                SettingsView(sync: sync).environment(\.palette, tokens).environment(\.colorScheme, scheme),
                 size: NSSize(width: 820, height: 900), scheme: scheme, name: "settings-\(scheme == .dark ? "dark" : "light")"
             )
         }
@@ -218,12 +218,12 @@ final class TaskListSnapshotTests: XCTestCase {
         try model.habitCommands.save(habit)
         model.start()
 
-        for (scheme, tokens) in [(ColorScheme.light, MiuixTokens.light), (ColorScheme.dark, MiuixTokens.dark)] {
+        for (scheme, tokens) in [(ColorScheme.light, DeadlinerPalette.light), (ColorScheme.dark, DeadlinerPalette.dark)] {
             for page in [AppModel.Page.tasks, .habits, .settings] {
                 model.page = page
                 RunLoop.main.run(until: Date().addingTimeInterval(0.6))
                 try capture(
-                    MainView(model: model).environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                    MainView(model: model).environment(\.palette, tokens).environment(\.colorScheme, scheme),
                     size: NSSize(width: 1280, height: 760), scheme: scheme,
                     name: "window-\(page.rawValue)-\(scheme == .dark ? "dark" : "light")"
                 )

@@ -60,7 +60,7 @@ struct ArchiveContent: View {
     var onTapTask: ((TaskItem) -> Void)?
     var onRestoreHabit: ((ArchiveStore.ArchivedHabit) -> Void)?
     var onDeleteHabit: ((ArchiveStore.ArchivedHabit) -> Void)?
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

@@ -1,13 +1,14 @@
 import SwiftUI
 
-/// MIUIX 设计参数（对齐安卓 Deadliner v6「MIUIX / HyperOS」设计模式）。
+/// Deadliner 的颜色。
 ///
-/// 深色值取自手机实测截图；任务指示色规则来自安卓 TaskIndicatorColorFactory：
-/// 「多彩任务指示标」关闭时，进行中 = Primary、即将到期 = Tertiary、已逾期 = Error、
-/// 已完成 = Secondary、已放弃 = 灰色；底色为纯白 / 纯黑叠加角色色低透明度，
-/// 进度条为角色色水平渐变。
-struct MiuixTokens {
+/// - 页面、分组、文字等表面颜色使用 **系统语义颜色**，跟随 macOS 的深浅色、强调色与对比度设置。
+/// - 主色与状态色保持与 Android 一致（深色值取自手机实测）。任务指示色规则来自安卓
+///   TaskIndicatorColorFactory：「多彩任务指示标」关闭时，进行中 = Primary、即将到期 = Tertiary、
+///   已逾期 = Error、已完成 = Secondary、已放弃 = 灰色；卡片为底色叠加角色色低透明度，进度条为角色色水平渐变。
+struct DeadlinerPalette {
     let isDark: Bool
+    // 表面（系统语义颜色）
     let pageBg: Color
     let groupBg: Color
     let fieldBg: Color
@@ -17,6 +18,7 @@ struct MiuixTokens {
     let onSurface: Color
     let onSurfaceVariant: Color
     let cardBase: Color
+    // 品牌与状态（与 Android 一致）
     let primary: Color
     let secondary: Color
     let tertiary: Color
@@ -25,27 +27,38 @@ struct MiuixTokens {
     let accentFab: Color
     let completedCheck: Color
 
-    static let dark = MiuixTokens(
+    private static let surfaces = (
+        page: Color(nsColor: .windowBackgroundColor),
+        group: Color(nsColor: .controlBackgroundColor),
+        field: Color(nsColor: .quaternaryLabelColor).opacity(0.5),
+        segmented: Color(nsColor: .quaternaryLabelColor).opacity(0.6),
+        segmentedSelected: Color(nsColor: .controlBackgroundColor),
+        search: Color(nsColor: .quaternaryLabelColor).opacity(0.5),
+        label: Color(nsColor: .labelColor),
+        secondaryLabel: Color(nsColor: .secondaryLabelColor)
+    )
+
+    static let dark = DeadlinerPalette(
         isDark: true,
-        pageBg: Color(hex: 0x000000), groupBg: Color(hex: 0x202022), fieldBg: Color(hex: 0x2B2B2D),
-        segmentedBg: Color(hex: 0x2A2A2C), segmentedSelected: Color(hex: 0x4A4A4D), searchBg: Color(hex: 0x2C2C2E),
-        onSurface: Color(hex: 0xECECEC), onSurfaceVariant: Color(hex: 0xA0A0A6), cardBase: Color(hex: 0x000000),
+        pageBg: surfaces.page, groupBg: surfaces.group, fieldBg: surfaces.field,
+        segmentedBg: surfaces.segmented, segmentedSelected: surfaces.segmentedSelected, searchBg: surfaces.search,
+        onSurface: surfaces.label, onSurfaceVariant: surfaces.secondaryLabel, cardBase: surfaces.page,
         primary: Color(hex: 0x4078EF), secondary: Color(hex: 0xC0C6DA), tertiary: Color(hex: 0xD9BCDC),
         error: Color(hex: 0xF2B8AE), abandoned: Color(hex: 0x8E8E93), accentFab: Color(hex: 0xD06262),
         completedCheck: Color(hex: 0x8FD3A8)
     )
 
-    static let light = MiuixTokens(
+    static let light = DeadlinerPalette(
         isDark: false,
-        pageBg: Color(hex: 0xF7F7F7), groupBg: Color(hex: 0xFFFFFF), fieldBg: Color(hex: 0xF0F0F2),
-        segmentedBg: Color(hex: 0xEBEBED), segmentedSelected: Color(hex: 0xFFFFFF), searchBg: Color(hex: 0xEBEBED),
-        onSurface: Color(hex: 0x1A1A1C), onSurfaceVariant: Color(hex: 0x6E6E73), cardBase: Color(hex: 0xFFFFFF),
+        pageBg: surfaces.page, groupBg: surfaces.group, fieldBg: surfaces.field,
+        segmentedBg: surfaces.segmented, segmentedSelected: surfaces.segmentedSelected, searchBg: surfaces.search,
+        onSurface: surfaces.label, onSurfaceVariant: surfaces.secondaryLabel, cardBase: surfaces.group,
         primary: Color(hex: 0x3478F6), secondary: Color(hex: 0x5B6274), tertiary: Color(hex: 0x8B6A8E),
         error: Color(hex: 0xC9443A), abandoned: Color(hex: 0x8E8E93), accentFab: Color(hex: 0xE06A65),
         completedCheck: Color(hex: 0x2E9E5B)
     )
 
-    static func of(_ scheme: ColorScheme) -> MiuixTokens { scheme == .dark ? dark : light }
+    static func of(_ scheme: ColorScheme) -> DeadlinerPalette { scheme == .dark ? dark : light }
 }
 
 enum MiuixRadius {
@@ -74,7 +87,7 @@ enum IndicatorStatus {
         let base: Color
     }
 
-    func colors(_ t: MiuixTokens) -> Colors {
+    func colors(_ t: DeadlinerPalette) -> Colors {
         let (role, indicatorAlpha, backgroundAlpha): (Color, Double, Double) = switch self {
         case .undergo: (t.primary, 0.55, 0.18)
         case .near: (t.tertiary, 0.65, 0.20)
@@ -91,7 +104,7 @@ enum IndicatorStatus {
     }
 
     /// 星标使用不透明的角色色。
-    func solid(_ t: MiuixTokens) -> Color {
+    func solid(_ t: DeadlinerPalette) -> Color {
         switch self {
         case .undergo: t.primary
         case .near: t.tertiary
@@ -120,25 +133,25 @@ extension Color {
     }
 }
 
-private struct MiuixTokensKey: EnvironmentKey {
-    static let defaultValue = MiuixTokens.light
+private struct DeadlinerPaletteKey: EnvironmentKey {
+    static let defaultValue = DeadlinerPalette.light
 }
 
 extension EnvironmentValues {
-    var miuix: MiuixTokens {
-        get { self[MiuixTokensKey.self] }
-        set { self[MiuixTokensKey.self] = newValue }
+    var palette: DeadlinerPalette {
+        get { self[DeadlinerPaletteKey.self] }
+        set { self[DeadlinerPaletteKey.self] = newValue }
     }
 }
 
 /// 根据当前深浅色注入 MIUIX 参数。
-struct MiuixThemeModifier: ViewModifier {
+struct DeadlinerThemeModifier: ViewModifier {
     @Environment(\.colorScheme) private var scheme
     func body(content: Content) -> some View {
-        content.environment(\.miuix, .of(scheme))
+        content.environment(\.palette, .of(scheme))
     }
 }
 
 extension View {
-    func miuixTheme() -> some View { modifier(MiuixThemeModifier()) }
+    func deadlinerTheme() -> some View { modifier(DeadlinerThemeModifier()) }
 }

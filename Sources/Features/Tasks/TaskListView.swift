@@ -34,7 +34,7 @@ struct TaskListView: View {
             TaskEditorSheet(commands: commands, categoryCommands: categoryCommands, draft: request.draft) {
                 store.editor = nil
             }
-            .miuixTheme()
+            .deadlinerTheme()
         }
         .confirmationDialog("确定要删除「\(pendingDelete?.title ?? "")」吗？", isPresented: Binding(
             get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }
@@ -83,7 +83,7 @@ struct TaskListContent: View {
     let now: Date
     var actionsFor: ((TaskItem) -> TaskCard.Actions)?
     var onSetupSync: (() -> Void)?
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -164,7 +164,7 @@ struct TaskListContent: View {
 struct SearchPill: View {
     @Binding var text: String
     let placeholder: String
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
     @Environment(\.searchFocusRequest) private var focusRequest
     @FocusState private var focused: Bool
 

@@ -20,7 +20,7 @@ enum CategoryIcons {
 /// 分类小标签：图标 + 名称，使用分类色的浅色底（对齐安卓卡片元数据行，最宽 128）。
 struct CategoryChip: View {
     let category: CategoryItem
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     var body: some View {
         let color = Color(hexString: category.colorHex) ?? t.primary
@@ -67,7 +67,7 @@ private struct MaxWidthLayout: Layout {
 /// 小胶囊（子任务进度、打卡次数等）。
 struct CountPill: View {
     let text: String
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     var body: some View {
         Text(text)

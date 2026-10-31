@@ -18,7 +18,7 @@ struct TaskCard: View {
     let category: CategoryItem?
     let now: Date
     var actions: Actions?
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
     @State private var hovering = false
 
     var body: some View {

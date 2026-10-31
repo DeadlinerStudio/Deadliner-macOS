@@ -5,7 +5,7 @@ struct Sidebar: View {
     @Binding var page: AppModel.Page
     /// 底部的同步状态；为 nil 时不显示。
     var syncStatus: SyncController.Status?
-    @Environment(\.miuix) private var t
+    @Environment(\.palette) private var t
 
     static let width: CGFloat = 208
 
