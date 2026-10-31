@@ -4,9 +4,20 @@ import SwiftUI
 /// 纯色底 + 状态色浅层 + 剩余时间渐变进度；
 /// 第一行 星标 / 标题 / 剩余时间，第二行 分类 / 子任务进度 / 备注。
 struct TaskCard: View {
+    /// 卡片上的操作；为 nil 时卡片只读（截图测试使用）。
+    struct Actions {
+        var toggleComplete: () -> Void
+        var open: () -> Void
+        var toggleStar: () -> Void
+        var toggleGiveUp: () -> Void
+        var archive: () -> Void
+        var delete: () -> Void
+    }
+
     let task: TaskItem
     let category: CategoryItem?
     let now: Date
+    var actions: Actions?
     @Environment(\.miuix) private var t
     @State private var hovering = false
 
@@ -18,9 +29,15 @@ struct TaskCard: View {
         let muted = task.isCompleted || task.isAbandoned
 
         HStack(spacing: 10) {
-            Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 19))
-                .foregroundStyle(task.isCompleted ? t.completedCheck : t.onSurfaceVariant.opacity(task.isAbandoned ? 0.4 : 0.85))
+            Button { actions?.toggleComplete() } label: {
+                Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 19))
+                    .foregroundStyle(task.isCompleted ? t.completedCheck : t.onSurfaceVariant.opacity(task.isAbandoned ? 0.4 : 0.85))
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(actions == nil || task.isAbandoned)
+            .help(task.isCompleted ? "取消完成" : "标记完成")
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 6) {
@@ -65,7 +82,23 @@ struct TaskCard: View {
         .offset(y: hovering ? -1 : 0)
         .animation(.easeOut(duration: 0.15), value: hovering)
         .onHover { hovering = $0 }
-        .accessibilityElement(children: .combine)
+        .contentShape(RoundedRectangle(cornerRadius: MiuixRadius.card, style: .continuous))
+        .onTapGesture { actions?.open() }
+        .contextMenu { if let actions { menu(actions) } }
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private func menu(_ actions: Actions) -> some View {
+        Button("编辑", systemImage: "pencil", action: actions.open)
+        Button(task.isStarred ? "取消标星" : "标星", systemImage: task.isStarred ? "star.slash" : "star", action: actions.toggleStar)
+        if TaskCommands.canApply(.markGiveUp, to: task.state) {
+            Button(task.isAbandoned ? "取消放弃" : "放弃", systemImage: task.isAbandoned ? "arrow.uturn.backward" : "nosign", action: actions.toggleGiveUp)
+        }
+        Button(TaskCommands.canApply(.markArchive, to: task.state) ? "归档" : "归档（需先完成或放弃）", systemImage: "archivebox", action: actions.archive)
+            .disabled(!TaskCommands.canApply(.markArchive, to: task.state))
+        Divider()
+        Button("删除", systemImage: "trash", role: .destructive, action: actions.delete)
     }
 }
 

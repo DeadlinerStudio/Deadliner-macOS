@@ -28,6 +28,13 @@ final class TaskListStore {
     private(set) var errorMessage: String?
     var searchText = ""
     var sortOrder: SortOrder = .dueDate
+    /// 正在打开的编辑器（新建或编辑）。
+    var editor: EditorRequest?
+
+    struct EditorRequest: Identifiable {
+        let id = UUID()
+        let draft: TaskDraft
+    }
 
     @ObservationIgnored private let database: DeadlinerDatabase
     @ObservationIgnored private var bridge: IosTaskListStateBridge?

@@ -48,6 +48,57 @@ final class TaskListSnapshotTests: XCTestCase {
         }
     }
 
+    /// 编辑器与分类管理的截图（使用临时数据库，数据为占位内容）。
+    func testRenderEditorAndCategoryManager() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("deadliner-snapshot-db-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let container = MacCoreContainer(databaseURL: directory.appendingPathComponent("db.sqlite"), deviceId: "snapshot")
+        defer { container.close() }
+        let commands = TaskCommands(database: container.database) {}
+        let categoryCommands = CategoryCommands(database: container.database) {}
+        let draft = TaskDraft(
+            id: "preview", title: "示例任务 A", note: "示例备注", startAt: nil, dueAt: now.addingTimeInterval(86400 * 3),
+            categoryId: categoryCommands.list().first?.id, isStarred: true,
+            subtasks: [.init(id: "1", content: "子任务一", isCompleted: true), .init(id: "2", content: "子任务二", isCompleted: false)]
+        )
+        for (scheme, tokens) in [(ColorScheme.light, MiuixTokens.light), (ColorScheme.dark, MiuixTokens.dark)] {
+            let suffix = scheme == .dark ? "dark" : "light"
+            try capture(
+                TaskEditorSheet(commands: commands, categoryCommands: categoryCommands, draft: draft) {}
+                    .environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                size: NSSize(width: 520, height: 660), scheme: scheme, name: "editor-\(suffix)"
+            )
+            try capture(
+                CategoryManagerSheet(commands: categoryCommands) {}
+                    .environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                size: NSSize(width: 480, height: 560), scheme: scheme, name: "categories-\(suffix)"
+            )
+        }
+    }
+
+    private func capture<V: View>(_ view: V, size: NSSize, scheme: ColorScheme, name: String) throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("deadliner-snapshots", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let hosting = NSHostingView(rootView: view)
+        hosting.frame = NSRect(origin: .zero, size: size)
+        let window = NSWindow(contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+        window.contentView = hosting
+        window.setFrameOrigin(NSPoint(x: -10_000, y: -10_000))
+        window.orderBack(nil)
+        hosting.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        hosting.layoutSubtreeIfNeeded()
+        let rep = try XCTUnwrap(hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds))
+        hosting.cacheDisplay(in: hosting.bounds, to: rep)
+        window.orderOut(nil)
+        let url = directory.appendingPathComponent("\(name).png")
+        try XCTUnwrap(rep.representation(using: .png, properties: [:])).write(to: url)
+        print("SNAPSHOT \(url.path)")
+    }
+
     private var sampleCategories: [String: CategoryItem] {
         [
             "c1": CategoryItem(id: "c1", name: "工作", iconKey: "briefcase", colorHex: "#4A90E2", sortOrder: 0),

@@ -1,8 +1,13 @@
 import SwiftUI
 
-/// 任务页：大标题 + 搜索框 + 自动分列的卡片网格（不出现横向滚动）。
+/// 任务页：大标题 + 搜索框 + 自动分列的卡片网格（不出现横向滚动），右下角撞色新建按钮。
 struct TaskListView: View {
     @Bindable var store: TaskListStore
+    let commands: TaskCommands
+    let categoryCommands: CategoryCommands
+
+    @State private var pendingDelete: TaskItem?
+    @State private var errorMessage: String?
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
@@ -14,9 +19,52 @@ struct TaskListView: View {
                 errorMessage: store.errorMessage,
                 searchText: $store.searchText,
                 sortOrder: $store.sortOrder,
-                now: context.date
+                now: context.date,
+                actionsFor: actions(for:)
             )
         }
+        .overlay(alignment: .bottomTrailing) {
+            AccentFab(label: "新建任务") { store.editor = .init(draft: TaskDraft()) }
+                .padding(28)
+        }
+        .sheet(item: $store.editor) { request in
+            TaskEditorSheet(commands: commands, categoryCommands: categoryCommands, draft: request.draft) {
+                store.editor = nil
+            }
+            .miuixTheme()
+        }
+        .confirmationDialog("确定要删除「\(pendingDelete?.title ?? "")」吗？", isPresented: Binding(
+            get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }
+        )) {
+            Button("删除", role: .destructive) {
+                if let task = pendingDelete { run { try commands.delete(task.id) } }
+                pendingDelete = nil
+            }
+        } message: {
+            Text("启用同步后，删除也会同步到手机。")
+        }
+        .alert("操作失败", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    private func actions(for task: TaskItem) -> TaskCard.Actions {
+        TaskCard.Actions(
+            toggleComplete: { run { try commands.toggleComplete(task.id) } },
+            open: {
+                if let draft = commands.draft(for: task.id) { store.editor = .init(draft: draft) }
+            },
+            toggleStar: { run { try commands.setStarred(task.id, !task.isStarred) } },
+            toggleGiveUp: { run { try commands.toggleGiveUp(task.id) } },
+            archive: { run { try commands.archive(task.id) } },
+            delete: { pendingDelete = task }
+        )
+    }
+
+    private func run(_ body: () throws -> Void) {
+        do { try body() } catch { errorMessage = error.localizedDescription }
     }
 }
 
@@ -30,6 +78,7 @@ struct TaskListContent: View {
     @Binding var searchText: String
     @Binding var sortOrder: TaskListStore.SortOrder
     let now: Date
+    var actionsFor: ((TaskItem) -> TaskCard.Actions)?
     @Environment(\.miuix) private var t
 
     var body: some View {
@@ -51,11 +100,16 @@ struct TaskListContent: View {
                         spacing: MiuixCard.gap
                     ) {
                         ForEach(tasks) { task in
-                            TaskCard(task: task, category: task.categoryId.flatMap { categories[$0] }, now: now)
+                            TaskCard(
+                                task: task,
+                                category: task.categoryId.flatMap { categories[$0] },
+                                now: now,
+                                actions: actionsFor?(task)
+                            )
                         }
                     }
                     .padding(.horizontal, 32)
-                    .padding(.bottom, 32)
+                    .padding(.bottom, 100)
                 }
             }
         }
@@ -90,7 +144,7 @@ struct TaskListContent: View {
         VStack(spacing: 10) {
             Image(systemName: "checklist")
                 .font(.system(size: 36))
-            Text(searchText.isEmpty ? "还没有任务。配置同步后会从手机拉取。" : "没有找到匹配的任务")
+            Text(searchText.isEmpty ? "还没有任务。点右下角的 + 新建，或配置同步后从手机拉取。" : "没有找到匹配的任务")
                 .font(.callout)
         }
         .foregroundStyle(t.onSurfaceVariant)
