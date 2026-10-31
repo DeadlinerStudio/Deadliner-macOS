@@ -19,6 +19,16 @@ final class AppModel {
             case .settings: "设置"
             }
         }
+
+        var systemImage: String {
+            switch self {
+            case .tasks: "checklist"
+            case .habits: "target"
+            case .focus: "timer"
+            case .archive: "archivebox"
+            case .settings: "gearshape"
+            }
+        }
     }
 
     var page: Page = .tasks

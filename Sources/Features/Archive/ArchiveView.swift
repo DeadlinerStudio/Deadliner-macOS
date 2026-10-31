@@ -9,6 +9,7 @@ struct ArchiveView: View {
     @State private var pendingDeleteTask: TaskItem?
     @State private var pendingDeleteHabit: ArchiveStore.ArchivedHabit?
     @State private var errorMessage: String?
+    @Environment(\.palette) private var t
 
     var body: some View {
         ArchiveContent(
@@ -19,6 +20,9 @@ struct ArchiveView: View {
             onRestoreHabit: { habit in run { try store.restoreHabit(habit.id) } },
             onDeleteHabit: { pendingDeleteHabit = $0 }
         )
+        .topAtmosphere(t.secondary)
+        .navigationTitle("存档")
+        .navigationSubtitle("\(store.tasks.count) 个任务 · \(store.habits.count) 个习惯")
         .onAppear { store.refresh() }
         .confirmationDialog(selectedTask?.title ?? "", isPresented: Binding(
             get: { selectedTask != nil }, set: { if !$0 { selectedTask = nil } }
@@ -64,18 +68,6 @@ struct ArchiveContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("存档")
-                    .font(.system(size: 30, weight: .bold))
-                    .foregroundStyle(t.onSurface)
-                Text("\(tasks.count) 个任务 · \(habits.count) 个习惯")
-                    .font(.system(size: 13))
-                    .foregroundStyle(t.onSurfaceVariant)
-            }
-            .padding(.horizontal, 32)
-            .padding(.top, 20)
-            .padding(.bottom, 14)
-
             if tasks.isEmpty && habits.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "archivebox").font(.system(size: 36))
@@ -122,7 +114,6 @@ struct ArchiveContent: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(t.pageBg)
     }
 
     private func sectionTitle(_ title: String) -> some View {

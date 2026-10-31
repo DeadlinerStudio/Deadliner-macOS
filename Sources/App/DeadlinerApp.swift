@@ -10,7 +10,7 @@ struct DeadlinerApp: App {
                 .deadlinerTheme()
                 .frame(minWidth: 820, minHeight: 520)
         }
-        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("新建任务") { appDelegate.model?.newTask() }
@@ -106,8 +106,10 @@ struct MainView: View {
     @Environment(\.palette) private var t
 
     var body: some View {
-        HStack(spacing: 0) {
+        NavigationSplitView {
             Sidebar(page: $model.page, syncStatus: model.sync.status)
+                .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
+        } detail: {
             Group {
                 switch model.page {
                 case .tasks:
@@ -120,17 +122,10 @@ struct MainView: View {
                 case .archive:
                     ArchiveView(store: model.archive, commands: model.taskCommands)
                 case .settings:
-                    SettingsView(sync: model.sync)
+                    SettingsView(sync: model.sync, database: model.container.database) { model.refreshAll() }
                 }
             }
-            .padding(.top, 24)
-            .background(t.pageBg)
-            .id(model.page)
-            .transition(.opacity.combined(with: .offset(y: 6)))
-            .animation(.easeOut(duration: 0.18), value: model.page)
             .environment(\.searchFocusRequest, model.searchFocusRequest)
         }
-        .background(t.pageBg)
-        .ignoresSafeArea(.container, edges: .top)
     }
 }

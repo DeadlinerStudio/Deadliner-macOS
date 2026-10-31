@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// 任务页：大标题 + 搜索框 + 自动分列的卡片网格（不出现横向滚动），右下角撞色新建按钮。
+/// 任务页：工具栏（标题、排序、新建、系统搜索框）+ 顶部氛围光 + 自动分列的卡片网格（不出现横向滚动），
+/// 右下角珊瑚色玻璃「+」。
 struct TaskListView: View {
     @Bindable var store: TaskListStore
     let commands: TaskCommands
@@ -10,6 +11,15 @@ struct TaskListView: View {
 
     @State private var pendingDelete: TaskItem?
     @State private var errorMessage: String?
+    @Environment(\.palette) private var t
+
+    /// 氛围光颜色：有逾期任务时为 Error，有 24 小时内到期的为 Tertiary，否则为主色。
+    static func tone(for tasks: [TaskItem], now: Date, palette: DeadlinerPalette) -> Color {
+        let statuses = tasks.filter { $0.state == .active }.map { TaskStatus.indicator($0, now: now) }
+        if statuses.contains(.passed) { return palette.error }
+        if statuses.contains(.near) { return palette.tertiary }
+        return palette.primary
+    }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
@@ -19,12 +29,33 @@ struct TaskListView: View {
                 categories: store.categories,
                 isLoading: store.isLoading,
                 errorMessage: store.errorMessage,
-                searchText: $store.searchText,
-                sortOrder: $store.sortOrder,
+                searchText: store.searchText,
                 now: context.date,
                 actionsFor: actions(for:),
                 onSetupSync: onSetupSync
             )
+            .topAtmosphere(Self.tone(for: store.visibleTasks, now: context.date, palette: t))
+        }
+        .navigationTitle("任务")
+        .navigationSubtitle(store.searchText.isEmpty ? "\(store.tasks.count) 个任务" : "\(store.visibleTasks.count) / \(store.tasks.count) 个任务")
+        .searchable(text: $store.searchText, placement: .toolbar, prompt: "搜索任务")
+        .searchFocusOnRequest()
+        .toolbar {
+            ToolbarItem {
+                Menu {
+                    Picker("排序", selection: $store.sortOrder) {
+                        ForEach(TaskListStore.SortOrder.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.inline)
+                } label: {
+                    Label("排序", systemImage: "arrow.up.arrow.down")
+                }
+                .help("排序")
+            }
+            ToolbarItem {
+                Button("新建任务", systemImage: "plus") { store.editor = .init(draft: TaskDraft()) }
+                    .help("新建任务（⌘N）")
+            }
         }
         .overlay(alignment: .bottomTrailing) {
             AccentFab(label: "新建任务") { store.editor = .init(draft: TaskDraft()) }
@@ -78,8 +109,7 @@ struct TaskListContent: View {
     let categories: [String: CategoryItem]
     let isLoading: Bool
     let errorMessage: String?
-    @Binding var searchText: String
-    @Binding var sortOrder: TaskListStore.SortOrder
+    var searchText = ""
     let now: Date
     var actionsFor: ((TaskItem) -> TaskCard.Actions)?
     var onSetupSync: (() -> Void)?
@@ -87,7 +117,6 @@ struct TaskListContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
             if let errorMessage {
                 Text("读取任务失败：\(errorMessage)")
                     .font(.callout)
@@ -112,36 +141,13 @@ struct TaskListContent: View {
                             )
                         }
                     }
-                    .padding(.horizontal, 32)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
                     .padding(.bottom, 100)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(t.pageBg)
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("Deadliner")
-                    .font(.system(size: 30, weight: .bold))
-                    .foregroundStyle(t.onSurface)
-                Text(searchText.isEmpty ? "\(totalCount) 个任务" : "\(tasks.count) / \(totalCount) 个任务")
-                    .font(.system(size: 13))
-                    .foregroundStyle(t.onSurfaceVariant)
-                Spacer()
-                Picker("排序", selection: $sortOrder) {
-                    ForEach(TaskListStore.SortOrder.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.menu)
-                .fixedSize()
-            }
-            SearchPill(text: $searchText, placeholder: "搜索任务")
-        }
-        .padding(.horizontal, 32)
-        .padding(.top, 20)
-        .padding(.bottom, 14)
     }
 
     private var emptyState: some View {
@@ -151,7 +157,8 @@ struct TaskListContent: View {
             Text(searchText.isEmpty ? "还没有任务。点右下角的 + 新建，或配置同步后从手机拉取。" : "没有找到匹配的任务")
                 .font(.callout)
             if searchText.isEmpty, let onSetupSync {
-                MiuixButton(title: "配置同步", kind: .primary, action: onSetupSync)
+                Button("配置同步", action: onSetupSync)
+                    .buttonStyle(.borderedProminent)
                     .padding(.top, 6)
             }
         }
@@ -185,6 +192,26 @@ struct SearchPill: View {
         .overlay(Capsule().strokeBorder(t.primary.opacity(focused ? 0.35 : 0), lineWidth: 2))
         .onChange(of: focusRequest) { focused = true }
     }
+}
+
+/// ⌘F：让当前页面的系统搜索框获得焦点（macOS 15 起支持；更早的系统由用户点击搜索框）。
+private struct SearchFocusOnRequest: ViewModifier {
+    @Environment(\.searchFocusRequest) private var request
+    @FocusState private var focused: Bool
+
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content
+                .searchFocused($focused)
+                .onChange(of: request) { focused = true }
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    func searchFocusOnRequest() -> some View { modifier(SearchFocusOnRequest()) }
 }
 
 private struct SearchFocusRequestKey: EnvironmentKey {

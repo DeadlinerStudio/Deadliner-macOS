@@ -9,6 +9,9 @@ struct FocusView: View {
             today: store.today, thisWeek: store.thisWeek, thisMonth: store.thisMonth, allTime: store.allTime,
             sessions: store.sessions
         )
+        .topAtmosphere(Color(hex: 0x10B981))
+        .navigationTitle("专注")
+        .navigationSubtitle("Mac 端只读，专注计时请在手机上进行")
         .onAppear { store.refresh() }
     }
 }
@@ -23,18 +26,6 @@ struct FocusContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("专注")
-                    .font(.system(size: 30, weight: .bold))
-                    .foregroundStyle(t.onSurface)
-                Text("Mac 端只读，专注计时请在手机上进行")
-                    .font(.system(size: 13))
-                    .foregroundStyle(t.onSurfaceVariant)
-            }
-            .padding(.horizontal, 32)
-            .padding(.top, 20)
-            .padding(.bottom, 14)
-
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 18) {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 10)], spacing: 10) {
@@ -65,7 +56,6 @@ struct FocusContent: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(t.pageBg)
     }
 
     private func tile(_ title: String, _ summary: FocusStore.Summary, tint: Color) -> some View {

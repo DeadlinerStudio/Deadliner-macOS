@@ -1,4 +1,5 @@
 import SwiftUI
+import Shared
 
 /// 外观设置（存 UserDefaults）。
 enum AppearanceMode: String, CaseIterable, Identifiable {
@@ -23,6 +24,9 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
 /// 设置页（MIUIX 分组列表）：WebDAV 同步、外观、关于。
 struct SettingsView: View {
     let sync: SyncController
+    /// 用于「清理测试占位数据」；为 nil 时不显示该分组。
+    var database: DeadlinerDatabase?
+    var onDataChanged: () -> Void = {}
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @Environment(\.palette) private var t
 
@@ -31,20 +35,18 @@ struct SettingsView: View {
     @State private var message: String?
     @State private var checks: [WebDavProbe.Check] = []
     @State private var probing = false
+    @State private var cleanupCandidates: TestDataCleanup.Candidates?
+    @State private var confirmCleanup = false
+    @State private var cleanupMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("设置")
-                .font(.system(size: 30, weight: .bold))
-                .foregroundStyle(t.onSurface)
-                .padding(.horizontal, 32)
-                .padding(.top, 20)
-                .padding(.bottom, 14)
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     serverGroup
                     if !checks.isEmpty { probeGroup }
                     statusGroup
+                    if database != nil { maintenanceGroup }
                     appearanceGroup
                     aboutGroup
                 }
@@ -54,8 +56,11 @@ struct SettingsView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(t.pageBg)
-        .onAppear { form = sync.settings }
+        .navigationTitle("设置")
+        .onAppear {
+            form = sync.settings
+            refreshCleanupCandidates()
+        }
         .alert("云端没有找到同步文件", isPresented: Binding(
             get: { sync.status == .awaitingConfirmation }, set: { _ in }
         )) {
@@ -165,6 +170,51 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
+    private var maintenanceGroup: some View {
+        if let candidates = cleanupCandidates, !candidates.isEmpty || cleanupMessage != nil {
+            MiuixGroup(title: "维护") {
+                MiuixRow(title: candidates.isEmpty ? "测试占位数据已清理" : "发现 \(candidates.taskIds.count) 个测试占位任务、\(candidates.habitIds.count) 个占位习惯",
+                         systemImage: "trash", tint: t.error) {
+                    if !candidates.isEmpty {
+                        Button("清理…") { confirmCleanup = true }
+                    }
+                }
+                Text(verbatim: cleanupMessage ?? "这些是 10 月 31 日截图测试误连真实同步时写入的「示例任务 A～E」「示例习惯 A/B」（20:20 之后创建）。清理前会先备份云端同步文件，删除会同步到手机。")
+                    .font(.caption)
+                    .foregroundStyle(t.onSurfaceVariant)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 8)
+            }
+            .confirmationDialog("删除 \(candidates.taskIds.count) 个占位任务和 \(candidates.habitIds.count) 个占位习惯？", isPresented: $confirmCleanup) {
+                Button("备份云端后删除", role: .destructive) { runCleanup(candidates) }
+            } message: {
+                Text("只删除标题为「示例任务 A～E」「示例习惯 A/B」且在 10 月 31 日 20:20 之后创建的条目。")
+            }
+        }
+    }
+
+    private func refreshCleanupCandidates() {
+        guard let database else { return }
+        cleanupCandidates = TestDataCleanup(database: database).candidates()
+    }
+
+    private func runCleanup(_ candidates: TestDataCleanup.Candidates) {
+        guard let database else { return }
+        _Concurrency.Task {
+            do {
+                let backup = try await sync.backupNow()
+                let removed = TestDataCleanup(database: database).run(candidates)
+                onDataChanged()
+                sync.syncNow()
+                cleanupMessage = "已删除 \(removed) 项" + (backup.map { "；删除前已备份云端：\($0.lastPathComponent)" } ?? "")
+                refreshCleanupCandidates()
+            } catch {
+                cleanupMessage = "没有删除：备份云端失败（\(error.localizedDescription)）"
+            }
+        }
+    }
+
     private var aboutGroup: some View {
         MiuixGroup(title: "关于") {
             MiuixRow(title: "版本", systemImage: "info", tint: t.secondary) {
@@ -243,7 +293,7 @@ struct SettingsView: View {
         probing = true
         checks = []
         let settings = form
-        Task {
+        _Concurrency.Task {
             let result = await WebDavProbe(settings: settings, password: probePassword).run()
             checks = result
             probing = false

@@ -8,6 +8,12 @@ struct HabitsView: View {
 
     @State private var pendingDelete: HabitItem?
     @State private var errorMessage: String?
+    @Environment(\.palette) private var t
+
+    private var subtitle: String {
+        guard let day = store.selectedDay else { return "" }
+        return "\(HabitDates.isToday(store.selectedDate) ? "今日" : HabitDates.monthDay(store.selectedDate)) \(day.completed)/\(day.total)"
+    }
 
     var body: some View {
         HabitsContent(
@@ -19,13 +25,24 @@ struct HabitsView: View {
             categories: categories,
             isLoading: store.isLoading,
             errorMessage: store.errorMessage,
-            searchText: $store.searchText,
+            searchText: store.searchText,
             onSelectDate: store.select(date:),
             onPrimaryAction: store.applyPrimaryAction,
             onOpen: open,
             onArchive: { habit in run { try commands.archive(habit.id) } },
             onDelete: { pendingDelete = $0 }
         )
+        .topAtmosphere(t.primary)
+        .navigationTitle("习惯")
+        .navigationSubtitle(subtitle)
+        .searchable(text: $store.searchText, placement: .toolbar, prompt: "搜索习惯")
+        .searchFocusOnRequest()
+        .toolbar {
+            ToolbarItem {
+                Button("新建习惯", systemImage: "plus") { store.editor = .init(draft: HabitDraft()) }
+                    .help("新建习惯")
+            }
+        }
         .overlay(alignment: .bottomTrailing) {
             AccentFab(label: "新建习惯") { store.editor = .init(draft: HabitDraft()) }
                 .padding(28)
@@ -69,7 +86,7 @@ struct HabitsContent: View {
     let categories: [String: CategoryItem]
     let isLoading: Bool
     let errorMessage: String?
-    @Binding var searchText: String
+    var searchText = ""
     var onSelectDate: ((String) -> Void)?
     var onPrimaryAction: ((HabitItem) -> Void)?
     var onOpen: ((HabitItem) -> Void)?
@@ -81,7 +98,6 @@ struct HabitsContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 18) {
                     overview
@@ -95,32 +111,12 @@ struct HabitsContent: View {
                     section("周期目标", period)
                     section("即将复习", upcoming)
                 }
-                .padding(.horizontal, 32)
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
                 .padding(.bottom, 100)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(t.pageBg)
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("习惯")
-                    .font(.system(size: 30, weight: .bold))
-                    .foregroundStyle(t.onSurface)
-                if let day = selectedDay {
-                    Text("\(HabitDates.isToday(selectedDate) ? "今日" : HabitDates.monthDay(selectedDate)) \(day.completed)/\(day.total)")
-                        .font(.system(size: 13))
-                        .foregroundStyle(t.onSurfaceVariant)
-                }
-                Spacer()
-            }
-            SearchPill(text: $searchText, placeholder: "搜索习惯")
-        }
-        .padding(.horizontal, 32)
-        .padding(.top, 20)
-        .padding(.bottom, 14)
     }
 
     private var overview: some View {

@@ -18,8 +18,7 @@ final class TaskListSnapshotTests: XCTestCase {
                 categories: sampleCategories,
                 isLoading: false,
                 errorMessage: nil,
-                searchText: .constant(""),
-                sortOrder: .constant(.dueDate),
+                searchText: "",
                 now: now
             )
             .environment(\.palette, tokens)
@@ -101,7 +100,7 @@ final class TaskListSnapshotTests: XCTestCase {
             period: [habit("4", "示例习惯 D", done: 2, target: 3, window: .week)],
             upcoming: [habit("5", "示例习惯 E", done: 0, target: 1, due: false)],
             week: week, selectedDate: selected, categories: sampleCategories, isLoading: false, errorMessage: nil,
-            searchText: .constant("")
+            searchText: ""
         )
         let archiveView = ArchiveContent(
             tasks: Array(sampleTasks.prefix(2)).map { var task = $0; task.state = .archived; return task },
@@ -225,27 +224,35 @@ final class TaskListSnapshotTests: XCTestCase {
                 try capture(
                     MainView(model: model).environment(\.palette, tokens).environment(\.colorScheme, scheme),
                     size: NSSize(width: 1280, height: 760), scheme: scheme,
-                    name: "window-\(page.rawValue)-\(scheme == .dark ? "dark" : "light")"
+                    name: "window-\(page.rawValue)-\(scheme == .dark ? "dark" : "light")", titled: true
                 )
             }
         }
     }
 
-    private func capture<V: View>(_ view: V, size: NSSize, scheme: ColorScheme, name: String) throws {
+    /// `titled` 为 true 时使用带标题栏的真实窗口，并让 SwiftUI 接管工具栏与标题，截图包含工具栏。
+    private func capture<V: View>(_ view: V, size: NSSize, scheme: ColorScheme, name: String, titled: Bool = false) throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("deadliner-snapshots", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let hosting = NSHostingView(rootView: view)
         hosting.frame = NSRect(origin: .zero, size: size)
-        let window = NSWindow(contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        let style: NSWindow.StyleMask = titled ? [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView] : [.borderless]
+        let window = NSWindow(contentRect: hosting.frame, styleMask: style, backing: .buffered, defer: false)
+        if titled {
+            hosting.sceneBridgingOptions = .all
+            window.toolbarStyle = .unified
+        }
         window.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
         window.contentView = hosting
         window.setFrameOrigin(NSPoint(x: -10_000, y: -10_000))
         window.orderBack(nil)
         hosting.layoutSubtreeIfNeeded()
-        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        RunLoop.main.run(until: Date().addingTimeInterval(titled ? 1.2 : 0.5))
         hosting.layoutSubtreeIfNeeded()
-        let rep = try XCTUnwrap(hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds))
-        hosting.cacheDisplay(in: hosting.bounds, to: rep)
+        // 带标题栏时截取整个窗口框架（含工具栏），否则只截内容。
+        let target: NSView = titled ? (window.contentView?.superview ?? hosting) : hosting
+        let rep = try XCTUnwrap(target.bitmapImageRepForCachingDisplay(in: target.bounds))
+        target.cacheDisplay(in: target.bounds, to: rep)
         window.orderOut(nil)
         let url = directory.appendingPathComponent("\(name).png")
         try XCTUnwrap(rep.representation(using: .png, properties: [:])).write(to: url)

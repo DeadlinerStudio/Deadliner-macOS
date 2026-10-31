@@ -132,6 +132,18 @@ final class SyncController {
     /// 云端同步文件的完整地址（用于提示）。
     var remoteFileURL: String { settings.normalizedURL + RemoteBackup.remotePath }
 
+    /// 立即把云端同步文件备份到本机（同步未启用时返回 nil）。
+    func backupNow() async throws -> URL? {
+        guard settings.enabled, !AppDelegate.isRunningTests,
+              let password = keychain.password(url: settings.normalizedURL, username: settings.username) else { return nil }
+        let backup = RemoteBackup(settings: settings, password: password, session: backupSession, directory: try backupDirectory())
+        if case .saved(let file) = try await backup.run() {
+            lastBackup = file
+            return file
+        }
+        return nil
+    }
+
     /// 立即同步（「立即同步」按钮、⌘R）。
     func syncNow() {
         guard configured else { return }
@@ -166,6 +178,12 @@ final class SyncController {
     // MARK: - Private
 
     private func applyConfiguration() {
+        // 单元测试与正式应用共用同一个 Bundle ID，会读到用户真实的同步设置与钥匙串密码。
+        // 测试中绝不连接 WebDAV（内存传输请用 configureForTesting）。
+        guard !AppDelegate.isRunningTests else {
+            status = .failed("测试运行中，不连接 WebDAV")
+            return
+        }
         guard settings.validationError == nil,
               let password = keychain.password(url: settings.normalizedURL, username: settings.username) else {
             status = .failed("同步设置不完整")
