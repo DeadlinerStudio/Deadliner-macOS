@@ -25,7 +25,8 @@ struct TaskItem: Identifiable, Equatable {
     var createdAt: Date?
     var updatedAt: Date?
 
-    var isCompleted: Bool { state == .completed }
+    /// 已归档的任务按「已完成」显示，放弃后归档的按「已放弃」显示。
+    var isCompleted: Bool { state == .completed || state == .archived }
     var isAbandoned: Bool { state == .abandoned || state == .abandonedArchived }
 }
 

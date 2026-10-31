@@ -78,6 +78,50 @@ final class TaskListSnapshotTests: XCTestCase {
         }
     }
 
+    /// 习惯页、存档页与带侧栏的整体布局截图（占位数据）。
+    func testRenderHabitsArchiveAndSidebar() throws {
+        func habit(_ id: String, _ name: String, done: Int, target: Int, kind: HabitItem.ActionKind = .checkOff, unit: String? = nil,
+                   window: HabitItem.GoalWindow = .scheduledDay, due: Bool = true, completed: Bool = false, category: String? = nil) -> HabitItem {
+            HabitItem(id: id, name: name, note: "", colorHex: nil, categoryId: category, doneCount: done, targetCount: target,
+                      isCompleted: completed, canApplyPrimaryAction: due, actionKind: kind, actionAmount: kind == .addQuantity ? 250 : 1,
+                      unit: unit, goalWindow: window, scheduleKind: .weeklyDays, weekdaysMask: nil, isDue: due,
+                      dueReason: due ? "DUE" : "WEEKDAY_NOT_SELECTED", hintKind: nil, daysUntil: nil)
+        }
+        let calendar = Calendar.current
+        let monday = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now))!
+        let week = (0..<7).map { offset -> HabitDay in
+            let date = HabitDates.string(calendar.date(byAdding: .day, value: offset, to: monday)!)
+            return HabitDay(date: date, completed: offset % 3, total: 3, fraction: Double(offset % 3) / 3)
+        }
+        let selected = week[3].date
+        let habitsView = HabitsContent(
+            daily: [habit("1", "示例习惯 A", done: 1, target: 1, completed: true, category: "c2"),
+                    habit("2", "示例习惯 B", done: 500, target: 2000, kind: .addQuantity, unit: "ml"),
+                    habit("3", "示例习惯 C", done: 0, target: 1, category: "c3")],
+            period: [habit("4", "示例习惯 D", done: 2, target: 3, window: .week)],
+            upcoming: [habit("5", "示例习惯 E", done: 0, target: 1, due: false)],
+            week: week, selectedDate: selected, categories: sampleCategories, isLoading: false, errorMessage: nil,
+            searchText: .constant("")
+        )
+        let archiveView = ArchiveContent(
+            tasks: Array(sampleTasks.prefix(2)).map { var task = $0; task.state = .archived; return task },
+            habits: [.init(id: "h", name: "示例习惯 F", colorHex: "#10B981", categoryId: nil)],
+            categories: sampleCategories
+        )
+        for (scheme, tokens) in [(ColorScheme.light, MiuixTokens.light), (ColorScheme.dark, MiuixTokens.dark)] {
+            let suffix = scheme == .dark ? "dark" : "light"
+            try capture(
+                HStack(spacing: 0) { Sidebar(page: .constant(.habits)); habitsView }
+                    .environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                size: NSSize(width: 1240, height: 680), scheme: scheme, name: "habits-\(suffix)"
+            )
+            try capture(
+                archiveView.environment(\.miuix, tokens).environment(\.colorScheme, scheme),
+                size: NSSize(width: 1000, height: 480), scheme: scheme, name: "archive-\(suffix)"
+            )
+        }
+    }
+
     private func capture<V: View>(_ view: V, size: NSSize, scheme: ColorScheme, name: String) throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("deadliner-snapshots", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
