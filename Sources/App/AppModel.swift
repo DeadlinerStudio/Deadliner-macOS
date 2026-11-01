@@ -15,7 +15,7 @@ final class AppModel {
             case .tasks: "任务"
             case .habits: "习惯"
             case .focus: "专注"
-            case .archive: "存档"
+            case .archive: "归档"
             case .settings: "设置"
             }
         }

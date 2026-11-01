@@ -1,6 +1,6 @@
 import XCTest
 import Shared
-@testable import Deadliner_for_macOS
+@testable import DeadlinerTestHost
 
 /// 习惯编辑与专注记录：保存经过 Core，非法输入在交给 Core 之前被拦下（不会因 Kotlin 异常崩溃）。
 @MainActor

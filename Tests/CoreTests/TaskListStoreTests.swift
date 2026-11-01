@@ -1,6 +1,6 @@
 import XCTest
 import Shared
-@testable import Deadliner_for_macOS
+@testable import DeadlinerTestHost
 
 /// 第三步验收：订阅层能收到 Core 的状态，主列表可见性与排序遵循 Core 规则。
 @MainActor

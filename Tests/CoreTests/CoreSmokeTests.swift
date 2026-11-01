@@ -1,6 +1,6 @@
 import XCTest
 import Shared
-@testable import Deadliner_for_macOS
+@testable import DeadlinerTestHost
 
 /// 第二步验收：建库 → 写一条任务 → 读出来，并确认写入进入了变更日志（同步的基础）。
 @MainActor

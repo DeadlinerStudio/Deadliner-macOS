@@ -1,5 +1,5 @@
 import XCTest
-@testable import Deadliner_for_macOS
+@testable import DeadlinerTestHost
 
 final class TaskStatusTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)

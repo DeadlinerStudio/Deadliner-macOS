@@ -1,6 +1,6 @@
 import XCTest
 import Shared
-@testable import Deadliner_for_macOS
+@testable import DeadlinerTestHost
 
 /// 第四步验收：任务与分类的写入全部经过 Core，并进入变更日志。
 @MainActor

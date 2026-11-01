@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 系统侧栏：任务 / 习惯｜专注 / 存档｜设置，底部显示同步状态。
+/// 系统侧栏：任务 / 习惯｜专注 / 归档｜设置，底部显示同步状态。
 struct Sidebar: View {
     @Binding var page: AppModel.Page
     /// 底部的同步状态；为 nil 时不显示。

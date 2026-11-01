@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 存档页：已归档的任务（沿用任务卡片，降低不透明度）与已归档的习惯。
+/// 归档页：已归档的任务（沿用任务卡片，降低不透明度）与已归档的习惯。
 struct ArchiveView: View {
     let store: ArchiveStore
     let commands: TaskCommands
@@ -21,7 +21,7 @@ struct ArchiveView: View {
             onDeleteHabit: { pendingDeleteHabit = $0 }
         )
         .topAtmosphere(t.secondary)
-        .navigationTitle("存档")
+        .navigationTitle("归档")
         .navigationSubtitle("\(store.tasks.count) 个任务 · \(store.habits.count) 个习惯")
         .onAppear { store.refresh() }
         .confirmationDialog(selectedTask?.title ?? "", isPresented: Binding(

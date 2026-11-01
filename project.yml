@@ -19,8 +19,9 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     FRAMEWORK_SEARCH_PATHS: $(PROJECT_DIR)/Frameworks
 
-targets:
-  DeadlinerMac:
+targetTemplates:
+  # 正式应用与测试宿主共用同一份代码与配置，只有身份（Bundle ID / 名称）不同。
+  DeadlinerApp:
     type: application
     platform: macOS
     sources:
@@ -28,8 +29,7 @@ targets:
       - Resources
     settings:
       base:
-        PRODUCT_NAME: Deadliner for macOS
-        PRODUCT_BUNDLE_IDENTIFIER: com.deadliner.macos
+        PRODUCT_MODULE_NAME: Deadliner_for_macOS
         INFOPLIST_FILE: Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Resources/DeadlinerMac.entitlements
         OTHER_LDFLAGS: -lsqlite3
@@ -40,10 +40,30 @@ targets:
       - framework: Frameworks/Shared.framework
         embed: true
         codeSign: true
+
+targets:
+  DeadlinerMac:
+    templates: [DeadlinerApp]
+    settings:
+      base:
+        PRODUCT_NAME: Deadliner for macOS
+        PRODUCT_BUNDLE_IDENTIFIER: com.deadliner.macos
     preBuildScripts:
       - name: Build DeadlinerCore
         script: '"${PROJECT_DIR}/scripts/build-core.sh"'
         basedOnDependencyAnalysis: false
+
+  # 单元测试的宿主：独立的 Bundle ID，因此拥有独立的 UserDefaults、钥匙串访问组与沙盒数据目录，
+  # 测试永远读不到正式应用的同步设置、密码与数据库。
+  DeadlinerTestHost:
+    templates: [DeadlinerApp]
+    settings:
+      base:
+        PRODUCT_NAME: Deadliner Test Host
+        PRODUCT_MODULE_NAME: DeadlinerTestHost
+        PRODUCT_BUNDLE_IDENTIFIER: com.deadliner.macos.testhost
+    dependencies:
+      - target: DeadlinerMac
 
   DeadlinerMacTests:
     type: bundle.unit-test
@@ -54,10 +74,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.deadliner.macos.tests
         GENERATE_INFOPLIST_FILE: YES
-        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Deadliner for macOS.app/Contents/MacOS/Deadliner for macOS
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Deadliner Test Host.app/Contents/MacOS/Deadliner Test Host
         BUNDLE_LOADER: $(TEST_HOST)
     dependencies:
-      - target: DeadlinerMac
+      - target: DeadlinerTestHost
       - framework: Frameworks/Shared.framework
         embed: false
 
@@ -66,6 +86,7 @@ schemes:
     build:
       targets:
         DeadlinerMac: all
+        DeadlinerTestHost: [test]
         DeadlinerMacTests: [test]
     test:
       targets:

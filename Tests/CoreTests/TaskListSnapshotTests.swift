@@ -1,6 +1,6 @@
 import XCTest
 import SwiftUI
-@testable import Deadliner_for_macOS
+@testable import DeadlinerTestHost
 
 /// 用占位数据渲染任务页截图（浅色 / 深色），供人工对照手机界面。
 /// 截图保存在测试进程临时目录下的 `deadliner-snapshots/`，路径会打印到测试日志。
@@ -77,7 +77,7 @@ final class TaskListSnapshotTests: XCTestCase {
         }
     }
 
-    /// 习惯页、存档页与带侧栏的整体布局截图（占位数据）。
+    /// 习惯页、归档页与带侧栏的整体布局截图（占位数据）。
     func testRenderHabitsArchiveAndSidebar() throws {
         func habit(_ id: String, _ name: String, done: Int, target: Int, kind: HabitItem.ActionKind = .checkOff, unit: String? = nil,
                    window: HabitItem.GoalWindow = .scheduledDay, due: Bool = true, completed: Bool = false, category: String? = nil) -> HabitItem {

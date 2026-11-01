@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import Shared
 
-/// 存档页：已归档 / 放弃后归档的任务（Core `TaskStateMachine.isVisibleInArchive`），以及已归档的习惯。
+/// 归档页：已归档 / 放弃后归档的任务（Core `TaskStateMachine.isVisibleInArchive`），以及已归档的习惯。
 @MainActor
 @Observable
 final class ArchiveStore {

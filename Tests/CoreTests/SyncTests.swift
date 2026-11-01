@@ -1,6 +1,6 @@
 import XCTest
 import Shared
-@testable import Deadliner_for_macOS
+@testable import DeadlinerTestHost
 
 /// 内存中的「云端」，实现 Core 的 SyncBlobTransport；用于在测试中模拟两台设备经同一份同步文件互通。
 final class InMemoryBlobTransport: NSObject, SyncBlobTransport, @unchecked Sendable {

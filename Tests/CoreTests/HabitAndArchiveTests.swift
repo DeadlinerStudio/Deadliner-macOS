@@ -1,8 +1,8 @@
 import XCTest
 import Shared
-@testable import Deadliner_for_macOS
+@testable import DeadlinerTestHost
 
-/// 第五步验收：习惯页的状态与打卡来自 Core，存档页的读取与恢复经过 Core。
+/// 第五步验收：习惯页的状态与打卡来自 Core，归档页的读取与恢复经过 Core。
 @MainActor
 final class HabitAndArchiveTests: XCTestCase {
     private var directory: URL!
