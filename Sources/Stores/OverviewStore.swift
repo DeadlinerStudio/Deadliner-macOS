@@ -66,6 +66,7 @@ final class OverviewStore {
         var daily: [DayCount] = []
         var totalTasks = 0
         var completedTasks = 0
+        /// 百分数（0～100），与 Core 一致。
         var completionRate = 0.0
         var overdueTasks = 0
         var mostActivePeriod: Period?
@@ -75,6 +76,14 @@ final class OverviewStore {
         var previousCompletionRate = 0.0
         var previousOverdueTasks = 0
         var completedTitles: [String] = []
+    }
+
+    /// 选定月份的完整数据（Core `loadMonth`）。
+    struct MonthDetail: Equatable {
+        var review: MonthReview
+        var distribution: History
+        var archivedTasks: Int
+        var archivedHabits: Int
     }
 
     private(set) var today = Today()
@@ -87,6 +96,8 @@ final class OverviewStore {
     private(set) var lastMonth = MonthReview()
     private(set) var isLoading = true
     private(set) var errorMessage: String?
+    private(set) var month: MonthDetail?
+    private(set) var monthError: String?
 
     @ObservationIgnored private let database: DeadlinerDatabase
     @ObservationIgnored private var bridge: IosOverviewStateBridge?
@@ -102,6 +113,27 @@ final class OverviewStore {
         }
     }
 
+    /// 读取某个月（`yyyy-MM-01`）的数据；结果在 `month`，失败时在 `monthError`。
+    func loadMonth(_ monthStart: String) {
+        if bridge == nil { bridge = IosOverviewStateBridge(database: database) }
+        monthError = nil
+        bridge?.loadMonth(monthStart: monthStart, onState: { [weak self] state in
+            MainActor.assumeIsolated {
+                self?.month = MonthDetail(
+                    review: Self.review(state.review),
+                    distribution: Self.history(state.statusDistribution),
+                    archivedTasks: Int(state.archivedTaskCount),
+                    archivedHabits: Int(state.archivedHabitCount)
+                )
+            }
+        }, onError: { [weak self] message in
+            MainActor.assumeIsolated {
+                self?.month = nil
+                self?.monthError = message
+            }
+        })
+    }
+
     func stop() {
         bridge?.close()
         bridge = nil
@@ -111,8 +143,7 @@ final class OverviewStore {
         let summary = state.summary
         today = Today(completed: Int(summary.completedToday), pending: Int(summary.pendingDueFromNow),
                       overdue: Int(summary.overdueToday), abandoned: Int(summary.activeAbandoned))
-        let h = state.history
-        history = History(completed: Int(h.completed), pending: Int(h.pending), abandoned: Int(h.abandoned), overdue: Int(h.overdue))
+        history = Self.history(state.history)
         let counts = Dictionary(state.completionBuckets.map { ($0.period.name, Int($0.completedCount)) }, uniquingKeysWith: +)
         periods = Period.allCases.map { PeriodCount(period: $0, count: counts[$0.rawValue] ?? 0) }
         daily = state.daily.map { DayCount(date: $0.date, completed: Int($0.completedCount), overdue: Int($0.overdueCount)) }
@@ -122,9 +153,18 @@ final class OverviewStore {
                        overdueCompleted: Int($0.overdueCompletedCount))
         }
         contribution = state.contribution.map { DayCount(date: $0.date, completed: Int($0.completedCount)) }
-        let review = state.lastMonth
+        lastMonth = Self.review(state.lastMonth)
+        isLoading = false
+        errorMessage = state.error
+    }
+
+    private static func history(_ h: OverviewHistory) -> History {
+        History(completed: Int(h.completed), pending: Int(h.pending), abandoned: Int(h.abandoned), overdue: Int(h.overdue))
+    }
+
+    private static func review(_ review: OverviewLastMonth) -> MonthReview {
         let m = review.metrics
-        lastMonth = MonthReview(
+        return MonthReview(
             monthStart: review.monthStart,
             daily: review.daily.map { DayCount(date: $0.date, completed: Int($0.completedCount), overdue: Int($0.overdueCount)) },
             totalTasks: Int(m.totalTasks),
@@ -139,7 +179,5 @@ final class OverviewStore {
             previousOverdueTasks: Int(m.previousOverdueTasks),
             completedTitles: review.completedTaskTitles
         )
-        isLoading = false
-        errorMessage = state.error
     }
 }

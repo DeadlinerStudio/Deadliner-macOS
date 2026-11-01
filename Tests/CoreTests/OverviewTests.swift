@@ -57,14 +57,30 @@ final class OverviewTests: XCTestCase {
         XCTAssertFalse(overview.contribution.isEmpty)
         XCTAssertEqual(overview.contribution.map(\.completed).reduce(0, +), 1)
 
-        for section in OverviewSection.allCases {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-01"
+        let thisMonth = formatter.string(from: now)
+        overview.loadMonth(thisMonth)
+        try await waitUntil { self.overview.month != nil || self.overview.monthError != nil }
+        XCTAssertNil(overview.monthError)
+        XCTAssertEqual(overview.month?.review.monthStart, thisMonth)
+
+        let pages: [(String, OverviewSection, String, TrendRange)] = [
+            ("stats-all", .stats, OverviewRange.all, .week),
+            ("stats-month", .stats, thisMonth, .week),
+            ("trends-week", .trends, OverviewRange.all, .week),
+            ("trends-month", .trends, OverviewRange.all, .month),
+            ("trends-year", .trends, OverviewRange.all, .year),
+        ]
+        for (name, section, range, trend) in pages {
             for scheme in [ColorScheme.light, .dark] {
                 try capture(
-                    OverviewContent(store: overview, section: section, layout: .double)
+                    OverviewContent(store: overview, section: section, range: .constant(range), trend: .constant(trend), layout: .double)
                         .deadlinerTheme()
                         .environment(\.colorScheme, scheme),
                     scheme: scheme,
-                    name: "overview-\(section.rawValue)-\(scheme == .dark ? "dark" : "light")"
+                    name: "overview-\(name)-\(scheme == .dark ? "dark" : "light")"
                 )
             }
         }
@@ -85,9 +101,9 @@ final class OverviewTests: XCTestCase {
     }
 
     func testMetricFormatting() {
-        XCTAssertEqual(OverviewMetricsCard.percent(0.666), "67%")
-        XCTAssertEqual(OverviewMetricsCard.pointDelta(0.1), "+10%")
-        XCTAssertNil(OverviewMetricsCard.pointDelta(0.001))
+        XCTAssertEqual(OverviewMetricsCard.percent(66.6), "67%")
+        XCTAssertEqual(OverviewMetricsCard.pointDelta(10), "+10%")
+        XCTAssertNil(OverviewMetricsCard.pointDelta(0.1))
         XCTAssertEqual(OverviewMetricsCard.minutes(45), "45 分钟")
         XCTAssertEqual(OverviewMetricsCard.minutes(90), "1.5 小时")
         XCTAssertEqual(OverviewMetricsCard.minutes(2880), "2.0 天")
@@ -105,10 +121,10 @@ final class OverviewTests: XCTestCase {
         let output = FileManager.default.temporaryDirectory.appendingPathComponent("deadliner-snapshots", isDirectory: true)
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         let hosting = NSHostingView(rootView: view)
-        hosting.frame = NSRect(x: 0, y: 0, width: 1100, height: 900)
+        hosting.frame = NSRect(x: 0, y: 0, width: 1300, height: 950)
         let window = NSWindow(contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false)
         window.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
-        window.backgroundColor = scheme == .dark ? .black : .white
+        window.backgroundColor = .windowBackgroundColor
         window.contentView = hosting
         window.setFrameOrigin(NSPoint(x: -10_000, y: -10_000))
         window.orderBack(nil)

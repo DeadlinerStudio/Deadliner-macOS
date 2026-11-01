@@ -1,18 +1,24 @@
 import Charts
 import SwiftUI
 
-/// 概览页：与 iOS 端相同的三部分（总览 / 趋势 / 月度），数据全部来自 Core。
-/// 不包含 iOS 的「AI 月度洞察」（AI 暂缓）。
+/// 概览页：总览 / 趋势两部分，数据全部来自 Core（iOS 的「AI 月度洞察」暂缓）。
+///
+/// 范围只在 Core 提供的数据内选择：总览可选「全部时间」或某个月（Core `loadMonth`）；
+/// 趋势可选周（近 7 天）/ 月（近 30 天）/ 年（近 12 个月）。
 struct OverviewView: View {
     let store: OverviewStore
     @AppStorage(CardLayout.storageKey) private var layoutRaw = CardLayout.single.rawValue
     @AppStorage("overview.section") private var sectionRaw = OverviewSection.stats.rawValue
+    @AppStorage("overview.range") private var range = OverviewRange.all
+    @AppStorage("overview.trendRange") private var trendRaw = TrendRange.week.rawValue
     @Environment(\.palette) private var t
 
     var body: some View {
         OverviewContent(
             store: store,
             section: OverviewSection(rawValue: sectionRaw) ?? .stats,
+            range: $range,
+            trend: Binding(get: { TrendRange(rawValue: trendRaw) ?? .week }, set: { trendRaw = $0.rawValue }),
             layout: CardLayout(rawValue: layoutRaw) ?? .single
         )
         .topAtmosphere(t.primary)
@@ -26,69 +32,185 @@ struct OverviewView: View {
                 .fixedSize()
             }
             ToolbarItem {
-                Button { store.refresh() } label: { Label("刷新", systemImage: "arrow.clockwise") }
+                Button { reload() } label: { Label("刷新", systemImage: "arrow.clockwise") }
                     .help("重新计算统计")
             }
         }
-        .onAppear { store.refresh() }
+        .onAppear { reload() }
+        .onChange(of: range) { reload() }
+    }
+
+    private func reload() {
+        store.refresh()
+        if range != OverviewRange.all { store.loadMonth(range) }
     }
 }
 
 enum OverviewSection: String, CaseIterable, Identifiable {
-    case stats, trends, month
+    case stats, trends
     var id: String { rawValue }
     var title: String {
         switch self {
         case .stats: "总览"
         case .trends: "趋势"
-        case .month: "月度"
         }
     }
 }
 
-/// 页面主体，便于截图测试（不依赖 Core 的值类型都在 OverviewStore 中）。
+/// 总览的范围：`all` 或某个月的第一天（`yyyy-MM-01`）。
+enum OverviewRange {
+    static let all = "all"
+}
+
+enum TrendRange: String, CaseIterable, Identifiable {
+    case week, month, year
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .week: "周"
+        case .month: "月"
+        case .year: "年"
+        }
+    }
+}
+
+/// 页面主体，便于截图测试。
 struct OverviewContent: View {
     let store: OverviewStore
     let section: OverviewSection
+    @Binding var range: String
+    @Binding var trend: TrendRange
     var layout: CardLayout = .single
     @Environment(\.palette) private var t
 
+    /// 单列时卡片纵向排列；双列、三列时成对的卡片并排且等高。
+    private var columns: Int { layout == .single ? 1 : 2 }
+
     var body: some View {
         ScrollView(.vertical) {
-            if let error = store.errorMessage {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(t.error)
-                    .padding(.top, 40)
-            } else {
-                // 同一行的卡片顶端对齐（默认居中，高度不同时会错位）。
-                LazyVGrid(columns: layout.columns.map { var item = $0; item.alignment = .top; return item },
-                          alignment: .leading, spacing: MiuixCard.gap) {
+            VStack(alignment: .leading, spacing: MiuixCard.gap) {
+                rangeBar
+                if let error = store.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(t.error)
+                } else {
                     switch section {
-                    case .stats:
-                        OverviewTodayCard(today: store.today)
-                        OverviewPeriodCard(periods: store.periods)
-                        OverviewHistoryCard(history: store.history)
-                    case .trends:
-                        OverviewHeatmapCard(days: store.contribution)
-                        OverviewDailyCard(days: store.daily)
-                        OverviewMonthlyCard(months: store.monthly)
-                        OverviewWeeklyCard(weeks: store.weekly)
-                    case .month:
-                        OverviewMetricsCard(review: store.lastMonth)
-                        OverviewMonthMapCard(review: store.lastMonth)
-                        if !store.lastMonth.completedTitles.isEmpty {
-                            OverviewTitlesCard(review: store.lastMonth)
-                        }
+                    case .stats: statsBody
+                    case .trends: trendsBody
                     }
                 }
-                .readableWidth(layout.maxContentWidth)
-                .padding(.horizontal, 24)
-                .padding(.top, 16)
-                .padding(.bottom, 32)
             }
+            .readableWidth(layout.maxContentWidth)
+            .padding(.horizontal, 24)
+            .padding(.top, 16)
+            .padding(.bottom, 32)
         }
         .overlay {
             if store.isLoading { ProgressView() }
+        }
+    }
+
+    @ViewBuilder
+    private var rangeBar: some View {
+        HStack {
+            switch section {
+            case .stats:
+                Picker("范围", selection: $range) {
+                    Text("全部时间").tag(OverviewRange.all)
+                    Divider()
+                    ForEach(store.monthly.reversed()) { month in
+                        Text(OverviewDates.label(month.monthStart, "yyyy 年 M 月")).tag(month.monthStart)
+                    }
+                }
+                .pickerStyle(.menu)
+                .fixedSize()
+            case .trends:
+                Picker("范围", selection: $trend) {
+                    ForEach(TrendRange.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+            }
+            Spacer()
+        }
+        .labelsHidden()
+    }
+
+    @ViewBuilder
+    private var statsBody: some View {
+        if range == OverviewRange.all {
+            OverviewTodayCard(today: store.today)
+            OverviewRow(columns: columns) {
+                OverviewPeriodCard(periods: store.periods)
+                OverviewHistoryCard(history: store.history, title: "历史统计", subtitle: "全部时间")
+            }
+        } else if let month = store.month, month.review.monthStart == range {
+            OverviewMetricsCard(review: month.review)
+            OverviewRow(columns: columns) {
+                OverviewMonthMapCard(review: month.review)
+                OverviewHistoryCard(history: month.distribution, title: "状态分布", subtitle: "截止日期在本月的任务")
+            }
+            if !month.review.completedTitles.isEmpty {
+                OverviewTitlesCard(review: month.review)
+            }
+        } else if let error = store.monthError {
+            Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(t.error)
+        } else {
+            ProgressView().frame(maxWidth: .infinity, minHeight: 200)
+        }
+    }
+
+    @ViewBuilder
+    private var trendsBody: some View {
+        let c = OverviewColors(t: t)
+        switch trend {
+        case .week:
+            let completed = store.daily.map(\.completed).reduce(0, +)
+            OverviewSummaryCard(items: [
+                ("近 7 天完成", "\(completed)", c.completed),
+                ("近 7 天逾期", "\(store.daily.map(\.overdue).reduce(0, +))", c.overdue),
+                ("日均完成", Self.average(completed, store.daily.count), c.pending),
+            ])
+            OverviewDailyCard(days: store.daily)
+        case .month:
+            let days = Array(store.contribution.suffix(30))
+            let completed = days.map(\.completed).reduce(0, +)
+            OverviewSummaryCard(items: [
+                ("近 30 天完成", "\(completed)", c.completed),
+                ("有完成的天数", "\(days.filter { $0.completed > 0 }.count)", t.tertiary),
+                ("日均完成", Self.average(completed, days.count), c.pending),
+            ])
+            OverviewRangeDailyCard(days: days)
+        case .year:
+            OverviewSummaryCard(items: [
+                ("近 12 个月任务", "\(store.monthly.map(\.total).reduce(0, +))", c.pending),
+                ("已完成", "\(store.monthly.map(\.completed).reduce(0, +))", c.completed),
+                ("逾期完成", "\(store.monthly.map(\.overdueCompleted).reduce(0, +))", c.overdue),
+            ])
+            OverviewMonthlyCard(months: store.monthly)
+        }
+        OverviewRow(columns: columns) {
+            OverviewHeatmapCard(days: store.contribution)
+            OverviewWeeklyCard(weeks: store.weekly)
+        }
+    }
+
+    static func average(_ total: Int, _ days: Int) -> String {
+        guard days > 0 else { return "0" }
+        return String(format: "%.1f", Double(total) / Double(days))
+    }
+}
+
+/// 一行卡片：多列时并排且等高，单列时纵向排列。
+struct OverviewRow<Content: View>: View {
+    let columns: Int
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        if columns > 1 {
+            HStack(alignment: .top, spacing: MiuixCard.gap) { content }
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            VStack(spacing: MiuixCard.gap) { content }
         }
     }
 }
@@ -144,8 +266,15 @@ struct OverviewCard<Content: View>: View {
             content
         }
         .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(t.groupBg, in: RoundedRectangle(cornerRadius: MiuixRadius.card, style: .continuous))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .modifier(OverviewCardBackground())
+    }
+}
+
+struct OverviewCardBackground: ViewModifier {
+    @Environment(\.palette) private var t
+    func body(content: Content) -> some View {
+        content.background(t.groupBg, in: RoundedRectangle(cornerRadius: MiuixRadius.card, style: .continuous))
     }
 }
 
@@ -230,6 +359,8 @@ struct OverviewPeriodCard: View {
 
 struct OverviewHistoryCard: View {
     let history: OverviewStore.History
+    var title = "历史统计"
+    var subtitle: String?
     @Environment(\.palette) private var t
 
     var body: some View {
@@ -240,7 +371,7 @@ struct OverviewHistoryCard: View {
             ("逾期", history.overdue, c.overdue),
             ("已放弃", history.abandoned, c.abandoned),
         ]
-        OverviewCard(title: "历史统计") {
+        OverviewCard(title: title, subtitle: subtitle) {
             if history.total == 0 {
                 EmptyChart()
             } else {
@@ -279,7 +410,15 @@ struct OverviewHistoryCard: View {
 
 struct OverviewHeatmapCard: View {
     let days: [OverviewStore.DayCount]
+    @State private var width: CGFloat = 400
     @Environment(\.palette) private var t
+
+    /// 每月第一周的列上方显示月份。
+    static func monthLabel(_ weeks: [[OverviewStore.DayCount?]], _ index: Int) -> String {
+        guard let first = weeks[index].compactMap({ $0 }).first(where: { $0.date.hasSuffix("-01") })
+                ?? (index == 0 ? weeks[index].compactMap({ $0 }).first : nil) else { return "" }
+        return OverviewDates.label(first.date, "M月")
+    }
 
     var body: some View {
         OverviewCard(title: "活跃热力图", subtitle: days.isEmpty ? nil : "\(days.count) 天内") {
@@ -288,22 +427,43 @@ struct OverviewHeatmapCard: View {
             } else {
                 let weeks = Self.weeks(days)
                 let peak = max(1, days.map(\.completed).max() ?? 1)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 3) {
+                // 方格大小随卡片宽度变化，铺满整行（8～22pt）。
+                let gap: CGFloat = 3
+                let labelWidth: CGFloat = 18
+                let cell = min(22, max(8, (width - labelWidth - gap * CGFloat(weeks.count)) / CGFloat(max(1, weeks.count))))
+                VStack(alignment: .leading, spacing: gap) {
+                    HStack(spacing: gap) {
+                        Color.clear.frame(width: labelWidth, height: 12)
                         ForEach(weeks.indices, id: \.self) { w in
-                            VStack(spacing: 3) {
-                                ForEach(0..<7, id: \.self) { d in
-                                    let day = weeks[w][d]
-                                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                        .fill(color(day?.completed, peak: peak))
-                                        .frame(width: 12, height: 12)
-                                        .help(day.map { "\($0.date)：完成 \($0.completed)" } ?? "")
-                                }
+                            Text(Self.monthLabel(weeks, w))
+                                .font(.system(size: 9))
+                                .foregroundStyle(t.onSurfaceVariant)
+                                .fixedSize()
+                                .frame(width: cell, height: 12, alignment: .leading)
+                        }
+                    }
+                    ForEach(0..<7, id: \.self) { d in
+                        HStack(spacing: gap) {
+                            Text(d % 2 == 0 ? ["一", "", "三", "", "五", "", "日"][d] : "")
+                                .font(.system(size: 9))
+                                .foregroundStyle(t.onSurfaceVariant)
+                                .frame(width: labelWidth, height: cell, alignment: .leading)
+                            ForEach(weeks.indices, id: \.self) { w in
+                                let day = weeks[w][d]
+                                RoundedRectangle(cornerRadius: cell / 4, style: .continuous)
+                                    .fill(color(day?.completed, peak: peak))
+                                    .frame(width: cell, height: cell)
+                                    .help(day.map { "\($0.date)：完成 \($0.completed)" } ?? "")
                             }
                         }
                     }
                 }
-                .defaultScrollAnchor(.trailing)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(GeometryReader { proxy in
+                    Color.clear
+                        .onAppear { width = proxy.size.width }
+                        .onChange(of: proxy.size.width) { width = proxy.size.width }
+                })
                 HStack(spacing: 4) {
                     Spacer()
                     Text("少").font(.caption2).foregroundStyle(t.onSurfaceVariant)
@@ -343,7 +503,7 @@ struct OverviewDailyCard: View {
 
     var body: some View {
         let c = OverviewColors(t: t)
-        OverviewCard(title: "本周完成情况") {
+        OverviewCard(title: "每日完成", subtitle: "近 7 天") {
             if days.isEmpty {
                 EmptyChart()
             } else {
@@ -364,7 +524,53 @@ struct OverviewDailyCard: View {
                 }
                 .chartForegroundStyleScale(["已完成": c.completed, "逾期": c.overdue])
                 .chartLegend(showOverdue ? .visible : .hidden)
-                .frame(height: 180)
+                .frame(height: 200)
+            }
+        }
+    }
+}
+
+struct OverviewSummaryCard: View {
+    let items: [(String, String, Color)]
+
+    var body: some View {
+        HStack {
+            ForEach(items, id: \.0) { item in
+                BigNumber(title: item.0, value: item.1, tint: item.2)
+            }
+        }
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity)
+        .modifier(OverviewCardBackground())
+    }
+}
+
+/// 近 30 天每日完成（Core 热力图数据的最后 30 天）。
+struct OverviewRangeDailyCard: View {
+    let days: [OverviewStore.DayCount]
+    @Environment(\.palette) private var t
+
+    var body: some View {
+        OverviewCard(title: "每日完成", subtitle: "近 30 天") {
+            if days.allSatisfy({ $0.completed == 0 }) {
+                EmptyChart()
+            } else {
+                Chart(days) { day in
+                    BarMark(x: .value("日期", OverviewDates.date(day.date) ?? Date(), unit: .day), y: .value("完成", day.completed))
+                        .foregroundStyle(OverviewColors(t: t).completed.gradient)
+                        .cornerRadius(3)
+                }
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: .day, count: 7)) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let date = value.as(Date.self) {
+                                Text(verbatim: "\(Calendar.current.component(.month, from: date))/\(Calendar.current.component(.day, from: date))")
+                            }
+                        }
+                    }
+                }
+                .frame(height: 200)
             }
         }
     }
@@ -376,7 +582,7 @@ struct OverviewMonthlyCard: View {
 
     var body: some View {
         let c = OverviewColors(t: t)
-        OverviewCard(title: "每月趋势") {
+        OverviewCard(title: "每月趋势", subtitle: "近 12 个月") {
             if months.isEmpty {
                 EmptyChart()
             } else {
@@ -434,10 +640,10 @@ struct OverviewMetricsCard: View {
         let c = OverviewColors(t: t)
         let month = review.monthStart.map { OverviewDates.label($0, "yyyy 年 M 月") }
         OverviewCard(title: "数据汇总", subtitle: month) {
-            if review.monthStart == nil {
-                EmptyChart(text: "上个月还没有数据")
+            if review.totalTasks == 0 && review.completedTasks == 0 {
+                EmptyChart(text: "这个月没有任务")
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
                     metric("任务总数", "\(review.totalTasks)", delta: review.totalTasks - review.previousTotalTasks, tint: c.pending)
                     metric("已完成", "\(review.completedTasks)", delta: review.completedTasks - review.previousCompletedTasks, tint: c.completed)
                     metric("完成率", Self.percent(review.completionRate),
@@ -466,10 +672,11 @@ struct OverviewMetricsCard: View {
         .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    static func percent(_ rate: Double) -> String { "\(Int((rate * 100).rounded()))%" }
+    /// Core 的完成率是百分数（0～100）。
+    static func percent(_ rate: Double) -> String { "\(Int(rate.rounded()))%" }
 
     static func pointDelta(_ diff: Double) -> String? {
-        let points = Int((diff * 100).rounded())
+        let points = Int(diff.rounded())
         return points == 0 ? nil : (points > 0 ? "+\(points)%" : "\(points)%")
     }
 
@@ -517,11 +724,12 @@ struct OverviewMonthMapCard: View {
             Text(OverviewDates.label(day.date, "d"))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(day.completed * 2 > peak ? .white : t.onSurface)
-                .frame(maxWidth: .infinity, minHeight: 30)
+                .frame(maxWidth: .infinity)
+                .frame(height: 30)
                 .background(fill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .help("完成 \(day.completed)" + (day.overdue > 0 ? "，逾期 \(day.overdue)" : ""))
         } else {
-            Color.clear.frame(maxWidth: .infinity, minHeight: 30)
+            Color.clear.frame(maxWidth: .infinity).frame(height: 30)
         }
     }
 }
@@ -531,7 +739,8 @@ struct OverviewTitlesCard: View {
     @Environment(\.palette) private var t
 
     var body: some View {
-        OverviewCard(title: "上月完成的任务", subtitle: "\(review.completedTitles.count) 个") {
+        let month = review.monthStart.map { OverviewDates.label($0, "M月") } ?? "本月"
+        OverviewCard(title: "\(month)完成的任务", subtitle: "\(review.completedTitles.count) 个") {
             FlowLayout(spacing: 6) {
                 ForEach(Array(review.completedTitles.enumerated()), id: \.offset) { _, title in
                     Text(verbatim: title)
