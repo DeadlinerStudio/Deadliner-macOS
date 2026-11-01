@@ -50,7 +50,7 @@ struct FocusContent: View {
                         }
                     }
                 }
-                .frame(maxWidth: 820, alignment: .leading)
+                .readableWidth(860)
                 .padding(.horizontal, 32)
                 .padding(.bottom, 32)
             }

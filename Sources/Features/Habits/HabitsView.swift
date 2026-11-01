@@ -8,6 +8,7 @@ struct HabitsView: View {
 
     @State private var pendingDelete: HabitItem?
     @State private var errorMessage: String?
+    @AppStorage(CardLayout.storageKey) private var layoutRaw = CardLayout.single.rawValue
     @Environment(\.palette) private var t
 
     private var subtitle: String {
@@ -30,7 +31,8 @@ struct HabitsView: View {
             onPrimaryAction: store.applyPrimaryAction,
             onOpen: open,
             onArchive: { habit in run { try commands.archive(habit.id) } },
-            onDelete: { pendingDelete = $0 }
+            onDelete: { pendingDelete = $0 },
+            layout: CardLayout(rawValue: layoutRaw) ?? .single
         )
         .topAtmosphere(t.primary)
         .navigationTitle("习惯")
@@ -92,6 +94,7 @@ struct HabitsContent: View {
     var onOpen: ((HabitItem) -> Void)?
     var onArchive: ((HabitItem) -> Void)?
     var onDelete: ((HabitItem) -> Void)?
+    var layout: CardLayout = .single
     @Environment(\.palette) private var t
 
     private var selectedDay: HabitDay? { week.first { $0.date == selectedDate } }
@@ -111,6 +114,7 @@ struct HabitsContent: View {
                     section("周期目标", period)
                     section("即将复习", upcoming)
                 }
+                .readableWidth(layout.maxContentWidth)
                 .padding(.horizontal, 24)
                 .padding(.top, 16)
                 .padding(.bottom, 100)
@@ -119,18 +123,20 @@ struct HabitsContent: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
+    /// 与 Android 一致：完成度圆环居中，下方一周日期条铺满（最宽 640），不加外框。
     private var overview: some View {
-        HStack(spacing: 28) {
-            ProgressRing(fraction: selectedDay?.fraction ?? 0, size: 92)
-            HStack(spacing: 6) {
+        VStack(spacing: 18) {
+            ProgressRing(fraction: selectedDay?.fraction ?? 0, size: 112)
+            HStack(spacing: 0) {
                 ForEach(week) { day in
                     WeekDayCell(day: day, selected: day.date == selectedDate) { onSelectDate?(day.date) }
+                        .frame(maxWidth: .infinity)
                 }
             }
-            Spacer(minLength: 0)
+            .readableWidth(640)
         }
-        .padding(18)
-        .background(t.groupBg, in: RoundedRectangle(cornerRadius: MiuixRadius.group, style: .continuous))
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
@@ -141,7 +147,7 @@ struct HabitsContent: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(t.onSurfaceVariant)
                     .padding(.leading, 4)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: MiuixCard.minColumnWidth), spacing: MiuixCard.gap)], spacing: MiuixCard.gap) {
+                LazyVGrid(columns: layout.columns, spacing: MiuixCard.gap) {
                     ForEach(items) { habit in
                         HabitCard(habit: habit, category: habit.categoryId.flatMap { categories[$0] }) {
                             onPrimaryAction?(habit)

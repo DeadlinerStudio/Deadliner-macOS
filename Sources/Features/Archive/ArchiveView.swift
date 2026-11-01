@@ -9,6 +9,7 @@ struct ArchiveView: View {
     @State private var pendingDeleteTask: TaskItem?
     @State private var pendingDeleteHabit: ArchiveStore.ArchivedHabit?
     @State private var errorMessage: String?
+    @AppStorage(CardLayout.storageKey) private var layoutRaw = CardLayout.single.rawValue
     @Environment(\.palette) private var t
 
     var body: some View {
@@ -18,7 +19,8 @@ struct ArchiveView: View {
             categories: store.categories,
             onTapTask: { selectedTask = $0 },
             onRestoreHabit: { habit in run { try store.restoreHabit(habit.id) } },
-            onDeleteHabit: { pendingDeleteHabit = $0 }
+            onDeleteHabit: { pendingDeleteHabit = $0 },
+            layout: CardLayout(rawValue: layoutRaw) ?? .single
         )
         .topAtmosphere(t.secondary)
         .navigationTitle("归档")
@@ -64,6 +66,7 @@ struct ArchiveContent: View {
     var onTapTask: ((TaskItem) -> Void)?
     var onRestoreHabit: ((ArchiveStore.ArchivedHabit) -> Void)?
     var onDeleteHabit: ((ArchiveStore.ArchivedHabit) -> Void)?
+    var layout: CardLayout = .single
     @Environment(\.palette) private var t
 
     var body: some View {
@@ -80,7 +83,7 @@ struct ArchiveContent: View {
                     VStack(alignment: .leading, spacing: 18) {
                         if !tasks.isEmpty {
                             sectionTitle("任务")
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: MiuixCard.minColumnWidth), spacing: MiuixCard.gap)], spacing: MiuixCard.gap) {
+                            LazyVGrid(columns: layout.columns, spacing: MiuixCard.gap) {
                                 ForEach(tasks) { task in
                                     TaskCard(task: task, category: task.categoryId.flatMap { categories[$0] }, now: Date())
                                         .opacity(0.72)
@@ -105,10 +108,12 @@ struct ArchiveContent: View {
                                     }
                                 }
                             }
-                            .frame(maxWidth: 560, alignment: .leading)
+
                         }
                     }
-                    .padding(.horizontal, 32)
+                    .readableWidth(layout.maxContentWidth)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
                     .padding(.bottom, 32)
                 }
             }

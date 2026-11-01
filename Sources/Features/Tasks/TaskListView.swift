@@ -11,6 +11,7 @@ struct TaskListView: View {
 
     @State private var pendingDelete: TaskItem?
     @State private var errorMessage: String?
+    @AppStorage(CardLayout.storageKey) private var layoutRaw = CardLayout.single.rawValue
     @Environment(\.palette) private var t
 
     /// 氛围光颜色：有逾期任务时为 Error，有 24 小时内到期的为 Tertiary，否则为主色。
@@ -32,7 +33,8 @@ struct TaskListView: View {
                 searchText: store.searchText,
                 now: context.date,
                 actionsFor: actions(for:),
-                onSetupSync: onSetupSync
+                onSetupSync: onSetupSync,
+                layout: CardLayout(rawValue: layoutRaw) ?? .single
             )
             .topAtmosphere(Self.tone(for: store.visibleTasks, now: context.date, palette: t))
         }
@@ -41,6 +43,13 @@ struct TaskListView: View {
         .searchable(text: $store.searchText, placement: .toolbar, prompt: "搜索任务")
         .searchFocusOnRequest()
         .toolbar {
+            ToolbarItem {
+                Picker("显示方式", selection: $layoutRaw) {
+                    ForEach(CardLayout.allCases) { Label($0.title, systemImage: $0.systemImage).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+                .help("显示方式")
+            }
             ToolbarItem {
                 Menu {
                     Picker("排序", selection: $store.sortOrder) {
@@ -113,6 +122,7 @@ struct TaskListContent: View {
     let now: Date
     var actionsFor: ((TaskItem) -> TaskCard.Actions)?
     var onSetupSync: (() -> Void)?
+    var layout: CardLayout = .single
     @Environment(\.palette) private var t
 
     var body: some View {
@@ -128,10 +138,7 @@ struct TaskListContent: View {
                 emptyState
             } else {
                 ScrollView(.vertical) {
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: MiuixCard.minColumnWidth), spacing: MiuixCard.gap)],
-                        spacing: MiuixCard.gap
-                    ) {
+                    LazyVGrid(columns: layout.columns, spacing: MiuixCard.gap) {
                         ForEach(tasks) { task in
                             TaskCard(
                                 task: task,
@@ -141,6 +148,7 @@ struct TaskListContent: View {
                             )
                         }
                     }
+                    .readableWidth(layout.maxContentWidth)
                     .padding(.horizontal, 24)
                     .padding(.top, 16)
                     .padding(.bottom, 100)

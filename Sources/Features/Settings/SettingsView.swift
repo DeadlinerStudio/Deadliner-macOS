@@ -52,7 +52,7 @@ struct SettingsView: View {
                     appearanceGroup
                     aboutGroup
                 }
-                .frame(maxWidth: 640, alignment: .leading)
+                .readableWidth(720)
                 .padding(.horizontal, 32)
                 .padding(.bottom, 32)
             }
