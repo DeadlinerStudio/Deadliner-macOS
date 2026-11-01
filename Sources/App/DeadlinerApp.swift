@@ -39,6 +39,7 @@ struct DeadlinerApp: App {
         Settings {
             if let model = appDelegate.model {
                 SettingsView(sync: model.sync)
+                    .modifier(AppearancePreferences())
                     .deadlinerTheme()
                     .frame(width: 640, height: 720)
             }
@@ -102,18 +103,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-struct RootView: View {
-    let appDelegate: AppDelegate
+/// 用户的外观偏好（深浅色、衬线字体），主窗口与设置窗口共用。
+struct AppearancePreferences: ViewModifier {
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
-    @Environment(\.palette) private var t
-
     @AppStorage(FontPreference.serifKey) private var serif = false
-    @Environment(\.openWindow) private var openWindow
 
-    var body: some View {
+    func body(content: Content) -> some View {
         content
             .preferredColorScheme(AppearanceMode(rawValue: appearance)?.colorScheme)
             .fontDesign(serif ? .serif : .default)
+    }
+}
+
+struct RootView: View {
+    let appDelegate: AppDelegate
+    @Environment(\.palette) private var t
+
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        content.modifier(AppearancePreferences())
     }
 
     @ViewBuilder
