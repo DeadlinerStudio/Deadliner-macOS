@@ -20,12 +20,19 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
         UNUserNotificationCenter.current().delegate = self
         _ = database.configureNotificationUpdates(
             gateway: MacNotificationGateway(sink: UserNotificationSink()),
-            policyProvider: { NotificationSettings.policy() },
-            interactionsProvider: { NotificationInteractionState(taskResults: [], dismissedHabitOccurrences: []) }
+            policyProvider: Self.policyProvider,
+            interactionsProvider: Self.interactionsProvider
         )
         timer = Timer.scheduledTimer(withTimeInterval: 30 * 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }
+    }
+
+    // Core 会在任意线程调用这两个回调（例如同步合并在后台线程提交后），
+    // 所以它们必须是非隔离的；写在本类的方法里会被当作主线程专用，在后台调用时 Swift 会直接终止应用。
+    nonisolated static let policyProvider: @Sendable () -> NotificationPolicy = { NotificationSettings.policy() }
+    nonisolated static let interactionsProvider: @Sendable () -> NotificationInteractionState = {
+        NotificationInteractionState(taskResults: [], dismissedHabitOccurrences: [])
     }
 
     func stop() {

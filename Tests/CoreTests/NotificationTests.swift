@@ -67,6 +67,25 @@ final class NotificationTests: XCTestCase {
         XCTAssertEqual(sink.items.filter { $0.ownerUid == otherId }.map(\.kind), ["TASK_DUE"])
     }
 
+    /// 同步合并在后台线程提交后，Core 会在那个线程调用策略回调。回调若被当作主线程专用，
+    /// Swift 会直接终止应用（2026-11-01 的崩溃）。
+    func testProvidersCanBeCalledOffMainThread() async throws {
+        let sink = RecordingSink()
+        _ = container.database.configureNotificationUpdates(
+            gateway: MacNotificationGateway(sink: sink, habitsEnabled: { true }),
+            policyProvider: NotificationController.policyProvider,
+            interactionsProvider: NotificationController.interactionsProvider
+        )
+        nonisolated(unsafe) let database = container.database
+        let ranOffMain = await withCheckedContinuation { (done: CheckedContinuation<Bool, Never>) in
+            DispatchQueue.global().async {
+                database.triggerNotificationInfoUpdate(force: true)
+                done.resume(returning: !Thread.isMainThread)
+            }
+        }
+        XCTAssertTrue(ranOffMain)
+    }
+
     func testDisabledSettingsPlanNothing() {
         let defaults = UserDefaults(suiteName: "notification-tests-\(UUID().uuidString)")!
         let policy = NotificationSettings.policy(defaults)
