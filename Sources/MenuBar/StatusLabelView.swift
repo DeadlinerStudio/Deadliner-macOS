@@ -87,9 +87,10 @@ struct LiveStatusLabel: View {
                 fields: StatusField.decode(fieldsRaw),
                 now: context.date
             )
+            // 测量的是内容本身（fixedSize），与菜单栏的高度、所在显示器无关。
+            .background(GeometryReader { proxy in Color.clear.preference(key: LabelSizeKey.self, value: proxy.size) })
         }
-        .frame(maxHeight: .infinity)
-        .background(GeometryReader { proxy in Color.clear.preference(key: LabelSizeKey.self, value: proxy.size) })
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onPreferenceChange(LabelSizeKey.self) { size in onSize(size) }
     }
 }

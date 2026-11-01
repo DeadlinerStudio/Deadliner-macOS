@@ -53,10 +53,16 @@ final class MenuBarController: NSObject {
 
         let label = PassthroughHostingView(rootView: AnyView(
             LiveStatusLabel(model: model) { [weak item] size in
-                item?.length = max(22, ceil(size.width))
+                // 只按内容宽度设置，取整到整点；忽略重新布局时的瞬时值和不到 1pt 的变化，
+                // 避免图标在多块显示器的菜单栏之间切换时宽度来回变化。
+                guard let item, size.width >= 10 else { return }
+                let length = max(22, size.width.rounded(.up))
+                if abs(item.length - length) >= 1 { item.length = length }
             }
             .deadlinerTheme()
         ))
+        // 不让 SwiftUI 的尺寸约束反过来影响菜单栏按钮的宽度（宽度只由 item.length 决定）。
+        label.sizingOptions = []
         label.translatesAutoresizingMaskIntoConstraints = false
         button.addSubview(label)
         NSLayoutConstraint.activate([
