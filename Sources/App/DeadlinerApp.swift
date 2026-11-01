@@ -75,6 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard let model else { return }
+        AppearancePreferences.apply(UserDefaults.standard.string(forKey: "appearance") ?? AppearanceMode.system.rawValue)
         menuBar = MenuBarController(model: model) { [weak self] in self?.showMainWindow() }
     }
 
@@ -109,9 +110,20 @@ struct AppearancePreferences: ViewModifier {
     @AppStorage(FontPreference.serifKey) private var serif = false
 
     func body(content: Content) -> some View {
+        // 外观设在 NSApp 上而不是 preferredColorScheme：后者从深色改回 nil 时，
+        // 窗口里已经渲染的部分不会恢复跟随系统（表单仍是深色、侧栏变浅色）。
         content
-            .preferredColorScheme(AppearanceMode(rawValue: appearance)?.colorScheme)
             .fontDesign(serif ? .serif : .default)
+            .onAppear { Self.apply(appearance) }
+            .onChange(of: appearance) { Self.apply(appearance) }
+    }
+
+    static func apply(_ raw: String) {
+        NSApp.appearance = switch AppearanceMode(rawValue: raw) ?? .system {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
     }
 }
 
@@ -148,7 +160,7 @@ struct MainView: View {
 
     var body: some View {
         NavigationSplitView {
-            Sidebar(page: $model.page, syncStatus: model.sync.status)
+            Sidebar(page: $model.page, syncStatus: model.sync.status, syncNow: { model.sync.syncNow() })
                 .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
         } detail: {
             Group {

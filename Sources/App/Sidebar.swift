@@ -5,6 +5,8 @@ struct Sidebar: View {
     @Binding var page: AppModel.Page
     /// 底部的同步状态；为 nil 时不显示。
     var syncStatus: SyncController.Status?
+    /// 「立即同步」按钮的动作；为 nil 时不显示按钮。
+    var syncNow: (() -> Void)?
     @Environment(\.palette) private var t
 
     private static let groups: [(title: String?, pages: [AppModel.Page])] = [
@@ -42,17 +44,34 @@ struct Sidebar: View {
         case .succeeded(let date): ("checkmark.icloud", "已同步 \(date.formatted(date: .omitted, time: .shortened))", Color(hex: 0x10B981))
         case .failed: ("exclamationmark.icloud", "同步失败", t.error)
         }
-        return Button { page = .settings } label: {
-            Label(text, systemImage: icon)
-                .font(.callout)
-                .foregroundStyle(tint)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .contentShape(Rectangle())
+        let busy = status == .syncing || status == .backingUp
+        return HStack(spacing: 4) {
+            Button { page = .settings } label: {
+                Label(text, systemImage: icon)
+                    .font(.callout)
+                    .foregroundStyle(tint)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 12)
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("打开同步设置")
+            if let syncNow, status != .disabled, status != .awaitingConfirmation {
+                Button(action: syncNow) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.callout.weight(.semibold))
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .disabled(busy)
+                .help("立即同步（⌘R）")
+                .accessibilityLabel("立即同步")
+                .padding(.trailing, 6)
+            }
         }
-        .buttonStyle(.plain)
-        .help("打开同步设置")
         .padding(8)
     }
 }

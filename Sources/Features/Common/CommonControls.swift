@@ -62,8 +62,9 @@ struct AccentFab: View {
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 56, height: 56)
-                .deadlinerGlass(in: Circle(), tint: t.accentFab, interactive: true)
-                .shadow(color: t.accentFab.opacity(0.35), radius: 12, y: 6)
+                .contentShape(Circle())
+                // 着色留出透明度，让背后的内容透过来；不另加彩色阴影（阴影透过玻璃会显脏）。
+                .deadlinerGlass(in: Circle(), tint: t.accentFab.opacity(0.72), interactive: true)
                 .scaleEffect(hovering ? 1.05 : 1)
         }
         .buttonStyle(.plain)

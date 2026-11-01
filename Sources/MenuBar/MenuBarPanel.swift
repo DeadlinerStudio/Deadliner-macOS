@@ -53,17 +53,13 @@ struct MenuBarPanelContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: 14) {
-                    ForEach(sections) { section in
-                        sectionView(section)
-                    }
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(sections) { section in
+                    sectionView(section)
                 }
-                .padding(.horizontal, 14)
-                .padding(.bottom, 10)
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .frame(maxHeight: 520)
+            .padding(.horizontal, 14)
+            .padding(.bottom, 10)
             Divider().padding(.horizontal, 14)
             footer
         }

@@ -11,6 +11,8 @@ final class MenuBarController: NSObject {
     private var panel: NSPanel?
     private var outsideClickMonitor: Any?
     private var escapeMonitor: Any?
+    private var insideClickMonitor: Any?
+    private var activationObservers: [NSObjectProtocol] = []
     private var defaultsObserver: NSObjectProtocol?
 
     init(model: AppModel, openMainWindow: @escaping () -> Void) {
@@ -93,7 +95,7 @@ final class MenuBarController: NSObject {
         let hosting = NSHostingView(rootView: content)
         let size = hosting.fittingSize
         let width = max(320, size.width)
-        let height = min(max(200, size.height), 680)
+        let height = max(200, size.height)
 
         let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
                             styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
@@ -120,6 +122,20 @@ final class MenuBarController: NSObject {
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             MainActor.assumeIsolated { self?.closePanel() }
         }
+        // 本应用其他窗口里的点击不会进入全局监听，另外用本地监听判断（面板与菜单栏图标自身除外）。
+        insideClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            MainActor.assumeIsolated {
+                guard let self, let window = event.window else { return }
+                if window !== self.panel && window !== self.statusItem?.button?.window { self.closePanel() }
+            }
+            return event
+        }
+        let center = NSWorkspace.shared.notificationCenter
+        activationObservers = [
+            center.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.closePanel() }
+            },
+        ]
         escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard event.keyCode == 53 else { return event } // Esc
             MainActor.assumeIsolated { self?.closePanel() }
@@ -132,8 +148,12 @@ final class MenuBarController: NSObject {
         panel = nil
         if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
         if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
+        if let insideClickMonitor { NSEvent.removeMonitor(insideClickMonitor) }
         outsideClickMonitor = nil
         escapeMonitor = nil
+        insideClickMonitor = nil
+        activationObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        activationObservers = []
     }
 }
 

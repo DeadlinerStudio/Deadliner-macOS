@@ -64,7 +64,7 @@ struct TaskCard: View {
         .padding(.horizontal, MiuixCard.padX)
         .padding(.vertical, MiuixCard.padY)
         .frame(height: MiuixCard.height)
-        .background { CardBackground(colors: colors, progress: progress) }
+        .background { CardBackground(colors: colors, sweepFrom: IndicatorStatus.undergo.colors(t), progress: progress) }
         .overlay(alignment: .bottomTrailing) {
             if let actions, hovering { hoverActions(actions) }
         }
@@ -134,21 +134,41 @@ struct TaskCard: View {
 }
 
 /// 卡片背景：底色、状态色浅层、从左到右的剩余时间渐变。
+/// 切换显示方式时进度从满格缩回当前值，颜色从「进行中」过渡到当前状态色。
 private struct CardBackground: View {
     let colors: IndicatorStatus.Colors
+    let sweepFrom: IndicatorStatus.Colors
     let progress: Double
+    @Environment(\.cardLayout) private var layout
+    @State private var sweeping = false
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                colors.base
-                colors.overlay
-                if progress > 0 {
-                    LinearGradient(colors: [colors.indicatorStart, colors.indicator], startPoint: .leading, endPoint: .trailing)
-                        .frame(width: proxy.size.width * progress)
-                        .animation(.easeOut(duration: 0.5), value: progress)
+        ZStack(alignment: .leading) {
+            colors.base
+            colors.overlay
+            if progress > 0 {
+                ZStack {
+                    gradient(sweepFrom)
+                    gradient(colors).opacity(sweeping ? 0 : 1)
                 }
+                .scaleEffect(x: sweeping ? 1 : progress, y: 1, anchor: .leading)
+                .animation(.easeOut(duration: 0.5), value: progress)
             }
         }
+        .onChange(of: layout) {
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) { sweeping = true }
+            withAnimation(.easeInOut(duration: 0.8).delay(0.05)) { sweeping = false }
+        }
     }
+
+    private func gradient(_ c: IndicatorStatus.Colors) -> some View {
+        LinearGradient(colors: [c.indicatorStart, c.indicator], startPoint: .leading, endPoint: .trailing)
+    }
+}
+
+extension EnvironmentValues {
+    /// 当前任务卡片的排列方式；变化时卡片播放进度回落动画。
+    @Entry var cardLayout: CardLayout = .single
 }
