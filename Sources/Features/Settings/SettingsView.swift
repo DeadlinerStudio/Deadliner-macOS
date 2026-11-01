@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// 外观设置（存 UserDefaults）。
 enum AppearanceMode: String, CaseIterable, Identifiable {
@@ -29,6 +30,8 @@ enum FontPreference {
 /// 同时用于侧栏中的「设置」页与 ⌘, 打开的设置窗口。
 struct SettingsView: View {
     let sync: SyncController
+    /// 备份导出；为 nil 时不显示「备份」分组（截图测试）。
+    var backup: LocalBackup?
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @AppStorage(ThemeAccent.storageKey) private var accentRaw = ThemeAccent.classic.rawValue
     @AppStorage(GlowStyle.storageKey) private var glowRaw = GlowStyle.immersive.rawValue
@@ -45,12 +48,14 @@ struct SettingsView: View {
     @State private var message: String?
     @State private var checks: [WebDavProbe.Check] = []
     @State private var probing = false
+    @State private var backupMessage: String?
 
     var body: some View {
         Form {
             syncSection
             if !checks.isEmpty { probeSection }
             statusSection
+            if backup != nil { backupSection }
             menuBarSection
             appearanceSection
             aboutSection
@@ -204,6 +209,36 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             .padding(.vertical, 4)
+        }
+    }
+
+    private var backupSection: some View {
+        Section {
+            LabeledContent("导出备份") {
+                Button("导出…") { exportBackup() }
+            }
+            if let backupMessage {
+                Text(verbatim: backupMessage).font(.caption).foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("备份")
+        } footer: {
+            Text("导出全部任务、习惯、分类与专注记录，格式与手机端一致。")
+        }
+    }
+
+    private func exportBackup() {
+        guard let backup else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = LocalBackup.suggestedFileName()
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try backup.export(to: url)
+            backupMessage = "已导出到 \(url.path(percentEncoded: false))"
+        } catch {
+            backupMessage = "导出失败：\(error.localizedDescription)"
         }
     }
 

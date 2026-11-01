@@ -70,6 +70,21 @@ final class OverviewTests: XCTestCase {
         }
     }
 
+    func testBackupExportWritesCoreSnapshot() throws {
+        let commands = TaskCommands(database: container.database) {}
+        var draft = TaskDraft()
+        draft.title = "示例导出"
+        _ = try commands.save(draft)
+
+        let url = directory.appendingPathComponent(LocalBackup.suggestedFileName())
+        try LocalBackup(database: container.database).export(to: url)
+        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        XCTAssertEqual(root["formatVersion"] as? Int, 1)
+        let snapshot = try XCTUnwrap(root["snapshot"] as? [String: Any])
+        XCTAssertEqual((snapshot["tasks"] as? [Any])?.count, 1)
+        XCTAssertTrue(url.lastPathComponent.hasPrefix("Deadliner-备份-"))
+    }
+
     func testHeatmapWeeksStartOnMonday() {
         // 2026-10-28 是周三：前面空出周一、周二。
         let days = (28...31).map { OverviewStore.DayCount(date: "2026-10-\($0)", completed: 1) }
