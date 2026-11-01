@@ -69,7 +69,7 @@ struct DeadlinerPalette {
 }
 
 enum MiuixRadius {
-    static let card: CGFloat = 24   // 安卓 item_corner_radius = 24dp
+    static let card: CGFloat = 28   // 参照 iOS 版任务卡片（安卓为 24dp）
     static let group: CGFloat = 20
     static let field: CGFloat = 16
     static let dialog: CGFloat = 28

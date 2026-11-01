@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 分类管理：新建、编辑、删除，以及恢复预设分类。
+/// 分类管理：系统分组表单；列表中新建、编辑、删除，以及恢复预设分类。
 struct CategoryManagerSheet: View {
     let commands: CategoryCommands
     var onClose: () -> Void
@@ -11,81 +11,76 @@ struct CategoryManagerSheet: View {
     @State private var errorMessage: String?
     @Environment(\.palette) private var t
 
-    struct CategoryForm: Identifiable {
+    struct CategoryForm {
         var id: String?
         var name = ""
         var iconKey = "folder"
         var colorHex = CategoryCommands.colors[0]
-        var formId: String { id ?? "new" }
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Text("管理分类")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(t.onSurface)
-                .padding(.vertical, 16)
-
-            if let form = Binding($editing) {
-                CategoryFormView(form: form)
-                    .padding(.horizontal, 22)
-            } else {
-                ScrollView {
-                    MiuixGroup {
-                        ForEach(categories) { category in
-                            MiuixRow(title: category.name, systemImage: CategoryIcons.symbol(for: category.iconKey),
-                                     tint: Color(hexString: category.colorHex)) {
-                                Button("编辑") { editing = CategoryForm(id: category.id, name: category.name,
-                                                                       iconKey: category.iconKey, colorHex: category.colorHex) }
-                                    .buttonStyle(.plain)
-                                    .foregroundStyle(t.primary)
-                                Button("删除") { pendingDelete = category }
-                                    .buttonStyle(.plain)
-                                    .foregroundStyle(t.error)
+        NavigationStack {
+            Group {
+                if let form = Binding($editing) {
+                    CategoryFormView(form: form)
+                        .navigationTitle(form.wrappedValue.id == nil ? "新建分类" : "编辑分类")
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) { Button("取消") { editing = nil } }
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("保存") { save() }
+                                    .disabled(form.wrappedValue.name.trimmingCharacters(in: .whitespaces).isEmpty)
                             }
                         }
-                    }
-                    .padding(.horizontal, 22)
-                }
-            }
-
-            if let errorMessage {
-                Text(errorMessage).font(.callout).foregroundStyle(t.error).padding(.top, 6)
-            }
-
-            HStack(spacing: 10) {
-                if editing != nil {
-                    Spacer()
-                    MiuixButton(title: "取消") { editing = nil }
-                        .keyboardShortcut(.cancelAction)
-                    MiuixButton(title: "保存", kind: .primary) { save() }
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(editing?.name.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
                 } else {
-                    MiuixButton(title: "恢复预设") { commands.restorePresets(); reload() }
-                    Spacer()
-                    MiuixButton(title: "新建分类") { editing = CategoryForm() }
-                    MiuixButton(title: "完成", kind: .primary) { onClose() }
-                        .keyboardShortcut(.defaultAction)
+                    list
+                        .navigationTitle("管理分类")
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) { Button("完成", action: onClose) }
+                            ToolbarItem(placement: .primaryAction) {
+                                Button("新建分类", systemImage: "plus") { editing = CategoryForm() }
+                            }
+                        }
                 }
             }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 16)
-            .background(t.groupBg)
         }
         .frame(width: 480, height: 560)
-        .background(t.pageBg)
         .onAppear(perform: reload)
         .confirmationDialog("删除分类「\(pendingDelete?.name ?? "")」？", isPresented: Binding(
             get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }
-        )) {
-            Button("删除", role: .destructive) {
-                if let category = pendingDelete { run { try commands.delete(id: category.id) } }
-                pendingDelete = nil
-            }
-        } message: {
+        ), presenting: pendingDelete) { category in
+            Button("删除", role: .destructive) { run { try commands.delete(id: category.id) } }
+        } message: { _ in
             Text("使用这个分类的任务会变成无分类。启用同步后，删除也会同步到手机。")
         }
+    }
+
+    private var list: some View {
+        Form {
+            Section {
+                ForEach(categories) { category in
+                    HStack(spacing: 12) {
+                        Image(systemName: CategoryIcons.symbol(for: category.iconKey))
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 26, height: 26)
+                            .background(Color(hexString: category.colorHex) ?? t.primary, in: Circle())
+                        Text(category.name)
+                        Spacer()
+                        Button("编辑") {
+                            editing = CategoryForm(id: category.id, name: category.name, iconKey: category.iconKey, colorHex: category.colorHex)
+                        }
+                        Button("删除", role: .destructive) { pendingDelete = category }
+                    }
+                    .buttonStyle(.borderless)
+                }
+            } footer: {
+                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+            }
+            Section {
+                Button("恢复预设分类") { commands.restorePresets(); reload() }
+            }
+        }
+        .formStyle(.grouped)
     }
 
     private func reload() { categories = commands.list() }
@@ -113,46 +108,47 @@ struct CategoryManagerSheet: View {
     }
 }
 
-/// 新建 / 编辑分类的表单：名称、图标、颜色。
+/// 新建 / 编辑分类：名称、颜色、图标。
 private struct CategoryFormView: View {
     @Binding var form: CategoryManagerSheet.CategoryForm
     @Environment(\.palette) private var t
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                MiuixTextField(placeholder: "分类名称", text: $form.name, font: .system(size: 15, weight: .semibold))
-                MiuixGroup(title: "颜色") {
-                    FlowLayout(spacing: 10) {
-                        ForEach(CategoryCommands.colors, id: \.self) { hex in
-                            let color = Color(hexString: hex) ?? t.primary
-                            Button { form.colorHex = hex } label: {
-                                Circle().fill(color).frame(width: 26, height: 26)
-                                    .overlay(Circle().strokeBorder(t.onSurface, lineWidth: form.colorHex.uppercased() == hex ? 2.5 : 0).padding(-4))
-                            }
-                            .buttonStyle(.plain)
-                        }
+        Form {
+            Section {
+                TextField("名称", text: $form.name, prompt: Text("分类名称"))
+                    .labelsHidden()
+                    .multilineTextAlignment(.leading)
+            }
+            Section("颜色") {
+                FlowLayout(spacing: 10) {
+                    ForEach(CategoryCommands.colors, id: \.self) { hex in
+                        ColorSwatch(hex: hex, selected: form.colorHex.uppercased() == hex) { form.colorHex = hex }
                     }
-                    .padding(14)
                 }
-                MiuixGroup(title: "图标") {
-                    FlowLayout(spacing: 8) {
-                        ForEach(CategoryCommands.iconKeys, id: \.self) { key in
-                            let selected = form.iconKey == key
-                            let color = Color(hexString: form.colorHex) ?? t.primary
-                            Button { form.iconKey = key } label: {
-                                Image(systemName: CategoryIcons.symbol(for: key))
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(selected ? .white : t.onSurface)
-                                    .frame(width: 34, height: 34)
-                                    .background(selected ? color : t.fieldBg, in: Circle())
-                            }
-                            .buttonStyle(.plain)
+                .padding(.vertical, 4)
+            }
+            Section("图标") {
+                FlowLayout(spacing: 8) {
+                    ForEach(CategoryCommands.iconKeys, id: \.self) { key in
+                        let selected = form.iconKey == key
+                        let color = Color(hexString: form.colorHex) ?? t.primary
+                        Button { form.iconKey = key } label: {
+                            Image(systemName: CategoryIcons.symbol(for: key))
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(selected ? Color.white : t.onSurface)
+                                .frame(width: 34, height: 34)
+                                .background(selected ? color : t.fieldBg, in: Circle())
+                                .contentShape(Circle())
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(key)
+                        .accessibilityAddTraits(selected ? .isSelected : [])
                     }
-                    .padding(14)
                 }
+                .padding(.vertical, 4)
             }
         }
+        .formStyle(.grouped)
     }
 }

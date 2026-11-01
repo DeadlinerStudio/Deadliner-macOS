@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// 任务卡片（对齐安卓 DDLItemCardSimplified）：76 高、24 圆角；
-/// 纯色底 + 状态色浅层 + 剩余时间渐变进度；
-/// 第一行 星标 / 标题 / 剩余时间，第二行 分类 / 子任务进度 / 备注。
+/// 任务卡片：76 高、28 圆角；纯色底 + 状态色浅层 + 剩余时间渐变进度（色块与 Android 一致）。
+/// 第一行 星标 / 标题 / 分类 / 剩余时间，第二行 子任务进度 / 备注（没有备注时保留空行，标题位置固定）。
+/// 不显示勾选框：完成等操作在悬停按钮、右键菜单与编辑器中。
 struct TaskCard: View {
     /// 卡片上的操作；为 nil 时卡片只读（截图测试使用）。
     struct Actions {
@@ -28,50 +28,37 @@ struct TaskCard: View {
         let remaining = TaskStatus.remainingText(task, now: now)
         let muted = task.isCompleted || task.isAbandoned
 
-        HStack(spacing: 10) {
-            Button { actions?.toggleComplete() } label: {
-                Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 19))
-                    .foregroundStyle(task.isCompleted ? t.completedCheck : t.onSurfaceVariant.opacity(task.isAbandoned ? 0.4 : 0.85))
-                    .contentShape(Circle())
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                if task.isStarred {
+                    Image(systemName: "star.fill")
+                        .font(.title3)
+                        .foregroundStyle(status.solid(t))
+                }
+                Text(task.title)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(t.onSurface.opacity(muted ? 0.6 : 1))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 8)
+                if let category { CategoryChip(category: category) }
+                if !remaining.isEmpty {
+                    Text(remaining)
+                        .font(.caption)
+                        .foregroundStyle(t.onSurface.opacity(0.8))
+                        .lineLimit(1)
+                        .fixedSize()
+                }
             }
-            .buttonStyle(.plain)
-            .disabled(actions == nil || task.isAbandoned)
-            .help(task.isCompleted ? "取消完成" : "标记完成")
-
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 6) {
-                    if task.isStarred {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 15))
-                            .foregroundStyle(status.solid(t))
-                    }
-                    Text(task.title)
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(t.onSurface.opacity(muted ? 0.6 : 1))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    if !remaining.isEmpty {
-                        Text(remaining)
-                            .font(.system(size: 12))
-                            .foregroundStyle(t.onSurface.opacity(0.85))
-                            .lineLimit(1)
-                            .fixedSize()
-                    }
-
-                }
-                Spacer(minLength: 0)
-                HStack(spacing: 6) {
-                    if let category { CategoryChip(category: category) }
-                    if task.subtaskTotal > 0 { CountPill(text: "\(task.subtaskDone)/\(task.subtaskTotal)") }
-                    Text(task.note)
-                        .font(.system(size: 12))
-                        .foregroundStyle(t.onSurfaceVariant)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+            .frame(minHeight: 24)
+            HStack(spacing: 6) {
+                if task.subtaskTotal > 0 { CountPill(text: "\(task.subtaskDone)/\(task.subtaskTotal)") }
+                Text(task.note.isEmpty ? "\u{00A0}" : task.note)
+                    .font(.caption)
+                    .foregroundStyle(t.onSurfaceVariant)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(.horizontal, MiuixCard.padX)
@@ -79,24 +66,7 @@ struct TaskCard: View {
         .frame(height: MiuixCard.height)
         .background { CardBackground(colors: colors, progress: progress) }
         .overlay(alignment: .bottomTrailing) {
-            if let actions, hovering {
-                // 悬停时浮在右下角的「更多」按钮，与右键菜单相同；不占用卡片布局。
-                Menu { menu(actions) } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(t.onSurface)
-                        .frame(width: 26, height: 20)
-                        .background(.regularMaterial, in: Capsule())
-                        .contentShape(Capsule())
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .padding(.trailing, 12)
-                .padding(.bottom, 10)
-                .help("更多操作")
-                .transition(.opacity)
-            }
+            if let actions, hovering { hoverActions(actions) }
         }
         .clipShape(RoundedRectangle(cornerRadius: MiuixRadius.card, style: .continuous))
         .shadow(color: .black.opacity(t.isDark ? 0 : (hovering ? 0.08 : 0.04)), radius: hovering ? 7 : 1, y: hovering ? 4 : 1)
@@ -105,8 +75,48 @@ struct TaskCard: View {
         .onHover { hovering = $0 }
         .contentShape(RoundedRectangle(cornerRadius: MiuixRadius.card, style: .continuous))
         .onTapGesture { actions?.open() }
-        .contextMenu { if let actions { menu(actions) } }
+        .contextMenu {
+            if let actions {
+                Button(task.isCompleted ? "取消完成" : "标记完成", systemImage: task.isCompleted ? "arrow.uturn.backward.circle" : "checkmark.circle",
+                       action: actions.toggleComplete)
+                    .disabled(task.isAbandoned)
+                menu(actions)
+            }
+        }
         .accessibilityElement(children: .contain)
+    }
+
+    /// 悬停时浮在右下角的玻璃按钮：完成 / 取消完成，以及「更多」菜单（与右键菜单相同），不占用卡片布局。
+    private func hoverActions(_ actions: Actions) -> some View {
+        HStack(spacing: 6) {
+            if !task.isAbandoned {
+                Button(action: actions.toggleComplete) {
+                    Label(task.isCompleted ? "取消完成" : "完成", systemImage: task.isCompleted ? "arrow.uturn.backward" : "checkmark")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 10)
+                        .frame(height: 24)
+                        .deadlinerGlass(in: Capsule(), interactive: true)
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .help(task.isCompleted ? "取消完成" : "标记完成")
+            }
+            Menu { menu(actions) } label: {
+                Image(systemName: "ellipsis")
+                    .font(.caption.weight(.bold))
+                    .frame(width: 28, height: 24)
+                    .deadlinerGlass(in: Capsule(), interactive: true)
+                    .contentShape(Capsule())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("更多操作")
+        }
+        .foregroundStyle(t.onSurface)
+        .padding(.trailing, 12)
+        .padding(.bottom, 8)
+        .transition(.opacity)
     }
 
     @ViewBuilder

@@ -1,11 +1,10 @@
 import SwiftUI
 import Shared
 
-/// 任务编辑器（仿安卓底部弹出面板）：圆角 28，填充式输入框，操作按钮在底部。
+/// 任务编辑器：系统弹窗 + 分组表单，取消 / 保存在系统按钮位置；分类选择保留 Deadliner 的彩色标签。
 struct TaskEditorSheet: View {
     let commands: TaskCommands
     let categoryCommands: CategoryCommands
-    let original: TaskDraft
     var onClose: () -> Void
 
     @State private var draft: TaskDraft
@@ -14,12 +13,10 @@ struct TaskEditorSheet: View {
     @State private var errorMessage: String?
     @State private var confirmDelete = false
     @State private var managingCategories = false
-    @Environment(\.palette) private var t
 
     init(commands: TaskCommands, categoryCommands: CategoryCommands, draft: TaskDraft, onClose: @escaping () -> Void) {
         self.commands = commands
         self.categoryCommands = categoryCommands
-        self.original = draft
         self.onClose = onClose
         _draft = State(initialValue: draft)
     }
@@ -27,41 +24,89 @@ struct TaskEditorSheet: View {
     private var isEditing: Bool { draft.id != nil }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Capsule()
-                .fill(t.onSurfaceVariant.opacity(0.35))
-                .frame(width: 36, height: 4)
-                .padding(.top, 10)
-            Text(isEditing ? "编辑任务" : "新建任务")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(t.onSurface)
-                .padding(.top, 12)
-                .padding(.bottom, 14)
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    MiuixTextField(placeholder: "任务标题", text: $draft.title, font: .system(size: 16, weight: .semibold))
-                    MiuixTextField(placeholder: "备注", text: $draft.note, axis: .vertical)
-                    timeGroup
-                    categoryGroup
-                    subtaskGroup
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("标题", text: $draft.title, prompt: Text("任务标题"))
+                        .labelsHidden()
+                        .multilineTextAlignment(.leading)
+                        .font(.title3.weight(.semibold))
+                    TextField("备注", text: $draft.note, prompt: Text("备注"), axis: .vertical)
+                        .labelsHidden()
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(3...6)
                 }
-                .padding(.horizontal, 22)
-                .padding(.bottom, 16)
-            }
 
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.callout)
-                    .foregroundStyle(t.error)
-                    .padding(.horizontal, 22)
-                    .padding(.bottom, 6)
+                Section("时间") {
+                    OptionalDateRow(title: "开始时间", date: $draft.startAt, defaultValue: Self.defaultStart)
+                    OptionalDateRow(title: "截止时间", date: $draft.dueAt, defaultValue: Self.defaultDue)
+                    Toggle("标星", isOn: $draft.isStarred)
+                }
+
+                Section {
+                    FlowLayout(spacing: 8) {
+                        CategoryChoiceChip(title: "无分类", selected: draft.categoryId == nil) { draft.categoryId = nil }
+                        ForEach(categories) { category in
+                            CategoryChoiceChip(title: category.name, icon: CategoryIcons.symbol(for: category.iconKey),
+                                               color: Color(hexString: category.colorHex), selected: draft.categoryId == category.id) {
+                                draft.categoryId = category.id
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                } header: {
+                    HStack {
+                        Text("分类")
+                        Spacer()
+                        Button("管理分类…") { managingCategories = true }
+                            .buttonStyle(.link)
+                            .font(.caption)
+                    }
+                }
+
+                Section("子任务") {
+                    ForEach(Array(draft.subtasks.enumerated()), id: \.element.id) { index, _ in
+                        SubtaskRow(
+                            subtask: $draft.subtasks[index],
+                            canMoveUp: index > 0,
+                            canMoveDown: index < draft.subtasks.count - 1,
+                            moveUp: { draft.subtasks.swapAt(index, index - 1) },
+                            moveDown: { draft.subtasks.swapAt(index, index + 1) },
+                            remove: { draft.subtasks.remove(at: index) }
+                        )
+                    }
+                    TextField("添加子任务", text: $newSubtask, prompt: Text("添加子任务，回车确认"))
+                        .labelsHidden()
+                        .multilineTextAlignment(.leading)
+                        .onSubmit(addSubtask)
+                }
+
+                if isEditing {
+                    Section {
+                        Button("删除任务", role: .destructive) { confirmDelete = true }
+                    }
+                }
+
+                if let errorMessage {
+                    Section { Text(errorMessage).foregroundStyle(.red) }
+                }
             }
-            bottomBar
+            .formStyle(.grouped)
+            .navigationTitle(isEditing ? "编辑任务" : "新建任务")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消", action: onClose)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") {
+                        addSubtask()
+                        perform { try commands.save(draft) }
+                    }
+                    .disabled(!draft.isValid)
+                }
+            }
         }
-        .frame(width: 520, height: 660)
-        .background(t.pageBg)
-        .clipShape(RoundedRectangle(cornerRadius: MiuixRadius.dialog, style: .continuous))
+        .frame(width: 520, height: 640)
         .onAppear { categories = categoryCommands.list() }
         .sheet(isPresented: $managingCategories, onDismiss: { categories = categoryCommands.list() }) {
             CategoryManagerSheet(commands: categoryCommands) { managingCategories = false }
@@ -74,127 +119,14 @@ struct TaskEditorSheet: View {
         }
     }
 
-    // MARK: - Groups
-
-    private var timeGroup: some View {
-        MiuixGroup(title: "时间") {
-            dateRow("开始时间", systemImage: "play.circle", tint: t.secondary, date: $draft.startAt)
-            dateRow("截止时间", systemImage: "flag", tint: t.error, date: $draft.dueAt)
-            MiuixRow(title: "标星", systemImage: "star.fill", tint: Color(hex: 0xF5A623)) {
-                Toggle("", isOn: $draft.isStarred).labelsHidden().toggleStyle(.miuix)
-            }
-        }
+    private static func defaultStart() -> Date {
+        Calendar.current.date(bySetting: .minute, value: 0, of: Date()) ?? Date()
     }
 
-    private func dateRow(_ title: String, systemImage: String, tint: Color, date: Binding<Date?>) -> some View {
-        MiuixRow(title: title, systemImage: systemImage, tint: tint) {
-            if let value = date.wrappedValue {
-                DatePicker("", selection: Binding(get: { value }, set: { date.wrappedValue = $0 }), displayedComponents: [.date, .hourAndMinute])
-                    .labelsHidden()
-                    .datePickerStyle(.compact)
-            }
-            Toggle("", isOn: Binding(
-                get: { date.wrappedValue != nil },
-                set: { date.wrappedValue = $0 ? Self.defaultDate(for: title) : nil }
-            ))
-            .labelsHidden()
-            .toggleStyle(.miuix)
-        }
-    }
-
-    private static func defaultDate(for title: String) -> Date {
+    private static func defaultDue() -> Date {
         let calendar = Calendar.current
-        let base = title == "开始时间" ? Date() : calendar.date(byAdding: .day, value: 1, to: Date())!
-        return calendar.date(bySettingHour: title == "开始时间" ? calendar.component(.hour, from: base) : 23,
-                             minute: title == "开始时间" ? 0 : 59, second: 0, of: base) ?? base
-    }
-
-    private var categoryGroup: some View {
-        MiuixGroup(title: "分类") {
-            FlowLayout(spacing: 8) {
-                choiceChip("无分类", selected: draft.categoryId == nil) { draft.categoryId = nil }
-                ForEach(categories) { category in
-                    choiceChip(category.name, icon: CategoryIcons.symbol(for: category.iconKey),
-                               color: Color(hexString: category.colorHex), selected: draft.categoryId == category.id) {
-                        draft.categoryId = category.id
-                    }
-                }
-                Button { managingCategories = true } label: {
-                    Label("管理分类", systemImage: "slider.horizontal.3")
-                        .font(.system(size: 12.5, weight: .medium))
-                        .foregroundStyle(t.primary)
-                        .padding(.horizontal, 10)
-                        .frame(height: 28)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-        }
-    }
-
-    private func choiceChip(_ title: String, icon: String? = nil, color: Color? = nil, selected: Bool, action: @escaping () -> Void) -> some View {
-        let tint = color ?? t.onSurfaceVariant
-        return Button(action: action) {
-            HStack(spacing: 4) {
-                if let icon { Image(systemName: icon).font(.system(size: 11, weight: .semibold)) }
-                Text(title).lineLimit(1)
-            }
-            .font(.system(size: 12.5, weight: .semibold))
-            .foregroundStyle(selected ? Color.white : tint)
-            .padding(.horizontal, 10)
-            .frame(height: 28)
-            .background(selected ? tint : tint.opacity(t.isDark ? 0.22 : 0.12), in: Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var subtaskGroup: some View {
-        MiuixGroup(title: "子任务") {
-            ForEach(Array(draft.subtasks.enumerated()), id: \.element.id) { index, _ in
-                HStack(spacing: 10) {
-                    Button { draft.subtasks[index].isCompleted.toggle() } label: {
-                        Image(systemName: draft.subtasks[index].isCompleted ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 17))
-                            .foregroundStyle(draft.subtasks[index].isCompleted ? t.completedCheck : t.onSurfaceVariant)
-                    }
-                    .buttonStyle(.plain)
-                    TextField("子任务", text: $draft.subtasks[index].content)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 14))
-                        .strikethrough(draft.subtasks[index].isCompleted)
-                        .foregroundStyle(t.onSurface)
-                    iconButton("chevron.up", disabled: index == 0) { draft.subtasks.swapAt(index, index - 1) }
-                    iconButton("chevron.down", disabled: index == draft.subtasks.count - 1) { draft.subtasks.swapAt(index, index + 1) }
-                    iconButton("xmark", disabled: false) { draft.subtasks.remove(at: index) }
-                }
-                .padding(.horizontal, 14)
-                .frame(minHeight: 38)
-            }
-            HStack(spacing: 10) {
-                Image(systemName: "plus.circle")
-                    .font(.system(size: 17))
-                    .foregroundStyle(t.primary)
-                TextField("添加子任务，回车确认", text: $newSubtask)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 14))
-                    .onSubmit(addSubtask)
-            }
-            .padding(.horizontal, 14)
-            .frame(minHeight: 38)
-        }
-    }
-
-    private func iconButton(_ name: String, disabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: name)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(t.onSurfaceVariant)
-                .frame(width: 22, height: 22)
-        }
-        .buttonStyle(.plain)
-        .disabled(disabled)
-        .opacity(disabled ? 0.3 : 1)
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date())!
+        return calendar.date(bySettingHour: 23, minute: 59, second: 0, of: tomorrow) ?? tomorrow
     }
 
     private func addSubtask() {
@@ -204,28 +136,6 @@ struct TaskEditorSheet: View {
         newSubtask = ""
     }
 
-    // MARK: - Bottom bar
-
-    private var bottomBar: some View {
-        HStack(spacing: 10) {
-            if isEditing {
-                MiuixButton(title: "删除", kind: .destructive) { confirmDelete = true }
-            }
-            Spacer()
-            MiuixButton(title: "取消") { onClose() }
-                .keyboardShortcut(.cancelAction)
-            MiuixButton(title: "保存", kind: .primary) {
-                addSubtask()
-                perform { try commands.save(draft) }
-            }
-            .keyboardShortcut(.defaultAction)
-            .disabled(!draft.isValid)
-        }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 16)
-        .background(t.groupBg)
-    }
-
     private func perform(_ body: () throws -> Void) {
         do {
             try body()
@@ -233,5 +143,84 @@ struct TaskEditorSheet: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+/// 可选日期：开关打开时显示系统日期时间选择器。
+struct OptionalDateRow: View {
+    let title: String
+    @Binding var date: Date?
+    var components: DatePickerComponents = [.date, .hourAndMinute]
+    var defaultValue: () -> Date
+
+    var body: some View {
+        Toggle(title, isOn: Binding(get: { date != nil }, set: { date = $0 ? (date ?? defaultValue()) : nil }))
+        if let value = date {
+            DatePicker(title, selection: Binding(get: { value }, set: { date = $0 }), displayedComponents: components)
+                .labelsHidden()
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+    }
+}
+
+/// 子任务行：勾选、内容、上移 / 下移 / 删除。
+private struct SubtaskRow: View {
+    @Binding var subtask: TaskDraft.Subtask
+    let canMoveUp: Bool
+    let canMoveDown: Bool
+    var moveUp: () -> Void
+    var moveDown: () -> Void
+    var remove: () -> Void
+    @Environment(\.palette) private var t
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button { subtask.isCompleted.toggle() } label: {
+                Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(subtask.isCompleted ? t.completedCheck : .secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(subtask.isCompleted ? "标记未完成" : "标记完成")
+            TextField("子任务", text: $subtask.content)
+                .labelsHidden()
+                .multilineTextAlignment(.leading)
+                .textFieldStyle(.plain)
+                .strikethrough(subtask.isCompleted)
+            Button(action: moveUp) { Image(systemName: "chevron.up") }
+                .disabled(!canMoveUp).help("上移")
+            Button(action: moveDown) { Image(systemName: "chevron.down") }
+                .disabled(!canMoveDown).help("下移")
+            Button(action: remove) { Image(systemName: "xmark") }
+                .help("删除子任务")
+        }
+        .buttonStyle(.borderless)
+    }
+}
+
+/// 分类选择标签：彩色胶囊，选中时填充分类色。
+struct CategoryChoiceChip: View {
+    let title: String
+    var icon: String?
+    var color: Color?
+    let selected: Bool
+    var action: () -> Void
+    @Environment(\.palette) private var t
+
+    var body: some View {
+        let tint = color ?? t.onSurfaceVariant
+        Button(action: action) {
+            HStack(spacing: 4) {
+                if let icon { Image(systemName: icon).font(.caption.weight(.semibold)) }
+                Text(title).lineLimit(1)
+            }
+            .font(.callout.weight(.medium))
+            .foregroundStyle(selected ? Color.white : tint)
+            .padding(.horizontal, 10)
+            .frame(height: 26)
+            .background(selected ? tint : tint.opacity(t.isDark ? 0.22 : 0.12), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
