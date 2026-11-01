@@ -8,9 +8,29 @@ struct TopAtmosphere: View {
     let tone: Color
     var height: CGFloat = 300
     @Environment(\.colorScheme) private var scheme
+    @AppStorage(GlowStyle.storageKey) private var styleRaw = GlowStyle.immersive.rawValue
+    @AppStorage(ThemeAccent.storageKey) private var accentRaw = ThemeAccent.classic.rawValue
 
     var body: some View {
+        let style = GlowStyle(rawValue: styleRaw) ?? .immersive
         let strength = scheme == .dark ? 0.32 : 0.18
+        Group {
+            switch style {
+            case .immersive: immersive(strength: strength)
+            case .vivid: vivid(strength: strength * 1.25)
+            case .off: Color.clear
+            }
+        }
+        .frame(height: height)
+        .mask(LinearGradient(colors: [.black, .black, .clear], startPoint: .top, endPoint: .bottom))
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+        .animation(.easeInOut(duration: 0.24), value: tone)
+        .animation(.easeInOut(duration: 0.24), value: styleRaw)
+    }
+
+    /// 沉浸：按页面语义着色的单色渐变。
+    private func immersive(strength: Double) -> some View {
         ZStack(alignment: .top) {
             LinearGradient(
                 stops: [
@@ -24,17 +44,37 @@ struct TopAtmosphere: View {
             RadialGradient(colors: [tone.opacity(strength * 0.9), .clear], center: .init(x: 0.15, y: 0), startRadius: 0, endRadius: height * 0.9)
             RadialGradient(colors: [tone.opacity(strength * 0.6), .clear], center: .init(x: 0.85, y: 0.1), startRadius: 0, endRadius: height * 0.7)
         }
-        .frame(height: height)
-        .mask(LinearGradient(colors: [.black, .black, .clear], startPoint: .top, endPoint: .bottom))
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-        .animation(.easeInOut(duration: 0.24), value: tone)
+    }
+
+    /// 幻彩：主题对应的三色流光。
+    private func vivid(strength: Double) -> some View {
+        let colors = (ThemeAccent(rawValue: accentRaw) ?? .classic).glowColors
+        return ZStack(alignment: .top) {
+            RadialGradient(colors: [colors[0].opacity(strength), .clear], center: .init(x: 0.1, y: 0), startRadius: 0, endRadius: height)
+            RadialGradient(colors: [colors[1].opacity(strength * 0.9), .clear], center: .init(x: 0.55, y: -0.1), startRadius: 0, endRadius: height * 0.9)
+            RadialGradient(colors: [colors[2].opacity(strength * 0.85), .clear], center: .init(x: 0.95, y: 0.05), startRadius: 0, endRadius: height * 0.85)
+        }
+    }
+}
+
+/// macOS 26 起把浮光延伸到侧栏下方（系统的 backgroundExtensionEffect）；旧系统不延伸。
+private struct ExtendUnderSidebar: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.backgroundExtensionEffect()
+        } else {
+            content
+        }
     }
 }
 
 extension View {
     /// 在页面顶部铺一层氛围光。
     func topAtmosphere(_ tone: Color) -> some View {
-        background(alignment: .top) { TopAtmosphere(tone: tone).ignoresSafeArea(edges: .top) }
+        background(alignment: .top) {
+            TopAtmosphere(tone: tone)
+                .modifier(ExtendUnderSidebar())
+                .ignoresSafeArea(edges: [.top, .leading])
+        }
     }
 }

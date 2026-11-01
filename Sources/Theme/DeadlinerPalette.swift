@@ -19,12 +19,12 @@ struct DeadlinerPalette {
     let onSurfaceVariant: Color
     let cardBase: Color
     // 品牌与状态（与 Android 一致）
-    let primary: Color
+    var primary: Color
     let secondary: Color
     let tertiary: Color
     let error: Color
     let abandoned: Color
-    let accentFab: Color
+    var accentFab: Color
     let completedCheck: Color
 
     private static let surfaces = (
@@ -58,7 +58,14 @@ struct DeadlinerPalette {
         completedCheck: Color(hex: 0x2E9E5B)
     )
 
-    static func of(_ scheme: ColorScheme) -> DeadlinerPalette { scheme == .dark ? dark : light }
+    static func of(_ scheme: ColorScheme, accent: ThemeAccent = .classic) -> DeadlinerPalette {
+        var palette = scheme == .dark ? dark : light
+        if let color = accent.color {
+            palette.primary = color
+            palette.accentFab = color
+        }
+        return palette
+    }
 }
 
 enum MiuixRadius {
@@ -144,11 +151,16 @@ extension EnvironmentValues {
     }
 }
 
-/// 根据当前深浅色注入 MIUIX 参数。
+/// 根据深浅色与主题色注入调色板；非「经典」主题时系统控件的强调色也跟随主题。
 struct DeadlinerThemeModifier: ViewModifier {
     @Environment(\.colorScheme) private var scheme
+    @AppStorage(ThemeAccent.storageKey) private var accentRaw = ThemeAccent.classic.rawValue
+
     func body(content: Content) -> some View {
-        content.environment(\.palette, .of(scheme))
+        let accent = ThemeAccent(rawValue: accentRaw) ?? .classic
+        content
+            .environment(\.palette, .of(scheme, accent: accent))
+            .tint(accent.color)
     }
 }
 

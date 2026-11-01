@@ -28,6 +28,8 @@ struct SettingsView: View {
     var database: DeadlinerDatabase?
     var onDataChanged: () -> Void = {}
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
+    @AppStorage(ThemeAccent.storageKey) private var accentRaw = ThemeAccent.classic.rawValue
+    @AppStorage(GlowStyle.storageKey) private var glowRaw = GlowStyle.immersive.rawValue
     @Environment(\.palette) private var t
 
     @State private var form = SyncSettings(serverURL: "", username: "", enabled: false)
@@ -167,7 +169,50 @@ struct SettingsView: View {
                 .labelsHidden()
                 .fixedSize()
             }
+            MiuixRow(title: "顶部浮光", systemImage: "sparkles", tint: Color(hex: 0xEC4899)) {
+                Picker("", selection: $glowRaw) {
+                    ForEach(GlowStyle.allCases) { Text($0.displayName).tag($0.rawValue) }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .fixedSize()
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("主题色").font(.callout).foregroundStyle(t.onSurface)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 8)], spacing: 10) {
+                    ForEach(ThemeAccent.allCases) { accent in
+                        accentSwatch(accent)
+                    }
+                }
+                Text("「经典」与手机配色一致；其他主题会改变主色、「+」按钮与系统控件的颜色，状态色不变。")
+                    .font(.caption)
+                    .foregroundStyle(t.onSurfaceVariant)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
         }
+    }
+
+    private func accentSwatch(_ accent: ThemeAccent) -> some View {
+        let selected = accentRaw == accent.rawValue
+        let color = accent.color ?? DeadlinerPalette.of(t.isDark ? .dark : .light).primary
+        return Button { accentRaw = accent.rawValue } label: {
+            VStack(spacing: 4) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 26, height: 26)
+                    .overlay(Circle().strokeBorder(t.onSurface, lineWidth: selected ? 2.5 : 0).padding(-4))
+                Text(accent.displayName)
+                    .font(.caption)
+                    .foregroundStyle(selected ? t.onSurface : t.onSurfaceVariant)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("主题色 \(accent.displayName)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     @ViewBuilder
