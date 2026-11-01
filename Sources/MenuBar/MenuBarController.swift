@@ -51,27 +51,30 @@ final class MenuBarController: NSObject {
         button.action = #selector(togglePanel)
         button.setAccessibilityLabel("Deadliner")
 
-        let label = PassthroughHostingView(rootView: AnyView(
-            LiveStatusLabel(model: model) { [weak item] size in
-                // 只按内容宽度设置，取整到整点；忽略重新布局时的瞬时值和不到 1pt 的变化，
-                // 避免图标在多块显示器的菜单栏之间切换时宽度来回变化。
-                guard let item, size.width >= 10 else { return }
-                let length = max(22, size.width.rounded(.up))
-                if abs(item.length - length) >= 1 { item.length = length }
-            }
-            .deadlinerTheme()
-        ))
-        // 不让 SwiftUI 的尺寸约束反过来影响菜单栏按钮的宽度（宽度只由 item.length 决定）。
-        label.sizingOptions = []
+        Self.attachLabel(AnyView(LiveStatusLabel(model: model).deadlinerTheme()), to: item)
+        statusItem = item
+    }
+
+    /// 把 SwiftUI 内容放进菜单栏按钮。嵌入视图只报告内容本身的尺寸，在按钮中居中；
+    /// 按钮宽度（`item.length`）在内容尺寸变化时设为内容宽度。嵌入视图不约束按钮的宽度，
+    /// 否则非活动显示器上的菜单栏副本宽度会和活动屏幕不同。
+    static func attachLabel(_ content: AnyView, to item: NSStatusItem) {
+        guard let button = item.button else { return }
+        let label = PassthroughHostingView(rootView: AnyView(content.fixedSize()))
+        label.sizingOptions = [.intrinsicContentSize]
+        label.onIntrinsicSizeChange = { [weak item] size in
+            // 取整到整点；忽略瞬时的过小值和不到 1pt 的变化。
+            guard let item, size.width >= 10 else { return }
+            let length = max(22, size.width.rounded(.up))
+            if abs(item.length - length) >= 1 { item.length = length }
+        }
         label.translatesAutoresizingMaskIntoConstraints = false
         button.addSubview(label)
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: button.leadingAnchor),
-            label.trailingAnchor.constraint(equalTo: button.trailingAnchor),
-            label.topAnchor.constraint(equalTo: button.topAnchor),
-            label.bottomAnchor.constraint(equalTo: button.bottomAnchor),
+            label.centerXAnchor.constraint(equalTo: button.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: button.centerYAnchor),
         ])
-        statusItem = item
+        label.reportIntrinsicSize()
     }
 
     private func removeStatusItem() {
@@ -165,5 +168,17 @@ final class MenuBarController: NSObject {
 
 /// 不拦截鼠标事件的 NSHostingView，让点击落到菜单栏按钮上。
 private final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
+    var onIntrinsicSizeChange: ((CGSize) -> Void)?
+
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func invalidateIntrinsicContentSize() {
+        super.invalidateIntrinsicContentSize()
+        // SwiftUI 内容变化（数字位数、样式）时会走到这里；下一轮再读取，拿到更新后的尺寸。
+        DispatchQueue.main.async { [weak self] in self?.reportIntrinsicSize() }
+    }
+
+    func reportIntrinsicSize() {
+        onIntrinsicSizeChange?(intrinsicContentSize)
+    }
 }

@@ -72,10 +72,9 @@ struct StatusLabelView: View {
     }
 }
 
-/// 读取 AppModel 与设置，每分钟刷新一次，并把自身尺寸报告给菜单栏项目。
+/// 读取 AppModel 与设置，每分钟刷新一次。
 struct LiveStatusLabel: View {
     let model: AppModel
-    var onSize: (CGSize) -> Void
     @AppStorage(MenuBarSettings.styleKey) private var styleRaw = StatusItemStyle.iconCount.rawValue
     @AppStorage(MenuBarSettings.fieldsKey) private var fieldsRaw = StatusField.encode(StatusField.defaults)
 
@@ -87,15 +86,6 @@ struct LiveStatusLabel: View {
                 fields: StatusField.decode(fieldsRaw),
                 now: context.date
             )
-            // 测量的是内容本身（fixedSize），与菜单栏的高度、所在显示器无关。
-            .background(GeometryReader { proxy in Color.clear.preference(key: LabelSizeKey.self, value: proxy.size) })
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onPreferenceChange(LabelSizeKey.self) { size in onSize(size) }
     }
-}
-
-private struct LabelSizeKey: PreferenceKey {
-    static let defaultValue: CGSize = .zero
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) { value = nextValue() }
 }

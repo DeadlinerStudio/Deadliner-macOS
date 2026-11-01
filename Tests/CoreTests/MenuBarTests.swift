@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import DeadlinerTestHost
 
@@ -38,5 +39,25 @@ final class MenuBarSummaryTests: XCTestCase {
         XCTAssertEqual(PanelSection.decode(nil), PanelSection.defaults)
         XCTAssertEqual(PanelSection.decode(""), [])
         XCTAssertEqual(PanelSection.encode([.tasks, .sync]), "tasks,sync")
+    }
+
+    /// 菜单栏项目的宽度跟随内容（2026-11-01：关掉尺寸约束后宽度没被设上，图标只显示一半、数字消失）。
+    @MainActor
+    func testStatusItemLengthFollowsContent() throws {
+        let summary = MenuBarSummary.make(tasks: (0..<12).map { task("t\($0)", due: -3600 * Double($0 + 1)) }, habits: [], today: nil,
+                                          focusTodaySeconds: 0, focusDays: [], now: now)
+        XCTAssertEqual(summary.pending, 12)
+        let content = StatusLabelView(summary: summary, style: .iconCount, fields: [], now: now)
+        let expected = NSHostingView(rootView: content).fittingSize.width.rounded(.up)
+        XCTAssertGreaterThan(expected, 30)
+
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        defer { NSStatusBar.system.removeStatusItem(item) }
+        MenuBarController.attachLabel(AnyView(content), to: item)
+        let deadline = Date().addingTimeInterval(2)
+        while abs(item.length - expected) > 1 && Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        }
+        XCTAssertEqual(item.length, expected, accuracy: 1)
     }
 }
