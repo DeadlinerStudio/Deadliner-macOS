@@ -134,7 +134,8 @@ struct TaskCard: View {
 }
 
 /// 卡片背景：底色、状态色浅层、从左到右的剩余时间渐变。
-/// 切换显示方式时进度从满格缩回当前值，颜色从「进行中」过渡到当前状态色。
+/// 切换显示方式时旧色块直接移除，在卡片的新位置重新创建色块，从满格缩回当前值，
+/// 颜色从「进行中」过渡到当前状态色。
 private struct CardBackground: View {
     let colors: IndicatorStatus.Colors
     let sweepFrom: IndicatorStatus.Colors
@@ -153,13 +154,19 @@ private struct CardBackground: View {
                 }
                 .scaleEffect(x: sweeping ? 1 : progress, y: 1, anchor: .leading)
                 .animation(.easeOut(duration: 0.5), value: progress)
+                // 每种排列方式一个新色块：不在新旧位置之间插值，也不做淡入淡出。
+                .id(layout)
+                .transition(.identity)
             }
         }
         .onChange(of: layout) {
             var instant = Transaction()
             instant.disablesAnimations = true
             withTransaction(instant) { sweeping = true }
-            withAnimation(.easeInOut(duration: 0.8).delay(0.05)) { sweeping = false }
+            // 等卡片在新位置排好之后再开始动画，否则位置变化会被一起动画化。
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 0.8)) { sweeping = false }
+            }
         }
     }
 
