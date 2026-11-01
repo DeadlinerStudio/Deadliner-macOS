@@ -2,7 +2,7 @@ import SwiftUI
 
 /// 归档页：已归档的任务（沿用任务卡片，降低不透明度）与已归档的习惯。
 struct ArchiveView: View {
-    let store: ArchiveStore
+    @Bindable var store: ArchiveStore
     let commands: TaskCommands
 
     @State private var selectedTask: TaskItem?
@@ -14,8 +14,8 @@ struct ArchiveView: View {
 
     var body: some View {
         ArchiveContent(
-            tasks: store.tasks,
-            habits: store.habits,
+            tasks: store.visibleTasks,
+            habits: store.visibleHabits,
             categories: store.categories,
             onTapTask: { selectedTask = $0 },
             onRestoreHabit: { habit in run { try store.restoreHabit(habit.id) } },
@@ -25,6 +25,8 @@ struct ArchiveView: View {
         .topAtmosphere(t.secondary)
         .navigationTitle("归档")
         .navigationSubtitle("\(store.tasks.count) 个任务 · \(store.habits.count) 个习惯")
+        .searchable(text: $store.searchText, placement: .toolbar, prompt: "搜索归档")
+        .searchFocusOnRequest()
         .onAppear { store.refresh() }
         .confirmationDialog(selectedTask?.title ?? "", isPresented: Binding(
             get: { selectedTask != nil }, set: { if !$0 { selectedTask = nil } }

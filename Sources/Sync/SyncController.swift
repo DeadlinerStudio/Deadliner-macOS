@@ -52,6 +52,8 @@ final class SyncController {
     @ObservationIgnored private let didApplyRemoteChanges: () -> Void
     @ObservationIgnored private var monitor: NWPathMonitor?
     @ObservationIgnored private var configured = false
+    @ObservationIgnored private var appActive = true
+    @ObservationIgnored private var backgroundTimer: Timer?
     @ObservationIgnored private let backupSession: URLSession
     @ObservationIgnored private let backupDirectory: () throws -> URL
 
@@ -74,6 +76,7 @@ final class SyncController {
     /// 启动时调用：已启用同步时按保存的设置开始自动同步。
     func start() {
         startNetworkMonitor()
+        restartBackgroundTimer()
         if settings.enabled { applyConfiguration() }
     }
 
@@ -143,11 +146,34 @@ final class SyncController {
     }
 
     func setForeground(_ active: Bool) {
+        appActive = active
         guard configured else { return }
         database.setSyncForeground(active: active)
     }
 
+    /// 应用不在前台时的同步间隔（分钟，0 为关闭）。前台时由 Core 负责（改动后、每分钟）。
+    func setBackgroundInterval(_ minutes: Int) {
+        settings.backgroundInterval = minutes
+        settings.save(to: defaults)
+        restartBackgroundTimer()
+    }
+
+    private func restartBackgroundTimer() {
+        backgroundTimer?.invalidate()
+        backgroundTimer = nil
+        let minutes = settings.backgroundInterval
+        guard minutes > 0 else { return }
+        backgroundTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(minutes * 60), repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.configured, !self.appActive else { return }
+                _ = self.database.startSync(trigger: SyncTrigger.periodic, onComplete: self.completionHandler())
+            }
+        }
+    }
+
     func stop() {
+        backgroundTimer?.invalidate()
+        backgroundTimer = nil
         monitor?.cancel()
         monitor = nil
         if configured { database.disableAutomaticSync() }

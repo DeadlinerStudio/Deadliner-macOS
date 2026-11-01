@@ -28,6 +28,9 @@ final class TaskListStore {
     private(set) var errorMessage: String?
     var searchText = ""
     var sortOrder: SortOrder = .dueDate
+    /// 分类筛选：nil 为全部，`uncategorized` 为未分类，其余为分类 ID。
+    var categoryFilter: String?
+    static let uncategorized = "__uncategorized"
     /// 正在打开的编辑器（新建或编辑）。
     var editor: EditorRequest?
 
@@ -67,11 +70,16 @@ final class TaskListStore {
         bridge = nil
     }
 
-    /// 经过搜索和排序后用于显示的任务。
+    /// 经过搜索、分类筛选和排序后用于显示的任务。
     var visibleTasks: [TaskItem] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let filtered = query.isEmpty ? coreTasks : coreTasks.filter {
+        var filtered = query.isEmpty ? coreTasks : coreTasks.filter {
             $0.title.localizedCaseInsensitiveContains(query) || $0.note.localizedCaseInsensitiveContains(query)
+        }
+        if let categoryFilter {
+            filtered = filtered.filter {
+                categoryFilter == Self.uncategorized ? ($0.categoryId.flatMap { categories[$0] } == nil) : $0.categoryId == categoryFilter
+            }
         }
         return Self.sorted(filtered, by: sortOrder)
     }

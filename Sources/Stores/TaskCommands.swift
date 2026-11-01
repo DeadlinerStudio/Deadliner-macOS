@@ -26,6 +26,7 @@ enum TaskCommandError: LocalizedError, Equatable {
     case invalidTransition
     case focusTimerRunning
     case emptyTitle
+    case noDeadline
 
     var errorDescription: String? {
         switch self {
@@ -33,6 +34,7 @@ enum TaskCommandError: LocalizedError, Equatable {
         case .invalidTransition: "当前状态下不能执行这个操作"
         case .focusTimerRunning: "这个任务正在专注计时，请先在手机上结束计时"
         case .emptyTitle: "标题不能为空"
+        case .noDeadline: "这个任务没有有效的截止时间"
         }
     }
 }
@@ -112,6 +114,19 @@ final class TaskCommands {
     func archive(_ uid: String) throws { try apply(TaskAction.markArchive, to: uid) }
 
     func unarchive(_ uid: String) throws { try apply(TaskAction.unarchive, to: uid) }
+
+    /// 延期：Core 规定 1～168 小时或 1～7 天。
+    func postpone(_ uid: String, amount: Int, inHours: Bool) throws {
+        let delay = TaskDeadlineDelay(amount: Int32(amount), unit: inHours ? TaskDeadlineUnit.hours : TaskDeadlineUnit.days)
+        guard delay.isValid else { throw TaskCommandError.invalidTransition }
+        let result = database.tasks.postpone(taskUid: uid, delay: delay, occurredAt: CoreClock.now())
+        switch result.outcome.name {
+        case "APPLIED": didChange()
+        case "NOT_FOUND": throw TaskCommandError.notFound
+        case "INVALID_DEADLINE": throw TaskCommandError.noDeadline
+        default: throw TaskCommandError.invalidTransition
+        }
+    }
 
     func setStarred(_ uid: String, _ starred: Bool) throws {
         guard var draft = draft(for: uid) else { throw TaskCommandError.notFound }

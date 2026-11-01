@@ -6,16 +6,25 @@ struct SyncSettings: Equatable {
     var serverURL: String
     var username: String
     var enabled: Bool
+    /// 应用不在前台时的同步间隔（分钟），0 为只在前台和手动同步。与手机的同步间隔选项相同。
+    var backgroundInterval = 15
+
+    static let intervalOptions: [(minutes: Int, title: String)] = [
+        (0, "仅手动"), (15, "每 15 分钟"), (30, "每 30 分钟"), (60, "每 1 小时"), (180, "每 3 小时"),
+        (360, "每 6 小时"), (720, "每 12 小时"), (1440, "每 24 小时"),
+    ]
 
     private static let urlKey = "sync.webdav.url"
     private static let userKey = "sync.webdav.username"
     private static let enabledKey = "sync.webdav.enabled"
+    private static let intervalKey = "sync.backgroundInterval"
 
     static func load(from defaults: UserDefaults = .standard) -> SyncSettings {
         SyncSettings(
             serverURL: defaults.string(forKey: urlKey) ?? "",
             username: defaults.string(forKey: userKey) ?? "",
-            enabled: defaults.bool(forKey: enabledKey)
+            enabled: defaults.bool(forKey: enabledKey),
+            backgroundInterval: defaults.object(forKey: intervalKey) as? Int ?? 15
         )
     }
 
@@ -23,6 +32,7 @@ struct SyncSettings: Equatable {
         defaults.set(serverURL, forKey: Self.urlKey)
         defaults.set(username, forKey: Self.userKey)
         defaults.set(enabled, forKey: Self.enabledKey)
+        defaults.set(backgroundInterval, forKey: Self.intervalKey)
     }
 
     /// 规范化后的服务器地址：去掉首尾空白，补上结尾的 `/`。

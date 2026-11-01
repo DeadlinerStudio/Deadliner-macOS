@@ -26,8 +26,21 @@ enum TaskStatus {
         return min(1, max(0, due.timeIntervalSince(now) / due.timeIntervalSince(begin)))
     }
 
-    /// 卡片右上角的文字。
-    static func remainingText(_ task: TaskItem, now: Date) -> String {
+    /// 卡片进度条：默认显示剩余比例（随时间缩短）；正向时显示已过去的比例（随时间增长）。
+    static func displayedProgress(_ task: TaskItem, now: Date, forward: Bool) -> Double {
+        let remaining = remainingProgress(task, now: now)
+        guard forward, task.state == .active, task.dueAt != nil else { return remaining }
+        return 1 - remaining
+    }
+
+    /// 卡片右上角的文字。`detailed` 为 false 时只保留最大的单位（「2天」而不是「2天 3小时」）。
+    static func remainingText(_ task: TaskItem, now: Date, detailed: Bool = true) -> String {
+        let text = fullRemainingText(task, now: now)
+        guard !detailed, let space = text.lastIndex(of: " "), text.hasSuffix("小时"), text.contains("天") else { return text }
+        return String(text[..<space])
+    }
+
+    private static func fullRemainingText(_ task: TaskItem, now: Date) -> String {
         if task.isAbandoned { return "已放弃" }
         if task.isCompleted { return "已完成" }
         if let start = task.startAt, now < start { return "\(span(start.timeIntervalSince(now)))后开始" }
@@ -44,4 +57,15 @@ enum TaskStatus {
         if hours > 0 { return "\(hours)小时" }
         return "\(minutes)分钟"
     }
+}
+
+/// 任务卡片的显示设置（与手机的「主界面正向进度条」「剩余时间详细显示」对应）。
+enum TaskDisplaySettings {
+    static let forwardProgressKey = "cards.forwardProgress"
+    static let detailedRemainingKey = "cards.detailedRemaining"
+
+    /// 延期选项：Core 允许 1～168 小时或 1～7 天。
+    static let postponeOptions: [(title: String, amount: Int, hours: Bool)] = [
+        ("1 小时", 1, true), ("3 小时", 3, true), ("1 天", 1, false), ("2 天", 2, false), ("3 天", 3, false), ("1 周", 7, false),
+    ]
 }

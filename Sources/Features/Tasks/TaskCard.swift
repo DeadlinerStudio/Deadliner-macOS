@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// 任务卡片：76 高、28 圆角；纯色底 + 状态色浅层 + 剩余时间渐变进度（色块与 Android 一致）。
@@ -12,20 +13,28 @@ struct TaskCard: View {
         var toggleGiveUp: () -> Void
         var archive: () -> Void
         var delete: () -> Void
+        /// 延期：数量与单位（true 为小时）。
+        var postpone: (Int, Bool) -> Void = { _, _ in }
+        /// 选中 / 取消选中（多选）。
+        var select: () -> Void = {}
     }
 
     let task: TaskItem
     let category: CategoryItem?
     let now: Date
     var actions: Actions?
+    /// 多选时是否选中；nil 表示不在多选状态。
+    var selected: Bool?
+    @AppStorage(TaskDisplaySettings.forwardProgressKey) private var forwardProgress = false
+    @AppStorage(TaskDisplaySettings.detailedRemainingKey) private var detailedRemaining = true
     @Environment(\.palette) private var t
     @State private var hovering = false
 
     var body: some View {
         let status = TaskStatus.indicator(task, now: now)
         let colors = status.colors(t)
-        let progress = TaskStatus.remainingProgress(task, now: now)
-        let remaining = TaskStatus.remainingText(task, now: now)
+        let progress = TaskStatus.displayedProgress(task, now: now, forward: forwardProgress)
+        let remaining = TaskStatus.remainingText(task, now: now, detailed: detailedRemaining)
         let muted = task.isCompleted || task.isAbandoned
 
         VStack(alignment: .leading, spacing: 6) {
@@ -66,7 +75,22 @@ struct TaskCard: View {
         .frame(height: MiuixCard.height)
         .background { CardBackground(colors: colors, sweepFrom: IndicatorStatus.undergo.colors(t), progress: progress) }
         .overlay(alignment: .bottomTrailing) {
-            if let actions, hovering { hoverActions(actions) }
+            if let actions, hovering, selected == nil { hoverActions(actions) }
+        }
+        .overlay {
+            if let selected {
+                RoundedRectangle(cornerRadius: MiuixRadius.card, style: .continuous)
+                    .strokeBorder(selected ? t.primary : t.onSurface.opacity(0.15), lineWidth: selected ? 2.5 : 1)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if let selected {
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(selected ? t.primary : t.onSurfaceVariant)
+                    .background(Circle().fill(t.cardBase).padding(2))
+                    .padding(8)
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: MiuixRadius.card, style: .continuous))
         .shadow(color: .black.opacity(t.isDark ? 0 : (hovering ? 0.08 : 0.04)), radius: hovering ? 7 : 1, y: hovering ? 4 : 1)
@@ -74,7 +98,10 @@ struct TaskCard: View {
         .animation(.easeOut(duration: 0.15), value: hovering)
         .onHover { hovering = $0 }
         .contentShape(RoundedRectangle(cornerRadius: MiuixRadius.card, style: .continuous))
-        .onTapGesture { actions?.open() }
+        .onTapGesture {
+            // 多选中点按切换选中；⌘ 点按进入多选。
+            if selected != nil || NSEvent.modifierFlags.contains(.command) { actions?.select() } else { actions?.open() }
+        }
         .contextMenu {
             if let actions {
                 Button(task.isCompleted ? "取消完成" : "标记完成", systemImage: task.isCompleted ? "arrow.uturn.backward.circle" : "checkmark.circle",
@@ -123,12 +150,20 @@ struct TaskCard: View {
     private func menu(_ actions: Actions) -> some View {
         Button("编辑", systemImage: "pencil", action: actions.open)
         Button(task.isStarred ? "取消标星" : "标星", systemImage: task.isStarred ? "star.slash" : "star", action: actions.toggleStar)
+        if task.state == .active, task.dueAt != nil {
+            Menu("延期", systemImage: "calendar.badge.clock") {
+                ForEach(TaskDisplaySettings.postponeOptions, id: \.title) { option in
+                    Button(option.title) { actions.postpone(option.amount, option.hours) }
+                }
+            }
+        }
         if TaskCommands.canApply(.markGiveUp, to: task.state) {
             Button(task.isAbandoned ? "取消放弃" : "放弃", systemImage: task.isAbandoned ? "arrow.uturn.backward" : "nosign", action: actions.toggleGiveUp)
         }
         Button(TaskCommands.canApply(.markArchive, to: task.state) ? "归档" : "归档（需先完成或放弃）", systemImage: "archivebox", action: actions.archive)
             .disabled(!TaskCommands.canApply(.markArchive, to: task.state))
         Divider()
+        Button("选择", systemImage: "checkmark.circle", action: actions.select)
         Button("删除", systemImage: "trash", role: .destructive, action: actions.delete)
     }
 }

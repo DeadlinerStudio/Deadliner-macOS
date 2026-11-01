@@ -16,6 +16,24 @@ final class ArchiveStore {
     private(set) var tasks: [TaskItem] = []
     private(set) var habits: [ArchivedHabit] = []
     private(set) var categories: [String: CategoryItem] = [:]
+    var searchText = ""
+
+    /// 按搜索词过滤后的归档任务与习惯。
+    var visibleTasks: [TaskItem] { tasks.filter { Self.matches($0, searchText) } }
+    var visibleHabits: [ArchivedHabit] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return query.isEmpty ? habits : habits.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    }
+
+    /// 任务页搜索时，归档中匹配的任务数。
+    func taskMatchCount(_ query: String) -> Int {
+        query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0 : tasks.filter { Self.matches($0, query) }.count
+    }
+
+    private static func matches(_ task: TaskItem, _ query: String) -> Bool {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return query.isEmpty || task.title.localizedCaseInsensitiveContains(query) || task.note.localizedCaseInsensitiveContains(query)
+    }
 
     @ObservationIgnored private let database: DeadlinerDatabase
     @ObservationIgnored private let didChange: () -> Void

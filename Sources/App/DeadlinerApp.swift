@@ -174,7 +174,12 @@ struct MainView: View {
                 switch model.page {
                 case .tasks:
                     TaskListView(store: model.taskList, commands: model.taskCommands, categoryCommands: model.categoryCommands,
-                                 onSetupSync: model.sync.status == .disabled ? { model.page = .settings } : nil)
+                                 onSetupSync: model.sync.status == .disabled ? { model.page = .settings } : nil,
+                                 archiveMatches: { model.archive.taskMatchCount($0) },
+                                 onShowArchive: { query in
+                                     model.archive.searchText = query
+                                     model.page = .archive
+                                 })
                 case .habits:
                     HabitsView(store: model.habitList, commands: model.habitCommands, categories: model.taskList.categories)
                 case .overview:

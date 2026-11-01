@@ -54,6 +54,8 @@ struct SettingsView: View {
     @State private var probing = false
     @State private var backupMessage: String?
     @State private var pendingImport: PendingImport?
+    @AppStorage(TaskDisplaySettings.forwardProgressKey) private var forwardProgress = false
+    @AppStorage(TaskDisplaySettings.detailedRemainingKey) private var detailedRemaining = true
 
     private struct PendingImport: Identifiable {
         let id = UUID()
@@ -74,6 +76,7 @@ struct SettingsView: View {
             if notifications != nil { notificationSection }
             if backup != nil { backupSection }
             menuBarSection
+            taskCardSection
             appearanceSection
             aboutSection
         }
@@ -137,6 +140,10 @@ struct SettingsView: View {
 
     private var statusSection: some View {
         Section("同步状态") {
+            Picker("后台同步", selection: Binding(get: { sync.settings.backgroundInterval }, set: { sync.setBackgroundInterval($0) })) {
+                ForEach(SyncSettings.intervalOptions, id: \.minutes) { Text($0.title).tag($0.minutes) }
+            }
+            .help("应用在后台或只开着菜单栏时的同步间隔；在前台时会在修改后和每分钟自动同步")
             HStack {
                 Label(statusText, systemImage: statusIcon)
                     .foregroundStyle(statusTint)
@@ -203,6 +210,17 @@ struct SettingsView: View {
             Text("菜单栏")
         } footer: {
             Text("面板使用 Liquid Glass（macOS 26 及以上）；更早的系统使用毛玻璃。")
+        }
+    }
+
+    private var taskCardSection: some View {
+        Section("任务卡片") {
+            Toggle("正向进度条", isOn: $forwardProgress)
+            Text("开启后进度条随时间增长（已过去的比例），关闭时随时间缩短（剩余的比例）。")
+                .font(.caption).foregroundStyle(.secondary)
+            Toggle("剩余时间详细显示", isOn: $detailedRemaining)
+            Text("开启时显示「2天 3小时」，关闭时只显示「2天」。")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
