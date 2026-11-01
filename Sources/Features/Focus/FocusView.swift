@@ -25,37 +25,34 @@ struct FocusContent: View {
     @Environment(\.palette) private var t
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: 18) {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 10)], spacing: 10) {
-                        tile("今天", today, tint: t.primary)
-                        tile("本周", thisWeek, tint: Color(hex: 0x10B981))
-                        tile("本月", thisMonth, tint: Color(hex: 0xF59E0B))
-                        tile("累计", allTime, tint: Color(hex: 0x8B5CF6))
-                    }
-                    if sessions.isEmpty {
-                        VStack(spacing: 10) {
-                            Image(systemName: "timer").font(.system(size: 36))
-                            Text("还没有专注记录").font(.callout)
-                        }
-                        .foregroundStyle(t.onSurfaceVariant)
+        Form {
+            Section {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 10)], spacing: 10) {
+                    tile("今天", today, tint: t.primary)
+                    tile("本周", thisWeek, tint: Color(hex: 0x10B981))
+                    tile("本月", thisMonth, tint: Color(hex: 0xF59E0B))
+                    tile("累计", allTime, tint: Color(hex: 0x8B5CF6))
+                }
+                .padding(.vertical, 4)
+            }
+            if sessions.isEmpty {
+                Section {
+                    Label("还没有专注记录", systemImage: "timer")
+                        .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
-                    } else {
-                        ForEach(groups, id: \.title) { group in
-                            MiuixGroup(title: group.title) {
-                                ForEach(group.sessions) { session in row(session) }
-                            }
-                        }
+                        .padding(.vertical, 24)
+                }
+            } else {
+                ForEach(groups, id: \.title) { group in
+                    Section(group.title) {
+                        ForEach(group.sessions) { session in row(session) }
                     }
                 }
-                .readableWidth(860)
-                .padding(.horizontal, 32)
-                .padding(.bottom, 32)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .readableWidth(860)
     }
 
     private func tile(_ title: String, _ summary: FocusStore.Summary, tint: Color) -> some View {
@@ -76,17 +73,22 @@ struct FocusContent: View {
     }
 
     private func row(_ session: FocusStore.Session) -> some View {
-        MiuixRow(title: session.title.isEmpty ? "（未命名）" : session.title,
-                 systemImage: session.isHabit ? "target" : "checklist",
-                 tint: session.isHabit ? Color(hex: 0x10B981) : t.primary) {
+        LabeledContent {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(FocusTexts.duration(session.durationSeconds))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(t.onSurface)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.primary)
                 Text([FocusTexts.timeRange(session), session.isCountdown ? "倒计时" : "正计时", FocusTexts.completion(session.completionKind)]
                         .compactMap { $0 }.joined(separator: " · "))
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(t.onSurfaceVariant)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } label: {
+            Label {
+                Text(session.title.isEmpty ? "（未命名）" : session.title).lineLimit(1)
+            } icon: {
+                Image(systemName: session.isHabit ? "target" : "checklist")
+                    .foregroundStyle(session.isHabit ? Color(hex: 0x10B981) : t.primary)
             }
         }
         .padding(.vertical, 2)

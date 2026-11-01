@@ -175,33 +175,6 @@ struct TaskListContent: View {
     }
 }
 
-/// MIUIX 搜索框：胶囊形、浅色底。
-struct SearchPill: View {
-    @Binding var text: String
-    let placeholder: String
-    @Environment(\.palette) private var t
-    @Environment(\.searchFocusRequest) private var focusRequest
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(t.onSurfaceVariant)
-            TextField(placeholder, text: $text)
-                .textFieldStyle(.plain)
-                .font(.system(size: 14))
-                .foregroundStyle(t.onSurface)
-                .focused($focused)
-        }
-        .padding(.horizontal, 14)
-        .frame(height: 40)
-        .background(t.searchBg, in: Capsule())
-        .overlay(Capsule().strokeBorder(t.primary.opacity(focused ? 0.35 : 0), lineWidth: 2))
-        .onChange(of: focusRequest) { focused = true }
-    }
-}
-
 /// ⌘F：让当前页面的系统搜索框获得焦点（macOS 15 起支持；更早的系统由用户点击搜索框）。
 private struct SearchFocusOnRequest: ViewModifier {
     @Environment(\.searchFocusRequest) private var request

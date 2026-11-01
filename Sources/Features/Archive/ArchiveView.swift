@@ -95,9 +95,9 @@ struct ArchiveContent: View {
                         }
                         if !habits.isEmpty {
                             sectionTitle("习惯")
-                            MiuixGroup {
+                            GroupedSection {
                                 ForEach(habits) { habit in
-                                    MiuixRow(title: habit.name, systemImage: "target",
+                                    GroupedRow(title: habit.name, systemImage: "target",
                                              tint: habit.colorHex.flatMap { Color(hexString: $0) } ?? t.primary) {
                                         Button("恢复") { onRestoreHabit?(habit) }
                                             .buttonStyle(.plain)
