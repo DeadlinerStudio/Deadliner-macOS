@@ -132,18 +132,6 @@ final class SyncController {
     /// 云端同步文件的完整地址（用于提示）。
     var remoteFileURL: String { settings.normalizedURL + RemoteBackup.remotePath }
 
-    /// 立即把云端同步文件备份到本机（同步未启用时返回 nil）。
-    func backupNow() async throws -> URL? {
-        guard settings.enabled, !AppDelegate.isRunningTests,
-              let password = keychain.password(url: settings.normalizedURL, username: settings.username) else { return nil }
-        let backup = RemoteBackup(settings: settings, password: password, session: backupSession, directory: try backupDirectory())
-        if case .saved(let file) = try await backup.run() {
-            lastBackup = file
-            return file
-        }
-        return nil
-    }
-
     /// 立即同步（「立即同步」按钮、⌘R）。
     func syncNow() {
         guard configured else { return }

@@ -16,10 +16,6 @@ struct DeadlinerApp: App {
                 Button("新建任务") { appDelegate.model?.newTask() }
                     .keyboardShortcut("n", modifiers: [.command])
             }
-            CommandGroup(replacing: .appSettings) {
-                Button("设置…") { appDelegate.model?.page = .settings }
-                    .keyboardShortcut(",", modifiers: [.command])
-            }
             CommandGroup(after: .textEditing) {
                 Button("搜索") { appDelegate.model?.searchFocusRequest += 1 }
                     .keyboardShortcut("f", modifiers: [.command])
@@ -36,6 +32,15 @@ struct DeadlinerApp: App {
                     appDelegate.model?.sync.syncNow()
                 }
                 .keyboardShortcut("r", modifiers: [.command])
+            }
+        }
+
+        // ⌘, 打开的系统设置窗口（与侧栏中的「设置」页内容相同）。
+        Settings {
+            if let model = appDelegate.model {
+                SettingsView(sync: model.sync)
+                    .deadlinerTheme()
+                    .frame(width: 640, height: 720)
             }
         }
     }
@@ -83,8 +88,12 @@ struct RootView: View {
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @Environment(\.palette) private var t
 
+    @AppStorage(FontPreference.serifKey) private var serif = false
+
     var body: some View {
-        content.preferredColorScheme(AppearanceMode(rawValue: appearance)?.colorScheme)
+        content
+            .preferredColorScheme(AppearanceMode(rawValue: appearance)?.colorScheme)
+            .fontDesign(serif ? .serif : .default)
     }
 
     @ViewBuilder
@@ -122,7 +131,7 @@ struct MainView: View {
                 case .archive:
                     ArchiveView(store: model.archive, commands: model.taskCommands)
                 case .settings:
-                    SettingsView(sync: model.sync, database: model.container.database) { model.refreshAll() }
+                    SettingsView(sync: model.sync)
                 }
             }
             .environment(\.searchFocusRequest, model.searchFocusRequest)

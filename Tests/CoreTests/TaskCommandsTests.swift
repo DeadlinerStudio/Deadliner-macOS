@@ -100,37 +100,6 @@ final class TaskCommandsTests: XCTestCase {
         XCTAssertEqual(changes, 0)
     }
 
-    func testTestDataCleanupOnlyMatchesPlaceholdersCreatedAfterCutoff() throws {
-        let before = Date(timeIntervalSince1970: TestDataCleanup.cutoff.timeIntervalSince1970 - 3600)
-        func insert(_ title: String, created: Date) -> String {
-            let uid = UUID().uuidString
-            let stamp = CoreClock.instant(created)
-            container.database.tasks.create(task: Task_(
-                uid: uid, title: title, note: "", startAt: nil, dueAt: nil, state: TaskState.active, completedAt: nil,
-                categoryUid: nil, isStarred: false, calendarEventId: nil, createdAt: stamp, updatedAt: stamp, isDeleted: false,
-                subtasks: [TaskSubtask(uid: uid + "-s", taskUid: uid, content: "子", isCompleted: false, sortOrder: 0,
-                                       createdAt: stamp, updatedAt: stamp, isDeleted: false)]
-            ))
-            return uid
-        }
-        let placeholder = insert("示例任务 A", created: Date())
-        let oldSameName = insert("示例任务 B", created: before)
-        let real = insert("真实任务", created: Date())
-        var habit = HabitDraft()
-        habit.name = "示例习惯 A"
-        let habitUid = try HabitCommands(database: container.database) {}.save(habit)
-
-        let cleanup = TestDataCleanup(database: container.database)
-        let candidates = cleanup.candidates()
-        XCTAssertEqual(candidates.taskIds, [placeholder])
-        XCTAssertEqual(candidates.habitIds, [habitUid])
-        XCTAssertEqual(cleanup.run(candidates), 2)
-
-        let live = Set(container.database.tasks.list().filter { !$0.isDeleted }.map(\.uid))
-        XCTAssertEqual(live, [oldSameName, real])
-        XCTAssertTrue(cleanup.candidates().isEmpty)
-    }
-
     func testCategoryLifecycle() throws {
         let before = categories.list()
         let uid = try categories.create(name: " 健身 ", iconKey: "fitness", colorHex: "#10B981")

@@ -1,5 +1,4 @@
 import SwiftUI
-import Shared
 
 /// 外观设置（存 UserDefaults）。
 enum AppearanceMode: String, CaseIterable, Identifiable {
@@ -21,15 +20,19 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
     }
 }
 
-/// 设置页（MIUIX 分组列表）：WebDAV 同步、外观、关于。
+/// 衬线字体开关（系统的 serif 设计：拉丁文为 New York，中文由系统选择对应的衬线字形）。
+enum FontPreference {
+    static let serifKey = "font.serif"
+}
+
+/// 设置（系统分组表单）：WebDAV 同步、同步状态、外观、关于。
+/// 同时用于侧栏中的「设置」页与 ⌘, 打开的设置窗口。
 struct SettingsView: View {
     let sync: SyncController
-    /// 用于「清理测试占位数据」；为 nil 时不显示该分组。
-    var database: DeadlinerDatabase?
-    var onDataChanged: () -> Void = {}
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @AppStorage(ThemeAccent.storageKey) private var accentRaw = ThemeAccent.classic.rawValue
     @AppStorage(GlowStyle.storageKey) private var glowRaw = GlowStyle.immersive.rawValue
+    @AppStorage(FontPreference.serifKey) private var serif = false
     @Environment(\.palette) private var t
 
     @State private var form = SyncSettings(serverURL: "", username: "", enabled: false)
@@ -37,32 +40,19 @@ struct SettingsView: View {
     @State private var message: String?
     @State private var checks: [WebDavProbe.Check] = []
     @State private var probing = false
-    @State private var cleanupCandidates: TestDataCleanup.Candidates?
-    @State private var confirmCleanup = false
-    @State private var cleanupMessage: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    serverGroup
-                    if !checks.isEmpty { probeGroup }
-                    statusGroup
-                    if database != nil { maintenanceGroup }
-                    appearanceGroup
-                    aboutGroup
-                }
-                .readableWidth(720)
-                .padding(.horizontal, 32)
-                .padding(.bottom, 32)
-            }
+        Form {
+            syncSection
+            if !checks.isEmpty { probeSection }
+            statusSection
+            appearanceSection
+            aboutSection
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .formStyle(.grouped)
+        .readableWidth(760)
         .navigationTitle("设置")
-        .onAppear {
-            form = sync.settings
-            refreshCleanupCandidates()
-        }
+        .onAppear { form = sync.settings }
         .alert("云端没有找到同步文件", isPresented: Binding(
             get: { sync.status == .awaitingConfirmation }, set: { _ in }
         )) {
@@ -77,119 +67,105 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Groups
+    // MARK: - Sections
 
-    private var serverGroup: some View {
-        MiuixGroup(title: "WebDAV 同步") {
-            field("服务器地址", "https://dav.jianguoyun.com/dav/", text: $form.serverURL, icon: "server.rack", tint: t.primary)
-            field("用户名", "账号邮箱", text: $form.username, icon: "person", tint: Color(hex: 0x8B5CF6))
-            MiuixRow(title: "应用密码", systemImage: "key", tint: Color(hex: 0xF59E0B)) {
-                SecureField(sync.hasPassword ? "已保存在钥匙串（留空则不修改）" : "第三方应用密码", text: $password)
-                    .textFieldStyle(.plain)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 260)
-            }
-            MiuixRow(title: "启用同步", systemImage: "arrow.triangle.2.circlepath", tint: Color(hex: 0x10B981)) {
-                Toggle("", isOn: $form.enabled).labelsHidden().toggleStyle(.miuix)
-            }
-            Text(verbatim: "坚果云：地址填 https://dav.jianguoyun.com/dav/，密码使用「第三方应用管理」中生成的应用密码。同步文件与手机相同：Deadliner/kmp-changelog-v1.json，首次同步以云端（手机）数据为准合并。")
-                .font(.system(size: 11.5))
-                .foregroundStyle(t.onSurfaceVariant)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-            HStack(spacing: 10) {
+    private var syncSection: some View {
+        Section {
+            TextField("服务器地址", text: $form.serverURL, prompt: Text("https://dav.jianguoyun.com/dav/"))
+            TextField("用户名", text: $form.username, prompt: Text("账号邮箱"))
+            SecureField("应用密码", text: $password, prompt: Text(sync.hasPassword ? "已保存在钥匙串（留空则不修改）" : "第三方应用密码"))
+            Toggle("启用同步", isOn: $form.enabled)
+            HStack {
                 if let message {
-                    Text(message).font(.system(size: 12)).foregroundStyle(t.onSurfaceVariant)
+                    Text(message).font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()
-                MiuixButton(title: probing ? "检测中…" : "检测服务器") { probe() }
+                Button(probing ? "检测中…" : "检测服务器") { probe() }
                     .disabled(probing || form.validationError != nil || (password.isEmpty && !sync.hasPassword))
-                MiuixButton(title: "保存", kind: .primary) { save() }
+                Button("保存") { save() }
+                    .buttonStyle(.borderedProminent)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+        } header: {
+            Text("WebDAV 同步")
+        } footer: {
+            Text(verbatim: "坚果云：地址填 https://dav.jianguoyun.com/dav/ 加上与手机相同的文件夹，密码使用「第三方应用管理」中生成的应用密码。同步文件与手机相同：<地址>/Deadliner/kmp-changelog-v1.json。")
         }
     }
 
-    private var probeGroup: some View {
-        MiuixGroup(title: "检测结果") {
+    private var probeSection: some View {
+        Section("检测结果") {
             ForEach(checks) { check in
-                MiuixRow(title: check.title,
-                         systemImage: check.state == .ok ? "checkmark" : check.state == .warning ? "exclamationmark" : "xmark",
-                         tint: check.state == .ok ? Color(hex: 0x10B981) : check.state == .warning ? Color(hex: 0xF59E0B) : t.error) {
+                LabeledContent {
                     Text(check.detail)
-                        .font(.system(size: 12))
-                        .foregroundStyle(t.onSurfaceVariant)
+                        .foregroundStyle(.secondary)
                         .multilineTextAlignment(.trailing)
-                        .frame(maxWidth: 330, alignment: .trailing)
+                } label: {
+                    Label(check.title, systemImage: check.state == .ok ? "checkmark.circle.fill" : check.state == .warning ? "exclamationmark.triangle.fill" : "xmark.octagon.fill")
+                        .foregroundStyle(check.state == .ok ? Color.green : check.state == .warning ? Color.orange : Color.red)
                 }
-                .padding(.vertical, 2)
             }
         }
     }
 
-    private var statusGroup: some View {
-        MiuixGroup(title: "同步状态") {
-            MiuixRow(title: statusText, systemImage: statusIcon, tint: statusTint) {
-                MiuixButton(title: "立即同步", kind: .primary) { sync.syncNow() }
+    private var statusSection: some View {
+        Section("同步状态") {
+            HStack {
+                Label(statusText, systemImage: statusIcon)
+                    .foregroundStyle(statusTint)
+                Spacer()
+                Button("立即同步") { sync.syncNow() }
                     .disabled(sync.status == .disabled || sync.status == .syncing || sync.status == .backingUp)
             }
-            if let backup = sync.lastBackup {
-                Text("启用前已备份云端数据：\(backup.lastPathComponent)")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(t.onSurfaceVariant)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 4)
-            }
             ForEach(sync.log.prefix(8)) { entry in
-                HStack(spacing: 10) {
-                    Circle().fill(entry.succeeded ? Color(hex: 0x10B981) : t.error).frame(width: 7, height: 7)
-                    Text(entry.date.formatted(date: .abbreviated, time: .standard))
-                        .font(.system(size: 12).monospacedDigit())
-                        .foregroundStyle(t.onSurfaceVariant)
+                LabeledContent(entry.date.formatted(date: .abbreviated, time: .standard)) {
                     Text(entry.succeeded ? (entry.applied > 0 ? "成功，合并了 \(entry.applied) 项云端修改" : "成功") : (entry.message ?? "失败"))
-                        .font(.system(size: 12))
-                        .foregroundStyle(entry.succeeded ? t.onSurface : t.error)
+                        .foregroundStyle(entry.succeeded ? Color.secondary : Color.red)
                         .lineLimit(2)
-                    Spacer()
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 4)
+                .font(.callout)
+            }
+            if let backup = sync.lastBackup {
+                LabeledContent("启用前的云端备份") {
+                    Text(backup.lastPathComponent).textSelection(.enabled).foregroundStyle(.secondary)
+                }
+                .font(.callout)
             }
         }
     }
 
-    private var appearanceGroup: some View {
-        MiuixGroup(title: "外观") {
-            MiuixRow(title: "深浅色", systemImage: "circle.lefthalf.filled", tint: Color(hex: 0x6366F1)) {
-                Picker("", selection: $appearance) {
-                    ForEach(AppearanceMode.allCases) { Text($0.label).tag($0.rawValue) }
-                }
-                .labelsHidden()
-                .fixedSize()
+    private var appearanceSection: some View {
+        Section("外观") {
+            Picker("深浅色", selection: $appearance) {
+                ForEach(AppearanceMode.allCases) { Text($0.label).tag($0.rawValue) }
             }
-            MiuixRow(title: "顶部浮光", systemImage: "sparkles", tint: Color(hex: 0xEC4899)) {
-                Picker("", selection: $glowRaw) {
-                    ForEach(GlowStyle.allCases) { Text($0.displayName).tag($0.rawValue) }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .fixedSize()
+            Picker("顶部浮光", selection: $glowRaw) {
+                ForEach(GlowStyle.allCases) { Text($0.displayName).tag($0.rawValue) }
             }
+            .pickerStyle(.segmented)
+            Toggle("衬线字体", isOn: $serif)
             VStack(alignment: .leading, spacing: 8) {
-                Text("主题色").font(.callout).foregroundStyle(t.onSurface)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 8)], spacing: 10) {
-                    ForEach(ThemeAccent.allCases) { accent in
-                        accentSwatch(accent)
-                    }
+                Text("主题色")
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 60), spacing: 8)], spacing: 10) {
+                    ForEach(ThemeAccent.allCases) { accentSwatch($0) }
                 }
                 Text("「经典」与手机配色一致；其他主题会改变主色、「+」按钮与系统控件的颜色，状态色不变。")
                     .font(.caption)
-                    .foregroundStyle(t.onSurfaceVariant)
+                    .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.vertical, 4)
+        }
+    }
+
+    private var aboutSection: some View {
+        Section("关于") {
+            LabeledContent("版本", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
+            LabeledContent("Core") {
+                Text(MacCoreContainer.coreVersion)
+                    .font(.callout.monospaced())
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+            }
         }
     }
 
@@ -200,11 +176,11 @@ struct SettingsView: View {
             VStack(spacing: 4) {
                 Circle()
                     .fill(color)
-                    .frame(width: 26, height: 26)
+                    .frame(width: 24, height: 24)
                     .overlay(Circle().strokeBorder(t.onSurface, lineWidth: selected ? 2.5 : 0).padding(-4))
                 Text(accent.displayName)
                     .font(.caption)
-                    .foregroundStyle(selected ? t.onSurface : t.onSurfaceVariant)
+                    .foregroundStyle(selected ? .primary : .secondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 4)
@@ -213,77 +189,6 @@ struct SettingsView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("主题色 \(accent.displayName)")
         .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    @ViewBuilder
-    private var maintenanceGroup: some View {
-        if let candidates = cleanupCandidates, !candidates.isEmpty || cleanupMessage != nil {
-            MiuixGroup(title: "维护") {
-                MiuixRow(title: candidates.isEmpty ? "测试占位数据已清理" : "发现 \(candidates.taskIds.count) 个测试占位任务、\(candidates.habitIds.count) 个占位习惯",
-                         systemImage: "trash", tint: t.error) {
-                    if !candidates.isEmpty {
-                        Button("清理…") { confirmCleanup = true }
-                    }
-                }
-                Text(verbatim: cleanupMessage ?? "这些是 10 月 31 日截图测试误连真实同步时写入的「示例任务 A～E」「示例习惯 A/B」（20:20 之后创建）。清理前会先备份云端同步文件，删除会同步到手机。")
-                    .font(.caption)
-                    .foregroundStyle(t.onSurfaceVariant)
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 8)
-            }
-            .confirmationDialog("删除 \(candidates.taskIds.count) 个占位任务和 \(candidates.habitIds.count) 个占位习惯？", isPresented: $confirmCleanup) {
-                Button("备份云端后删除", role: .destructive) { runCleanup(candidates) }
-            } message: {
-                Text("只删除标题为「示例任务 A～E」「示例习惯 A/B」且在 10 月 31 日 20:20 之后创建的条目。")
-            }
-        }
-    }
-
-    private func refreshCleanupCandidates() {
-        guard let database else { return }
-        cleanupCandidates = TestDataCleanup(database: database).candidates()
-    }
-
-    private func runCleanup(_ candidates: TestDataCleanup.Candidates) {
-        guard let database else { return }
-        _Concurrency.Task {
-            do {
-                let backup = try await sync.backupNow()
-                let removed = TestDataCleanup(database: database).run(candidates)
-                onDataChanged()
-                sync.syncNow()
-                cleanupMessage = "已删除 \(removed) 项" + (backup.map { "；删除前已备份云端：\($0.lastPathComponent)" } ?? "")
-                refreshCleanupCandidates()
-            } catch {
-                cleanupMessage = "没有删除：备份云端失败（\(error.localizedDescription)）"
-            }
-        }
-    }
-
-    private var aboutGroup: some View {
-        MiuixGroup(title: "关于") {
-            MiuixRow(title: "版本", systemImage: "info", tint: t.secondary) {
-                Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
-                    .foregroundStyle(t.onSurfaceVariant)
-            }
-            MiuixRow(title: "Core", systemImage: "cpu", tint: t.secondary) {
-                Text(MacCoreContainer.coreVersion)
-                    .font(.system(size: 11.5).monospaced())
-                    .foregroundStyle(t.onSurfaceVariant)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-            }
-        }
-    }
-
-    private func field(_ title: String, _ placeholder: String, text: Binding<String>, icon: String, tint: Color) -> some View {
-        MiuixRow(title: title, systemImage: icon, tint: tint) {
-            TextField(placeholder, text: text)
-                .textFieldStyle(.plain)
-                .multilineTextAlignment(.trailing)
-                .frame(width: 260)
-        }
     }
 
     // MARK: - Status
@@ -312,10 +217,10 @@ struct SettingsView: View {
 
     private var statusTint: Color {
         switch sync.status {
-        case .disabled, .idle, .syncing, .backingUp: t.secondary
-        case .awaitingConfirmation: Color(hex: 0xF59E0B)
-        case .succeeded: Color(hex: 0x10B981)
-        case .failed: t.error
+        case .disabled, .idle, .syncing, .backingUp: .secondary
+        case .awaitingConfirmation: .orange
+        case .succeeded: .green
+        case .failed: .red
         }
     }
 
