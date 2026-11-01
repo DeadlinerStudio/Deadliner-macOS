@@ -44,6 +44,8 @@ final class AppModel {
     @ObservationIgnored private(set) var focus: FocusStore!
     @ObservationIgnored private(set) var overview: OverviewStore!
     @ObservationIgnored private(set) var sync: SyncController!
+    /// 系统通知（由 AppDelegate 在启动完成后创建）。
+    @ObservationIgnored var notifications: NotificationController?
     @ObservationIgnored private(set) var taskCommands: TaskCommands!
     @ObservationIgnored private(set) var categoryCommands: CategoryCommands!
     @ObservationIgnored private(set) var habitCommands: HabitCommands!
@@ -109,6 +111,7 @@ final class AppModel {
         taskList.stop()
         habitList.stop()
         overview.stop()
+        notifications?.stop()
         container.close()
     }
 }

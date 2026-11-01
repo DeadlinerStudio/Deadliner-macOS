@@ -38,7 +38,7 @@ struct DeadlinerApp: App {
         // ⌘, 打开的系统设置窗口（与侧栏中的「设置」页内容相同）。
         Settings {
             if let model = appDelegate.model {
-                SettingsView(sync: model.sync, backup: LocalBackup(database: model.container.database))
+                SettingsView(sync: model.sync, backup: LocalBackup(database: model.container.database), notifications: model.notifications)
                     .modifier(AppearancePreferences())
                     .deadlinerTheme()
                     .frame(width: 640, height: 720)
@@ -77,6 +77,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let model else { return }
         AppearancePreferences.apply(UserDefaults.standard.string(forKey: "appearance") ?? AppearanceMode.system.rawValue)
         menuBar = MenuBarController(model: model) { [weak self] in self?.showMainWindow() }
+        let notifications = NotificationController(database: model.container.database) { [weak self, weak model] _, kind in
+            model?.page = kind.hasPrefix("HABIT") ? .habits : .tasks
+            self?.showMainWindow()
+        }
+        notifications.start()
+        model.notifications = notifications
     }
 
     /// 激活应用并显示主窗口；主窗口已关闭时重新打开。
@@ -92,6 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidBecomeActive(_ notification: Notification) {
         model?.refreshAll()
         model?.sync.setForeground(true)
+        model?.notifications?.refresh()
     }
 
     func applicationDidResignActive(_ notification: Notification) {
@@ -177,7 +184,7 @@ struct MainView: View {
                 case .archive:
                     ArchiveView(store: model.archive, commands: model.taskCommands)
                 case .settings:
-                    SettingsView(sync: model.sync, backup: LocalBackup(database: model.container.database))
+                    SettingsView(sync: model.sync, backup: LocalBackup(database: model.container.database), notifications: model.notifications)
                 }
             }
             .environment(\.searchFocusRequest, model.searchFocusRequest)

@@ -32,6 +32,8 @@ struct SettingsView: View {
     let sync: SyncController
     /// 备份导出；为 nil 时不显示「备份」分组（截图测试）。
     var backup: LocalBackup?
+    /// 通知设置变化后重新计算提醒；为 nil 时不显示「通知」分组（截图测试）。
+    var notifications: NotificationController?
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @AppStorage(ThemeAccent.storageKey) private var accentRaw = ThemeAccent.classic.rawValue
     @AppStorage(GlowStyle.storageKey) private var glowRaw = GlowStyle.immersive.rawValue
@@ -49,12 +51,18 @@ struct SettingsView: View {
     @State private var checks: [WebDavProbe.Check] = []
     @State private var probing = false
     @State private var backupMessage: String?
+    @State private var notificationsDenied = false
+    @AppStorage(NotificationSettings.enabledKey) private var notificationsEnabled = false
+    @AppStorage(NotificationSettings.taskNearbyKey) private var notifyTaskNearby = true
+    @AppStorage(NotificationSettings.taskDueKey) private var notifyTaskDue = true
+    @AppStorage(NotificationSettings.habitsKey) private var notifyHabits = true
 
     var body: some View {
         Form {
             syncSection
             if !checks.isEmpty { probeSection }
             statusSection
+            if notifications != nil { notificationSection }
             if backup != nil { backupSection }
             menuBarSection
             appearanceSection
@@ -209,6 +217,51 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             .padding(.vertical, 4)
+        }
+    }
+
+    private var notificationSection: some View {
+        Section {
+            Toggle("启用通知", isOn: Binding(get: { notificationsEnabled }, set: { setNotifications($0) }))
+            if notificationsEnabled {
+                Toggle("任务到期前一天提醒", isOn: $notifyTaskNearby)
+                Toggle("任务到期时提醒", isOn: $notifyTaskDue)
+                Toggle("习惯打卡提醒", isOn: $notifyHabits)
+            }
+            if notificationsDenied {
+                HStack {
+                    Text("系统设置中没有允许 Deadliner 发送通知。").font(.caption).foregroundStyle(t.error)
+                    Spacer()
+                    Button("打开系统设置") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!)
+                    }
+                }
+            }
+        } header: {
+            Text("通知")
+        } footer: {
+            Text("提醒时间与手机一致，由 Core 计算；习惯在设定的提醒时间通知。")
+        }
+        .onChange(of: notifyTaskNearby) { notifications?.refresh(force: true) }
+        .onChange(of: notifyTaskDue) { notifications?.refresh(force: true) }
+        .onChange(of: notifyHabits) { notifications?.refresh(force: true) }
+        .task {
+            if notificationsEnabled { notificationsDenied = await NotificationController.authorizationStatus() == .denied }
+        }
+    }
+
+    private func setNotifications(_ enabled: Bool) {
+        guard enabled else {
+            notificationsEnabled = false
+            notificationsDenied = false
+            notifications?.refresh(force: true)
+            return
+        }
+        _Concurrency.Task {
+            let granted = await NotificationController.requestAuthorization()
+            notificationsDenied = !granted
+            notificationsEnabled = granted
+            notifications?.refresh(force: true)
         }
     }
 
