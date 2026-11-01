@@ -109,6 +109,13 @@ struct FocusContent: View {
 }
 
 enum FocusTexts {
+    /// 菜单栏用的短格式，例如「1h20」「45m」。
+    static func compact(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        if minutes >= 60 { return minutes % 60 == 0 ? "\(minutes / 60)h" : "\(minutes / 60)h\(minutes % 60)" }
+        return "\(minutes)m"
+    }
+
     static func duration(_ seconds: Int) -> String {
         let minutes = seconds / 60
         if minutes >= 60 { return minutes % 60 == 0 ? "\(minutes / 60)小时" : "\(minutes / 60)小时\(minutes % 60)分" }

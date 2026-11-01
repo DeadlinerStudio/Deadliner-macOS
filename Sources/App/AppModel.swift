@@ -73,6 +73,27 @@ final class AppModel {
         focus.refresh()
     }
 
+    /// 菜单栏与面板的汇总。习惯取今天的状态（习惯页正在看其他日期时，只统计今天的完成度）。
+    func menuBarSummary(now: Date) -> MenuBarSummary {
+        let today = HabitDates.string(now)
+        let todayHabits = habitList.selectedDate == today ? habitList.dailyHabits + habitList.periodGoals : []
+        return MenuBarSummary.make(
+            tasks: taskList.tasks,
+            habits: todayHabits,
+            today: habitList.week.first { $0.date == today },
+            focusTodaySeconds: focus.today.totalSeconds,
+            focusDays: focus.recentDays,
+            now: now
+        )
+    }
+
+    /// 打开菜单栏面板前：让习惯回到今天，刷新专注统计。
+    func prepareMenuBarPanel() {
+        let today = HabitDates.string(Date())
+        if habitList.selectedDate != today { habitList.select(date: today) }
+        focus.refresh()
+    }
+
     func newTask() {
         page = .tasks
         taskList.editor = .init(draft: TaskDraft())

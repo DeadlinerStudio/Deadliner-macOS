@@ -5,7 +5,7 @@ struct DeadlinerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        WindowGroup("Deadliner") {
+        WindowGroup("Deadliner", id: "main") {
             RootView(appDelegate: appDelegate)
                 .deadlinerTheme()
                 .frame(minWidth: 820, minHeight: 520)
@@ -51,6 +51,9 @@ struct DeadlinerApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var model: AppModel?
     private(set) var startupError: String?
+    private var menuBar: MenuBarController?
+    /// 由主窗口内容在出现时提供，用于在主窗口关闭后从菜单栏重新打开它。
+    var openMainWindowAction: (() -> Void)?
 
     /// 作为单元测试的宿主运行时为 true。此时不打开正式数据库、不启动同步，
     /// 避免测试读到用户的同步设置而连接真实的 WebDAV。
@@ -69,6 +72,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        guard let model else { return }
+        menuBar = MenuBarController(model: model) { [weak self] in self?.showMainWindow() }
+    }
+
+    /// 激活应用并显示主窗口；主窗口已关闭时重新打开。
+    func showMainWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        if let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true }) {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            openMainWindowAction?()
+        }
+    }
+
     func applicationDidBecomeActive(_ notification: Notification) {
         model?.refreshAll()
         model?.sync.setForeground(true)
@@ -79,6 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        menuBar?.tearDown()
         model?.stop()
     }
 }
@@ -89,6 +108,7 @@ struct RootView: View {
     @Environment(\.palette) private var t
 
     @AppStorage(FontPreference.serifKey) private var serif = false
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         content
@@ -100,7 +120,10 @@ struct RootView: View {
     private var content: some View {
         if let model = appDelegate.model {
             MainView(model: model)
-                .onAppear { model.start() }
+                .onAppear {
+                    model.start()
+                    appDelegate.openMainWindowAction = { openWindow(id: "main") }
+                }
         } else {
             Text("数据库打开失败：\(appDelegate.startupError ?? "未知错误")")
                 .foregroundStyle(t.error)

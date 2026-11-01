@@ -37,6 +37,14 @@ final class FocusStore {
     private(set) var thisMonth = Summary(totalSeconds: 0, sessionCount: 0)
     private(set) var allTime = Summary(totalSeconds: 0, sessionCount: 0)
     private(set) var sessions: [Session] = []
+    /// 最近 7 天每天的专注时长（Core overview.daily）。
+    private(set) var recentDays: [DayPoint] = []
+
+    struct DayPoint: Identifiable, Equatable {
+        let date: String
+        let seconds: Int
+        var id: String { date }
+    }
 
     @ObservationIgnored private let database: DeadlinerDatabase
 
@@ -50,6 +58,7 @@ final class FocusStore {
         thisWeek = Summary(core: overview.thisWeek)
         thisMonth = Summary(core: overview.thisMonth.summary)
         allTime = Summary(core: overview.allTime)
+        recentDays = overview.daily.suffix(7).map { DayPoint(date: $0.startDate, seconds: Int($0.durationSeconds)) }
         sessions = database.focusSessions.recent(limit: 300)
             .filter { !$0.isDeleted }
             .map {

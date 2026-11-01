@@ -230,6 +230,48 @@ final class TaskListSnapshotTests: XCTestCase {
         }
     }
 
+    /// 菜单栏面板（两种风格，Liquid Glass 与旧系统毛玻璃）与菜单栏样式截图（占位数据）。
+    func testRenderMenuBarPanelAndLabels() throws {
+        func habit(_ id: String, _ name: String, done: Int, target: Int, quantity: Bool = false) -> HabitItem {
+            HabitItem(id: id, name: name, note: "", colorHex: nil, categoryId: nil, doneCount: done, targetCount: target,
+                      isCompleted: done >= target, canApplyPrimaryAction: true, actionKind: quantity ? .addQuantity : .checkOff,
+                      actionAmount: quantity ? 250 : 1, unit: quantity ? "ml" : nil, goalWindow: .scheduledDay, scheduleKind: .weeklyDays,
+                      weekdaysMask: nil, isDue: true, dueReason: "DUE", hintKind: nil, daysUntil: nil)
+        }
+        let now = self.now
+        let focusDays = (0..<7).map { FocusStore.DayPoint(date: HabitDates.string(now.addingTimeInterval(Double($0 - 6) * 86400)), seconds: [1800, 5400, 0, 7200, 3600, 9000, 2400][$0]) }
+        let summary = MenuBarSummary.make(
+            tasks: sampleTasks, habits: [habit("h1", "示例习惯 A", done: 1, target: 1), habit("h2", "示例习惯 B", done: 500, target: 2000, quantity: true)],
+            today: HabitDay(date: "x", completed: 1, total: 2, fraction: 0.5), focusTodaySeconds: 4800, focusDays: focusDays, now: now
+        )
+        for (scheme, tokens) in [(ColorScheme.light, DeadlinerPalette.light), (ColorScheme.dark, DeadlinerPalette.dark)] {
+            let suffix = scheme == .dark ? "dark" : "light"
+            for style in PanelStyle.allCases {
+                for legacy in [false, true] {
+                    try capture(
+                        MenuBarPanelContent(summary: summary, style: style, sections: PanelSection.defaults, syncStatus: .succeeded(now), now: now)
+                            .padding(30)
+                            .background(LinearGradient(colors: [.purple, .orange], startPoint: .topLeading, endPoint: .bottomTrailing))
+                            .environment(\.palette, tokens).environment(\.colorScheme, scheme).environment(\.forceLegacyGlass, legacy),
+                        size: NSSize(width: 440, height: 860), scheme: scheme,
+                        name: "menubar-\(style.rawValue)-\(suffix)\(legacy ? "-legacy" : "")"
+                    )
+                }
+            }
+            try capture(
+                VStack(alignment: .trailing, spacing: 14) {
+                    ForEach(StatusItemStyle.allCases) { style in
+                        StatusLabelView(summary: summary, style: style, fields: [.today, .overdue, .habits, .focus, .next], now: now)
+                            .frame(height: 22)
+                    }
+                }
+                .padding(16)
+                .environment(\.palette, tokens).environment(\.colorScheme, scheme),
+                size: NSSize(width: 420, height: 180), scheme: scheme, name: "menubar-labels-\(suffix)"
+            )
+        }
+    }
+
     /// `titled` 为 true 时使用带标题栏的真实窗口，并让 SwiftUI 接管工具栏与标题，截图包含工具栏。
     private func capture<V: View>(_ view: V, size: NSSize, scheme: ColorScheme, name: String, titled: Bool = false) throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("deadliner-snapshots", isDirectory: true)

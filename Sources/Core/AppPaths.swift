@@ -24,3 +24,11 @@ enum DeviceIdentity {
         return created
     }
 }
+
+import AppKit
+
+/// 应用图标：直接读取包内的 AppIcon.icns，不依赖 LaunchServices 是否已登记本应用。
+enum AppIconImage {
+    @MainActor static let image: NSImage = Bundle.main.url(forResource: "AppIcon", withExtension: "icns")
+        .flatMap(NSImage.init(contentsOf:)) ?? NSApp.applicationIconImage
+}

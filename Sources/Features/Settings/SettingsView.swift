@@ -33,6 +33,11 @@ struct SettingsView: View {
     @AppStorage(ThemeAccent.storageKey) private var accentRaw = ThemeAccent.classic.rawValue
     @AppStorage(GlowStyle.storageKey) private var glowRaw = GlowStyle.immersive.rawValue
     @AppStorage(FontPreference.serifKey) private var serif = false
+    @AppStorage(MenuBarSettings.enabledKey) private var menuBarEnabled = true
+    @AppStorage(MenuBarSettings.styleKey) private var statusStyleRaw = StatusItemStyle.iconCount.rawValue
+    @AppStorage(MenuBarSettings.fieldsKey) private var fieldsRaw = StatusField.encode(StatusField.defaults)
+    @AppStorage(MenuBarSettings.panelStyleKey) private var panelStyleRaw = PanelStyle.list.rawValue
+    @AppStorage(MenuBarSettings.sectionsKey) private var sectionsRaw = PanelSection.encode(PanelSection.defaults)
     @Environment(\.palette) private var t
 
     @State private var form = SyncSettings(serverURL: "", username: "", enabled: false)
@@ -46,6 +51,7 @@ struct SettingsView: View {
             syncSection
             if !checks.isEmpty { probeSection }
             statusSection
+            menuBarSection
             appearanceSection
             aboutSection
         }
@@ -130,6 +136,51 @@ struct SettingsView: View {
                 }
                 .font(.callout)
             }
+        }
+    }
+
+    private var menuBarSection: some View {
+        Section {
+            Toggle("在菜单栏显示 Deadliner", isOn: $menuBarEnabled)
+            if menuBarEnabled {
+                Picker("菜单栏显示", selection: $statusStyleRaw) {
+                    ForEach(StatusItemStyle.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                if statusStyleRaw == StatusItemStyle.stats.rawValue {
+                    ForEach(StatusField.allCases) { field in
+                        Toggle(field.title, isOn: Binding(
+                            get: { StatusField.decode(fieldsRaw).contains(field) },
+                            set: { on in
+                                var fields = StatusField.decode(fieldsRaw).filter { $0 != field }
+                                if on { fields.append(field) }
+                                fields.sort { StatusField.allCases.firstIndex(of: $0)! < StatusField.allCases.firstIndex(of: $1)! }
+                                fieldsRaw = StatusField.encode(fields.isEmpty ? [field] : fields)
+                            }
+                        ))
+                        .padding(.leading, 16)
+                    }
+                }
+                Picker("面板风格", selection: $panelStyleRaw) {
+                    ForEach(PanelStyle.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+                ForEach(PanelSection.allCases) { section in
+                    Toggle(section.title, isOn: Binding(
+                        get: { PanelSection.decode(sectionsRaw).contains(section) },
+                        set: { on in
+                            var sections = PanelSection.decode(sectionsRaw).filter { $0 != section }
+                            if on { sections.append(section) }
+                            sections.sort { PanelSection.allCases.firstIndex(of: $0)! < PanelSection.allCases.firstIndex(of: $1)! }
+                            sectionsRaw = PanelSection.encode(sections)
+                        }
+                    ))
+                    .padding(.leading, 16)
+                }
+            }
+        } header: {
+            Text("菜单栏")
+        } footer: {
+            Text("面板使用 Liquid Glass（macOS 26 及以上）；更早的系统使用毛玻璃。")
         }
     }
 
