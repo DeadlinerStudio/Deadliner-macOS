@@ -170,6 +170,8 @@ struct MainView: View {
                                  onSetupSync: model.sync.status == .disabled ? { model.page = .settings } : nil)
                 case .habits:
                     HabitsView(store: model.habitList, commands: model.habitCommands, categories: model.taskList.categories)
+                case .overview:
+                    OverviewView(store: model.overview)
                 case .focus:
                     FocusView(store: model.focus)
                 case .archive:

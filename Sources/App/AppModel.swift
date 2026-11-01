@@ -7,13 +7,14 @@ import Observation
 @Observable
 final class AppModel {
     enum Page: String, CaseIterable, Identifiable {
-        case tasks, habits, focus, archive, settings
+        case tasks, habits, overview, focus, archive, settings
         var id: String { rawValue }
 
         var title: String {
             switch self {
             case .tasks: "任务"
             case .habits: "习惯"
+            case .overview: "概览"
             case .focus: "专注"
             case .archive: "归档"
             case .settings: "设置"
@@ -24,6 +25,7 @@ final class AppModel {
             switch self {
             case .tasks: "checklist"
             case .habits: "target"
+            case .overview: "chart.bar.xaxis"
             case .focus: "timer"
             case .archive: "archivebox"
             case .settings: "gearshape"
@@ -40,6 +42,7 @@ final class AppModel {
     @ObservationIgnored private(set) var habitList: HabitListStore!
     @ObservationIgnored private(set) var archive: ArchiveStore!
     @ObservationIgnored private(set) var focus: FocusStore!
+    @ObservationIgnored private(set) var overview: OverviewStore!
     @ObservationIgnored private(set) var sync: SyncController!
     @ObservationIgnored private(set) var taskCommands: TaskCommands!
     @ObservationIgnored private(set) var categoryCommands: CategoryCommands!
@@ -52,6 +55,7 @@ final class AppModel {
         habitList = HabitListStore(database: database) { [unowned self] in refreshAll(except: .habits) }
         archive = ArchiveStore(database: database) { [unowned self] in refreshAll() }
         focus = FocusStore(database: database)
+        overview = OverviewStore(database: database)
         sync = SyncController(database: database) { [unowned self] in refreshAll() }
         taskCommands = TaskCommands(database: database) { [unowned self] in refreshAll() }
         categoryCommands = CategoryCommands(database: database) { [unowned self] in refreshAll() }
@@ -71,6 +75,7 @@ final class AppModel {
         if skipped != .habits { habitList.refresh() }
         archive.refresh()
         focus.refresh()
+        if page == .overview { overview.refresh() }
     }
 
     /// 菜单栏与面板的汇总。习惯取今天的状态（习惯页正在看其他日期时，只统计今天的完成度）。
@@ -103,6 +108,7 @@ final class AppModel {
         sync.stop()
         taskList.stop()
         habitList.stop()
+        overview.stop()
         container.close()
     }
 }

@@ -11,7 +11,7 @@ struct Sidebar: View {
 
     private static let groups: [(title: String?, pages: [AppModel.Page])] = [
         (nil, [.tasks, .habits]),
-        ("记录", [.focus, .archive]),
+        ("记录", [.overview, .focus, .archive]),
         (nil, [.settings]),
     ]
 
