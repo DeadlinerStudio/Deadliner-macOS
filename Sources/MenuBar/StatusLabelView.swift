@@ -48,7 +48,7 @@ struct StatusLabelView: View {
             }
         }
         // 两侧留白与系统图标按钮一致，和相邻的菜单栏图标间距协调。
-        .padding(.horizontal, 7)
+        .padding(.horizontal, 5)
         .fixedSize()
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityText)
