@@ -269,9 +269,10 @@ struct ProgressRing: View {
     @Environment(\.palette) private var t
 
     var body: some View {
+        // 线宽收在 size 之内（inset 半个线宽），不画到外面贴边或压住旁边的文字。
         ZStack {
-            Circle().stroke(t.segmentedBg, lineWidth: 7)
-            Circle()
+            Circle().inset(by: 3.5).stroke(t.segmentedBg, lineWidth: 7)
+            Circle().inset(by: 3.5)
                 .trim(from: 0, to: max(0, min(1, fraction)))
                 .stroke(t.primary, style: StrokeStyle(lineWidth: 7, lineCap: .round))
                 .rotationEffect(.degrees(-90))

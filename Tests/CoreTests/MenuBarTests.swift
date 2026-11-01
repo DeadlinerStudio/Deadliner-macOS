@@ -33,6 +33,31 @@ final class MenuBarSummaryTests: XCTestCase {
         XCTAssertEqual(summary.value(for: .next, now: now), "5小时")
     }
 
+    /// 面板数据格与「即将到期」范围。测试日期 2027-01-15 是周五：周日仍在本周，下周二不在。
+    func testWeekCountsAndUpcomingRange() {
+        let tasks = [
+            task("overdue", due: -3600),
+            task("today", due: 3600 * 5),
+            task("tomorrow", due: 86400 + 3600),
+            task("sunday", due: 86400 * 2 + 3600),
+            task("next-week", due: 86400 * 4),
+        ]
+        let summary = MenuBarSummary.make(tasks: tasks, habits: [], today: nil, focusTodaySeconds: 600,
+                                          focusDays: [], now: now, focusWeekSeconds: 5400)
+        XCTAssertEqual(summary.dueTomorrow, 1)
+        XCTAssertEqual(summary.dueThisWeek, 3)
+        XCTAssertEqual(summary.pendingThisWeek, 4)
+        XCTAssertEqual(summary.activeToday, 5)
+        XCTAssertEqual(summary.value(for: .focusThisWeek), "1h30")
+        XCTAssertEqual(summary.value(for: .pendingThisWeek), "4")
+        XCTAssertEqual(summary.upcoming(in: .today, now: now).map(\.id), ["overdue", "today"])
+        XCTAssertEqual(summary.upcoming(in: .threeDays, now: now).map(\.id), ["overdue", "today", "tomorrow", "sunday"])
+        XCTAssertEqual(summary.upcoming(in: .week, now: now).map(\.id), ["overdue", "today", "tomorrow", "sunday"])
+        XCTAssertEqual(summary.upcoming(in: .all, now: now).count, 5)
+        XCTAssertEqual(PanelStat.decode(nil), PanelStat.defaults)
+        XCTAssertEqual(PanelStat.decode("overdue,focusThisWeek"), [.overdue, .focusThisWeek])
+    }
+
     func testSettingsEncoding() {
         XCTAssertEqual(StatusField.decode("overdue,focus"), [.overdue, .focus])
         XCTAssertEqual(StatusField.decode(""), StatusField.defaults)

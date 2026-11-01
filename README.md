@@ -31,8 +31,16 @@ Liquid Glass 与侧栏下的顶部浮光需要 macOS 26；更早的系统使用�
 - **WebDAV 同步**：与手机端使用同一个同步文件，双向同步；后台同步间隔可选
 - **通知**：任务到期前一天、到期时与习惯打卡提醒，提醒时间与手机端一致
 - **备份**：导出 / 导入与手机端同一格式的完整备份
-- **菜单栏**：四种显示样式，面板内查看今日任务、习惯与专注，内容可自定义
+- **菜单栏**：四种显示样式；面板内查看任务、习惯与专注，概况数据、即将到期范围、专注图表方向都可以自定义
 - **外观**：浅色 / 深色 / 跟随系统、15 种主题色、顶部浮光、衬线字体
+
+## 截图
+
+<img src="./assets/tasks-light.png" alt="任务" width="100%" />
+<img src="./assets/habits-dark.png" alt="习惯（深色）" width="100%" />
+<img src="./assets/menubar-light.png" alt="菜单栏面板" width="49%" /><img src="./assets/menubar-dark.png" alt="菜单栏面板（深色）" width="49%" />
+
+截图由测试 `TaskListSnapshotTests.testRenderReadmeScreenshots` 用示例数据生成。
 
 ## 技术栈
 
@@ -98,3 +106,7 @@ scripts/package.sh ../Deadliner-for-macOS-package   # 打包 DMG 与 ZIP（临�
 ## 贡献
 
 欢迎提交 Issue 或 Pull Request。界面文案计划与 iOS 端统一，之后迁移到各端共用的本地化层。
+
+## 许可证
+
+本项目基于 MIT 许可证，详情请参见 [LICENSE](LICENSE)。

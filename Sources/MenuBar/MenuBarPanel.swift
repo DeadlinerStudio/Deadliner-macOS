@@ -1,4 +1,3 @@
-import Charts
 import SwiftUI
 
 /// 菜单栏面板：读取 AppModel 与设置，交给不依赖 Core 的 `MenuBarPanelContent` 渲染。
@@ -8,6 +7,9 @@ struct MenuBarPanel: View {
     var openMain: () -> Void
     @AppStorage(MenuBarSettings.panelStyleKey) private var styleRaw = PanelStyle.list.rawValue
     @AppStorage(MenuBarSettings.sectionsKey) private var sectionsRaw = PanelSection.encode(PanelSection.defaults)
+    @AppStorage(MenuBarSettings.focusChartKey) private var focusChartRaw = FocusChartOrientation.vertical.rawValue
+    @AppStorage(MenuBarSettings.statsKey) private var statsRaw = PanelStat.encode(PanelStat.defaults)
+    @AppStorage(MenuBarSettings.upcomingRangeKey) private var upcomingRaw = UpcomingRange.all.rawValue
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
@@ -17,6 +19,9 @@ struct MenuBarPanel: View {
                 sections: PanelSection.decode(sectionsRaw),
                 syncStatus: model.sync.status,
                 now: context.date,
+                focusOrientation: FocusChartOrientation(rawValue: focusChartRaw) ?? .vertical,
+                stats: Array(PanelStat.decode(statsRaw).prefix(PanelStat.maxCount)),
+                upcomingRange: UpcomingRange(rawValue: upcomingRaw) ?? .all,
                 actions: .init(
                     completeTask: { id in try? model.taskCommands.toggleComplete(id) },
                     checkHabit: { habit in model.habitList.applyPrimaryAction(habit) },
@@ -47,7 +52,11 @@ struct MenuBarPanelContent: View {
     let sections: [PanelSection]
     let syncStatus: SyncController.Status
     let now: Date
+    var focusOrientation: FocusChartOrientation = .vertical
+    var stats: [PanelStat] = PanelStat.defaults
+    var upcomingRange: UpcomingRange = .all
     var actions: Actions?
+    @State private var hoveredFocusDay: String?
     @Environment(\.palette) private var t
 
     var body: some View {
@@ -143,24 +152,28 @@ struct MenuBarPanelContent: View {
         switch style {
         case .dashboard:
             HStack(spacing: 16) {
-                ProgressRing(fraction: summary.habitFraction, size: 78)
-                    .overlay(alignment: .bottom) {
-                        Text("习惯").font(.caption2).foregroundStyle(.secondary).offset(y: 14)
-                    }
+                VStack(spacing: 6) {
+                    ProgressRing(fraction: summary.habitFraction, size: 78)
+                    Text("习惯").font(.caption2).foregroundStyle(.secondary)
+                }
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    statTile("今天到期", "\(summary.dueToday)", t.tertiary)
-                    statTile("已逾期", "\(summary.overdue)", t.error)
-                    statTile("进行中", "\(summary.activeCount)", t.primary)
-                    statTile("今日专注", FocusTexts.compact(summary.focusTodaySeconds), Color(hex: 0x10B981))
+                    ForEach(stats) { stat in statTile(stat.title, summary.value(for: stat), tint(stat)) }
                 }
             }
             .padding(.bottom, 8)
         case .list:
             HStack(spacing: 8) {
-                statTile("今天到期", "\(summary.dueToday)", t.tertiary)
-                statTile("已逾期", "\(summary.overdue)", t.error)
-                statTile("习惯", "\(summary.habitsDone)/\(summary.habitsTotal)", t.primary)
+                ForEach(stats) { stat in statTile(stat.title, summary.value(for: stat), tint(stat)) }
             }
+        }
+    }
+
+    private func tint(_ stat: PanelStat) -> Color {
+        switch stat {
+        case .dueToday, .dueTomorrow, .dueThisWeek, .pendingThisWeek: t.tertiary
+        case .overdue: t.error
+        case .active, .activeToday, .activeThisWeek, .habits: t.primary
+        case .focusToday, .focusThisWeek: Color(hex: 0x10B981)
         }
     }
 
@@ -177,12 +190,21 @@ struct MenuBarPanelContent: View {
 
     @ViewBuilder
     private var tasks: some View {
-        sectionTitle("即将到期")
-        if summary.upcoming.isEmpty {
-            Text("没有有截止时间的待办").font(.callout).foregroundStyle(.secondary)
+        let lines = summary.upcoming(in: upcomingRange, now: now)
+        let limit = style == .dashboard ? 4 : 6
+        HStack {
+            sectionTitle(upcomingRange == .all ? "即将到期" : "即将到期 · \(upcomingRange.title)")
+            Spacer()
+            if lines.count > limit {
+                Text("还有 \(lines.count - limit) 个").font(.caption).foregroundStyle(.secondary).padding(.top, 2)
+            }
+        }
+        if lines.isEmpty {
+            Text(upcomingRange == .all ? "没有有截止时间的待办" : "\(upcomingRange.title)没有到期的待办")
+                .font(.callout).foregroundStyle(.secondary)
         } else {
             VStack(spacing: 2) {
-                ForEach(summary.upcoming.prefix(style == .dashboard ? 4 : 6)) { line in
+                ForEach(lines.prefix(limit)) { line in
                     TaskLineRow(line: line) { actions?.completeTask(line.id) }
                 }
             }
@@ -205,18 +227,84 @@ struct MenuBarPanelContent: View {
 
     @ViewBuilder
     private var focusChart: some View {
-        sectionTitle("最近 7 天专注")
+        let peak = max(1, summary.focusDays.map(\.seconds).max() ?? 1)
+        let total = summary.focusDays.map(\.seconds).reduce(0, +)
+        HStack {
+            sectionTitle("最近 7 天专注")
+            Spacer()
+            // 悬停在某一天上时显示那天的时长，否则显示 7 天合计。
+            Group {
+                if let day = hoveredFocusDay, let point = summary.focusDays.first(where: { $0.id == day }) {
+                    Text("周\(point.label) · \(FocusTexts.duration(point.seconds))")
+                } else if total > 0 {
+                    Text("合计 \(FocusTexts.duration(total))")
+                }
+            }
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .padding(.top, 2)
+        }
         if summary.focusDays.isEmpty {
             Text("还没有专注记录").font(.callout).foregroundStyle(.secondary)
         } else {
-            Chart(summary.focusDays) { day in
-                BarMark(x: .value("日期", day.label), y: .value("分钟", Double(day.seconds) / 60))
-                    .foregroundStyle(Color(hex: 0x10B981).gradient)
-                    .cornerRadius(4)
+            switch focusOrientation {
+            case .vertical: verticalFocusBars(peak: peak)
+            case .horizontal: horizontalFocusBars(peak: peak)
             }
-            .chartYAxis(.hidden)
-            .frame(height: style == .dashboard ? 90 : 64)
         }
+    }
+
+    /// 竖向：细长的胶囊柱，日期在下方。
+    private func verticalFocusBars(peak: Int) -> some View {
+        let height: CGFloat = style == .dashboard ? 84 : 60
+        return HStack(alignment: .bottom, spacing: 0) {
+            ForEach(summary.focusDays) { day in
+                VStack(spacing: 5) {
+                    ZStack(alignment: .bottom) {
+                        Capsule().fill(Color.primary.opacity(0.06)).frame(width: 8, height: height)
+                        Capsule()
+                            .fill(Color(hex: 0x10B981).gradient)
+                            .frame(width: 8, height: day.seconds == 0 ? 0 : max(8, height * CGFloat(day.seconds) / CGFloat(peak)))
+                            .opacity(hoveredFocusDay == nil || hoveredFocusDay == day.id ? 1 : 0.45)
+                    }
+                    Text(day.label).font(.caption2).foregroundStyle(hoveredFocusDay == day.id ? .primary : .secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .onHover { hoveredFocusDay = $0 ? day.id : (hoveredFocusDay == day.id ? nil : hoveredFocusDay) }
+                .help("周\(day.label)：\(FocusTexts.duration(day.seconds))")
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: hoveredFocusDay)
+    }
+
+    /// 横向：每天一行细条，右侧显示时长。
+    private func horizontalFocusBars(peak: Int) -> some View {
+        VStack(spacing: 7) {
+            ForEach(summary.focusDays) { day in
+                HStack(spacing: 8) {
+                    Text(day.label).font(.caption2).foregroundStyle(.secondary).frame(width: 14)
+                    GeometryReader { proxy in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Color.primary.opacity(0.06))
+                            Capsule()
+                                .fill(Color(hex: 0x10B981).gradient)
+                                .frame(width: day.seconds == 0 ? 0 : max(6, proxy.size.width * CGFloat(day.seconds) / CGFloat(peak)))
+                        }
+                    }
+                    .frame(height: 6)
+                    Text(day.seconds == 0 ? "—" : FocusTexts.compact(day.seconds))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 36, alignment: .trailing)
+                }
+                .opacity(hoveredFocusDay == nil || hoveredFocusDay == day.id ? 1 : 0.55)
+                .contentShape(Rectangle())
+                .onHover { hoveredFocusDay = $0 ? day.id : (hoveredFocusDay == day.id ? nil : hoveredFocusDay) }
+                .help("周\(day.label)：\(FocusTexts.duration(day.seconds))")
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: hoveredFocusDay)
     }
 
     private var quickAdd: some View {

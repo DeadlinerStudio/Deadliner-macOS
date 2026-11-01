@@ -90,7 +90,8 @@ final class AppModel {
             today: habitList.week.first { $0.date == today },
             focusTodaySeconds: focus.today.totalSeconds,
             focusDays: focus.recentDays,
-            now: now
+            now: now,
+            focusWeekSeconds: focus.thisWeek.totalSeconds
         )
     }
 

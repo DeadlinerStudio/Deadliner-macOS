@@ -258,6 +258,16 @@ final class TaskListSnapshotTests: XCTestCase {
                     )
                 }
             }
+            // 自定义数据格、「本周」范围与横向专注图表。
+            try capture(
+                MenuBarPanelContent(summary: summary, style: .dashboard, sections: PanelSection.defaults, syncStatus: .succeeded(now), now: now,
+                                    focusOrientation: .horizontal, stats: [.dueTomorrow, .pendingThisWeek, .activeThisWeek, .focusThisWeek],
+                                    upcomingRange: .week)
+                    .padding(30)
+                    .background(LinearGradient(colors: [.purple, .orange], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .environment(\.palette, tokens).environment(\.colorScheme, scheme).environment(\.forceLegacyGlass, true),
+                size: NSSize(width: 440, height: 900), scheme: scheme, name: "menubar-custom-\(suffix)"
+            )
             try capture(
                 VStack(alignment: .trailing, spacing: 14) {
                     ForEach(StatusItemStyle.allCases) { style in
@@ -273,6 +283,68 @@ final class TaskListSnapshotTests: XCTestCase {
     }
 
     /// `titled` 为 true 时使用带标题栏的真实窗口，并让 SwiftUI 接管工具栏与标题，截图包含工具栏。
+    /// README 用的截图（示例数据）：任务、习惯与菜单栏面板，浅色与深色各一张。
+    /// 生成后复制到 `assets/`：`cp …/deadliner-snapshots/readme-*.png assets/`。
+    func testRenderReadmeScreenshots() throws {
+        func habit(_ id: String, _ name: String, done: Int, target: Int, quantity: Bool = false, completed: Bool = false,
+                   category: String? = nil) -> HabitItem {
+            HabitItem(id: id, name: name, note: "", colorHex: nil, categoryId: category, doneCount: done, targetCount: target,
+                      isCompleted: completed, canApplyPrimaryAction: true, actionKind: quantity ? .addQuantity : .checkOff,
+                      actionAmount: quantity ? 250 : 1, unit: quantity ? "ml" : nil, goalWindow: .scheduledDay,
+                      scheduleKind: .weeklyDays, weekdaysMask: nil, isDue: true, dueReason: "DUE", hintKind: nil, daysUntil: nil)
+        }
+        let calendar = Calendar.current
+        let monday = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now))!
+        let week = (0..<7).map { offset -> HabitDay in
+            let date = HabitDates.string(calendar.date(byAdding: .day, value: offset, to: monday)!)
+            return HabitDay(date: date, completed: offset % 3, total: 3, fraction: Double(offset % 3) / 3)
+        }
+        let habits = [habit("1", "示例习惯 A", done: 1, target: 1, completed: true, category: "c2"),
+                      habit("2", "示例习惯 B", done: 500, target: 2000, quantity: true),
+                      habit("3", "示例习惯 C", done: 0, target: 1, category: "c3")]
+        let now = self.now
+        let focusDays = (0..<7).map { FocusStore.DayPoint(date: HabitDates.string(now.addingTimeInterval(Double($0 - 6) * 86400)), seconds: [1800, 5400, 0, 7200, 3600, 9000, 2400][$0]) }
+        let summary = MenuBarSummary.make(tasks: sampleTasks, habits: Array(habits.prefix(2)),
+                                          today: HabitDay(date: "x", completed: 1, total: 2, fraction: 0.5),
+                                          focusTodaySeconds: 4800, focusDays: focusDays, now: now, focusWeekSeconds: 21600)
+
+        for (scheme, tokens) in [(ColorScheme.light, DeadlinerPalette.light), (ColorScheme.dark, DeadlinerPalette.dark)] {
+            let suffix = scheme == .dark ? "dark" : "light"
+            func page<Content: View>(_ title: String, _ subtitle: String, @ViewBuilder _ content: () -> Content) -> some View {
+                VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(title).font(.headline)
+                        Text(subtitle).font(.caption).foregroundStyle(tokens.onSurfaceVariant)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 18)
+                    content()
+                }
+                .background(tokens.pageBg)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+                .padding(36)
+                .background(LinearGradient(colors: [Color(hex: 0x6D83F2), Color(hex: 0xC084FC)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .environment(\.palette, tokens).environment(\.colorScheme, scheme).environment(\.forceLegacyGlass, true)
+            }
+            try capture(page("任务", "\(sampleTasks.count) 个任务") {
+                TaskListContent(tasks: TaskListStore.sorted(sampleTasks, by: .dueDate), totalCount: sampleTasks.count,
+                                categories: sampleCategories, isLoading: false, errorMessage: nil, now: now, layout: .double)
+            }, size: NSSize(width: 1180, height: 520), scheme: scheme, name: "readme-tasks-\(suffix)")
+            try capture(page("习惯", "今天 1/3") {
+                HabitsContent(daily: habits, period: [], upcoming: [], week: week, selectedDate: week[4].date,
+                              categories: sampleCategories, isLoading: false, errorMessage: nil, searchText: "")
+            }, size: NSSize(width: 1000, height: 640), scheme: scheme, name: "readme-habits-\(suffix)")
+            try capture(
+                MenuBarPanelContent(summary: summary, style: .dashboard, sections: PanelSection.defaults, syncStatus: .succeeded(now), now: now)
+                    .padding(36)
+                    .background(LinearGradient(colors: [Color(hex: 0x6D83F2), Color(hex: 0xC084FC)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .environment(\.palette, tokens).environment(\.colorScheme, scheme).environment(\.forceLegacyGlass, true),
+                size: NSSize(width: 450, height: 860), scheme: scheme, name: "readme-menubar-\(suffix)"
+            )
+        }
+    }
+
     private func capture<V: View>(_ view: V, size: NSSize, scheme: ColorScheme, name: String, titled: Bool = false) throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("deadliner-snapshots", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

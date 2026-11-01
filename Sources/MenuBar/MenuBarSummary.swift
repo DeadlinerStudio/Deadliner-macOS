@@ -9,6 +9,7 @@ struct MenuBarSummary: Equatable {
         let status: IndicatorStatus
         let isStarred: Bool
         let isCompleted: Bool
+        var dueAt: Date?
     }
 
     struct FocusDay: Identifiable, Equatable {
@@ -27,14 +28,23 @@ struct MenuBarSummary: Equatable {
     var habitsTotal = 0
     var habits: [HabitItem] = []
     var focusTodaySeconds = 0
+    var focusWeekSeconds = 0
     var focusDays: [FocusDay] = []
+    var dueTomorrow = 0
+    var dueThisWeek = 0
+    var activeToday = 0
+    var activeThisWeek = 0
+    var pendingThisWeek = 0
+    /// 本周结束时间（周一为一周的第一天），用于「即将到期」的范围。
+    var weekEnd: Date = .distantFuture
 
     /// 需要处理的数量：今天到期 + 已逾期。
     var pending: Int { dueToday + overdue }
     var habitFraction: Double { habitsTotal > 0 ? Double(habitsDone) / Double(habitsTotal) : 0 }
 
     static func make(tasks: [TaskItem], habits: [HabitItem], today: HabitDay?, focusTodaySeconds: Int,
-                     focusDays: [FocusStore.DayPoint], now: Date, calendar: Calendar = .current, upcomingLimit: Int = 6) -> MenuBarSummary {
+                     focusDays: [FocusStore.DayPoint], now: Date, focusWeekSeconds: Int = 0,
+                     calendar: Calendar = .current, upcomingLimit: Int = 50) -> MenuBarSummary {
         var summary = MenuBarSummary()
         let active = tasks.filter { $0.state == .active }
         summary.activeCount = active.count
@@ -43,6 +53,26 @@ struct MenuBarSummary: Equatable {
             guard let due = task.dueAt else { return false }
             return due >= now && calendar.isDate(due, inSameDayAs: now)
         }.count
+
+        var weekCalendar = calendar
+        weekCalendar.firstWeekday = 2
+        let todayStart = calendar.startOfDay(for: now)
+        let todayEnd = calendar.date(byAdding: .day, value: 1, to: todayStart) ?? now
+        let tomorrowEnd = calendar.date(byAdding: .day, value: 1, to: todayEnd) ?? now
+        let week = weekCalendar.dateInterval(of: .weekOfYear, for: now) ?? DateInterval(start: todayStart, end: todayEnd)
+        summary.weekEnd = week.end
+        func due(_ task: TaskItem, in range: Range<Date>) -> Bool { task.dueAt.map { range.contains($0) } ?? false }
+        /// 任务的时间段（开始或创建 → 截止）与区间有重叠。
+        func spans(_ task: TaskItem, _ start: Date, _ end: Date) -> Bool {
+            let begin = task.startAt ?? task.createdAt ?? .distantPast
+            return begin < end && (task.dueAt.map { $0 >= start } ?? true)
+        }
+        summary.dueTomorrow = active.filter { due($0, in: todayEnd..<tomorrowEnd) }.count
+        summary.dueThisWeek = active.filter { due($0, in: now..<max(now, week.end)) }.count
+        summary.activeToday = active.filter { spans($0, todayStart, todayEnd) }.count
+        summary.activeThisWeek = active.filter { spans($0, week.start, week.end) }.count
+        summary.pendingThisWeek = active.filter { ($0.dueAt.map { $0 < week.end }) ?? false }.count
+        summary.focusWeekSeconds = focusWeekSeconds
 
         // 逾期的在前，其余按截止时间；没有截止时间的不进入列表。
         let dated = active.filter { $0.dueAt != nil }.sorted { ($0.dueAt ?? .distantFuture) < ($1.dueAt ?? .distantFuture) }
@@ -65,7 +95,38 @@ struct MenuBarSummary: Equatable {
 
     private static func line(_ task: TaskItem, now: Date) -> TaskLine {
         TaskLine(id: task.id, title: task.title, remaining: TaskStatus.remainingText(task, now: now),
-                 status: TaskStatus.indicator(task, now: now), isStarred: task.isStarred, isCompleted: task.isCompleted)
+                 status: TaskStatus.indicator(task, now: now), isStarred: task.isStarred, isCompleted: task.isCompleted,
+                 dueAt: task.dueAt)
+    }
+
+    /// 「即将到期」列表在所选范围内的任务（逾期的始终包含）。
+    func upcoming(in range: UpcomingRange, now: Date, calendar: Calendar = .current) -> [TaskLine] {
+        let todayStart = calendar.startOfDay(for: now)
+        let end: Date? = switch range {
+        case .today: calendar.date(byAdding: .day, value: 1, to: todayStart)
+        case .threeDays: calendar.date(byAdding: .day, value: 3, to: todayStart)
+        case .week: weekEnd
+        case .all: nil
+        }
+        guard let end else { return upcoming }
+        return upcoming.filter { ($0.dueAt ?? .distantFuture) < end }
+    }
+
+    /// 面板数据格的数值文字。
+    func value(for stat: PanelStat) -> String {
+        switch stat {
+        case .dueToday: "\(dueToday)"
+        case .dueTomorrow: "\(dueTomorrow)"
+        case .dueThisWeek: "\(dueThisWeek)"
+        case .overdue: "\(overdue)"
+        case .active: "\(activeCount)"
+        case .activeToday: "\(activeToday)"
+        case .activeThisWeek: "\(activeThisWeek)"
+        case .pendingThisWeek: "\(pendingThisWeek)"
+        case .habits: "\(habitsDone)/\(habitsTotal)"
+        case .focusToday: FocusTexts.compact(focusTodaySeconds)
+        case .focusThisWeek: FocusTexts.compact(focusWeekSeconds)
+        }
     }
 
     /// 菜单栏「多项数据」中某一项的数值文字。

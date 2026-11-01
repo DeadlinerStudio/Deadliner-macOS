@@ -44,6 +44,9 @@ struct SettingsView: View {
     @AppStorage(MenuBarSettings.styleKey) private var statusStyleRaw = StatusItemStyle.iconCount.rawValue
     @AppStorage(MenuBarSettings.fieldsKey) private var fieldsRaw = StatusField.encode(StatusField.defaults)
     @AppStorage(MenuBarSettings.panelStyleKey) private var panelStyleRaw = PanelStyle.list.rawValue
+    @AppStorage(MenuBarSettings.focusChartKey) private var focusChartRaw = FocusChartOrientation.vertical.rawValue
+    @AppStorage(MenuBarSettings.statsKey) private var statsRaw = PanelStat.encode(PanelStat.defaults)
+    @AppStorage(MenuBarSettings.upcomingRangeKey) private var upcomingRaw = UpcomingRange.all.rawValue
     @AppStorage(MenuBarSettings.sectionsKey) private var sectionsRaw = PanelSection.encode(PanelSection.defaults)
     @Environment(\.palette) private var t
 
@@ -204,6 +207,41 @@ struct SettingsView: View {
                         }
                     ))
                     .padding(.leading, 16)
+                }
+                if PanelSection.decode(sectionsRaw).contains(.overview) {
+                    DisclosureGroup("概况数据（最多 \(PanelStat.maxCount) 项，已选 \(PanelStat.decode(statsRaw).count)）") {
+                        ForEach(PanelStat.allCases) { stat in
+                            let selected = PanelStat.decode(statsRaw)
+                            Toggle(isOn: Binding(
+                                get: { selected.contains(stat) },
+                                set: { on in
+                                    var stats = selected.filter { $0 != stat }
+                                    if on { stats.append(stat) }
+                                    stats.sort { PanelStat.allCases.firstIndex(of: $0)! < PanelStat.allCases.firstIndex(of: $1)! }
+                                    statsRaw = PanelStat.encode(stats)
+                                }
+                            )) {
+                                Text(stat.title)
+                                Text(stat.detail)
+                            }
+                            .disabled(!selected.contains(stat) && selected.count >= PanelStat.maxCount)
+                        }
+                    }
+                    .padding(.leading, 16)
+                }
+                if PanelSection.decode(sectionsRaw).contains(.tasks) {
+                    Picker("即将到期范围", selection: $upcomingRaw) {
+                        ForEach(UpcomingRange.allCases) { Text($0.title).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.segmented)
+                    .help("已逾期的任务始终显示")
+                }
+                if PanelSection.decode(sectionsRaw).contains(.focusChart) {
+                    Picker("专注图表", selection: $focusChartRaw) {
+                        ForEach(FocusChartOrientation.allCases) { Text($0.title).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.segmented)
+                    .help("「最近 7 天专注」的柱子方向；悬停在某一天上可以看到具体时长")
                 }
             }
         } header: {

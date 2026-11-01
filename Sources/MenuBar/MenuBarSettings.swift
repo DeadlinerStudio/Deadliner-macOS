@@ -7,6 +7,90 @@ enum MenuBarSettings {
     static let fieldsKey = "menubar.fields"
     static let panelStyleKey = "menubar.panelStyle"
     static let sectionsKey = "menubar.sections"
+    static let focusChartKey = "menubar.focusChart"
+    static let statsKey = "menubar.stats"
+    static let upcomingRangeKey = "menubar.upcomingRange"
+}
+
+/// 面板顶部的数据格（最多 4 个）。
+enum PanelStat: String, CaseIterable, Identifiable {
+    case dueToday, dueTomorrow, dueThisWeek, overdue
+    case active, activeToday, activeThisWeek, pendingThisWeek
+    case habits, focusToday, focusThisWeek
+
+    var id: String { rawValue }
+    static let maxCount = 4
+    static let defaults: [PanelStat] = [.dueToday, .overdue, .active, .focusToday]
+
+    var title: String {
+        switch self {
+        case .dueToday: "今天到期"
+        case .dueTomorrow: "明天到期"
+        case .dueThisWeek: "本周到期"
+        case .overdue: "已逾期"
+        case .active: "进行中"
+        case .activeToday: "今日进行中"
+        case .activeThisWeek: "本周进行中"
+        case .pendingThisWeek: "本周待完成"
+        case .habits: "今日习惯"
+        case .focusToday: "今日专注"
+        case .focusThisWeek: "本周专注"
+        }
+    }
+
+    /// 设置中的说明。
+    var detail: String {
+        switch self {
+        case .dueToday: "今天剩余时间内到期的任务"
+        case .dueTomorrow: "明天到期的任务"
+        case .dueThisWeek: "从现在到本周日结束前到期的任务"
+        case .overdue: "已过截止时间、尚未完成的任务"
+        case .active: "所有未完成、未放弃的任务"
+        case .activeToday: "时间段（开始到截止）覆盖今天的任务"
+        case .activeThisWeek: "时间段（开始到截止）覆盖本周的任务"
+        case .pendingThisWeek: "本周日结束前到期、尚未完成的任务（含已逾期）"
+        case .habits: "今天已完成 / 需要完成的习惯"
+        case .focusToday: "今天的专注时长"
+        case .focusThisWeek: "本周（周一起）的专注时长"
+        }
+    }
+
+    static func decode(_ raw: String?) -> [PanelStat] {
+        guard let raw else { return defaults }
+        return raw.split(separator: ",").compactMap { PanelStat(rawValue: String($0)) }
+    }
+
+    static func encode(_ stats: [PanelStat]) -> String { stats.map(\.rawValue).joined(separator: ",") }
+}
+
+/// 「即将到期」列表的时间范围（逾期的任务始终显示）。
+enum UpcomingRange: String, CaseIterable, Identifiable {
+    case today, threeDays, week, all
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .today: "今天"
+        case .threeDays: "3 天内"
+        case .week: "本周"
+        case .all: "全部"
+        }
+    }
+}
+
+/// 面板中「最近 7 天专注」的排列方向。
+enum FocusChartOrientation: String, CaseIterable, Identifiable {
+    /// 竖向柱子，日期在下方。
+    case vertical
+    /// 横向条，每天一行，右侧显示时长。
+    case horizontal
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .vertical: "竖向"
+        case .horizontal: "横向"
+        }
+    }
 }
 
 /// 菜单栏上显示的样式。
