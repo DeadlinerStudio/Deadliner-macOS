@@ -38,7 +38,7 @@ struct DeadlinerApp: App {
         // ⌘, 打开的系统设置窗口（与侧栏中的「设置」页内容相同）。
         Settings {
             if let model = appDelegate.model {
-                SettingsView(sync: model.sync, backup: LocalBackup(database: model.container.database), notifications: model.notifications)
+                SettingsView(sync: model.sync, backup: LocalBackup(database: model.container.database), notifications: model.notifications, onBackupImported: { model.refreshAll() })
                     .modifier(AppearancePreferences())
                     .deadlinerTheme()
                     .frame(width: 640, height: 720)
@@ -184,7 +184,7 @@ struct MainView: View {
                 case .archive:
                     ArchiveView(store: model.archive, commands: model.taskCommands)
                 case .settings:
-                    SettingsView(sync: model.sync, backup: LocalBackup(database: model.container.database), notifications: model.notifications)
+                    SettingsView(sync: model.sync, backup: LocalBackup(database: model.container.database), notifications: model.notifications, onBackupImported: { model.refreshAll() })
                 }
             }
             .environment(\.searchFocusRequest, model.searchFocusRequest)

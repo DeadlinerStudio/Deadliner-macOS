@@ -11,7 +11,7 @@ SwiftUI 原生 Mac 客户端。数据库、同步和业务规则全部由 [Deadl
 - **归档**：归档的任务与习惯，取消归档 / 恢复 / 删除。
 - **WebDAV 同步**：与手机共用 `Deadliner/kmp-changelog-v1.json`；钥匙串保存密码；检测服务器；启用前备份云端文件；云端没有同步文件时先询问。
 - **通知**：任务到期前一天、到期时、习惯打卡提醒。提醒时间由 Core 计算（`configureNotificationUpdates` + Mac 端的 `NotificationGateway` 实现），同步合并后自动更新。
-- **备份**：导出 Core 格式的完整备份（与手机端同一格式）。
+- **备份**：导出 / 导入 Core 格式的完整备份（与手机端同一格式）。导入整库替换，导入前自动保存当前数据到 `local-backups/`；无效文件只提示错误。
 - **菜单栏**：图标 / 数量 / 多项数据 / 胶囊四种样式；仪表盘或列表菜单两种面板，模块可选。
 - **外观**：系统侧栏与工具栏；15 种主题色；顶部浮光（沉浸 / 幻彩 / 关闭，macOS 26 起延伸到侧栏下方）；Liquid Glass（macOS 26+）与毛玻璃回退；衬线字体；⌘, 打开设置窗口。
 
@@ -56,6 +56,7 @@ scripts/package.sh ../Deadliner-for-macOS-package   # Release 打包（临时签
 - Lifi（闭源 AI）使用 Core 官方的公开回退 `-PlifiMode=stub`，AI 功能不可用。
 - `scripts/deadliner-mac.init.gradle` 在构建时为 Core 加上 macOS framework 导出，不修改 Core 的文件。
 - 页面状态使用 Core `appleMain` 中的 `Ios*StateBridge`。这 4 个类是在本地分支 `mac/apple-bridges` 上从 `iosMain` 原样移过来的，类名不变，iOS 头文件逐字节一致（计划作为 PR 提交给 Core）。
+- 本地构建使用 Core 的集成分支 `mac/local`，包含两个待合并的改动：`mac/apple-bridges`（PR #1）和 `mac/backup-restore-throws`（给 `BackupService.restore` 加 `@Throws`，计划作为第二个 PR）。
 - Core 中用 `require()` 校验的数据（习惯周期、目标、记录方式、WebDAV 地址）在交给 Core 之前先在 Swift 中检查，避免未捕获的 Kotlin 异常导致崩溃。
 
 ## 数据

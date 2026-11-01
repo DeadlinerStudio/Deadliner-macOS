@@ -34,6 +34,8 @@ struct SettingsView: View {
     var backup: LocalBackup?
     /// 通知设置变化后重新计算提醒；为 nil 时不显示「通知」分组（截图测试）。
     var notifications: NotificationController?
+    /// 导入备份后刷新各页面。
+    var onBackupImported: (() -> Void)?
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @AppStorage(ThemeAccent.storageKey) private var accentRaw = ThemeAccent.classic.rawValue
     @AppStorage(GlowStyle.storageKey) private var glowRaw = GlowStyle.immersive.rawValue
@@ -51,6 +53,13 @@ struct SettingsView: View {
     @State private var checks: [WebDavProbe.Check] = []
     @State private var probing = false
     @State private var backupMessage: String?
+    @State private var pendingImport: PendingImport?
+
+    private struct PendingImport: Identifiable {
+        let id = UUID()
+        let fileName: String
+        let raw: String
+    }
     @State private var notificationsDenied = false
     @AppStorage(NotificationSettings.enabledKey) private var notificationsEnabled = false
     @AppStorage(NotificationSettings.taskNearbyKey) private var notifyTaskNearby = true
@@ -270,13 +279,47 @@ struct SettingsView: View {
             LabeledContent("导出备份") {
                 Button("导出…") { exportBackup() }
             }
+            LabeledContent("导入备份") {
+                Button("导入…") { chooseBackupToImport() }
+            }
             if let backupMessage {
                 Text(verbatim: backupMessage).font(.caption).foregroundStyle(.secondary)
             }
         } header: {
             Text("备份")
         } footer: {
-            Text("导出全部任务、习惯、分类与专注记录，格式与手机端一致。")
+            Text("导出全部任务、习惯、分类与专注记录，格式与手机端一致。导入会替换这台 Mac 上的全部数据，导入前自动保存一份当前数据。")
+        }
+        .confirmationDialog("用「\(pendingImport?.fileName ?? "")」替换这台 Mac 上的全部数据？",
+                            isPresented: Binding(get: { pendingImport != nil }, set: { if !$0 { pendingImport = nil } }),
+                            presenting: pendingImport) { item in
+            Button("导入并替换", role: .destructive) { importBackup(item) }
+        } message: { _ in
+            Text("导入前会把当前数据自动保存到本机。\n\n启用同步时，导入不会删除手机或云端的数据：下次同步会按修改时间合并，云端较新的内容会保留。")
+        }
+    }
+
+    private func chooseBackupToImport() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let raw = try LocalBackup.check(Data(contentsOf: url))
+            pendingImport = PendingImport(fileName: url.lastPathComponent, raw: raw)
+        } catch {
+            backupMessage = error.localizedDescription
+        }
+    }
+
+    private func importBackup(_ item: PendingImport) {
+        guard let backup else { return }
+        do {
+            let safety = try backup.restore(item.raw, safetyDirectory: LocalBackup.defaultSafetyDirectory())
+            backupMessage = "已导入。原来的数据保存在 \(safety.path(percentEncoded: false))"
+            onBackupImported?()
+        } catch {
+            backupMessage = error.localizedDescription
         }
     }
 
