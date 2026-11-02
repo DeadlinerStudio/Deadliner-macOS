@@ -109,4 +109,6 @@ scripts/package.sh ../Deadliner-for-macOS-package   # 打包 DMG 与 ZIP（临�
 
 ## 许可证
 
-本项目基于 MIT 许可证，详情请参见 [LICENSE](LICENSE)。
+本项目基于 GNU 宽通用公共许可证（LGPL）2.1 版发布，或（由你选择）任何更高版本（`LGPL-2.1-or-later`），详情请参见 [LICENSE](LICENSE)。
+
+依赖的 [DeadlinerCore](https://github.com/DeadlinerStudio/DeadlinerCore) 使用 MIT 许可证。

@@ -1,8 +1,35 @@
 # 由 project.yml 生成：xcodegen generate
 *.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+*.xcuserstate
+
 # 由 scripts/build-core.sh 从 DeadlinerCore 构建
 Frameworks/
+
+# 构建与测试产物
 build/
 DerivedData/
-.DS_Store
 *.xcresult
+*.xcarchive
+.swiftpm/
+.build/
+
+# 打包产物（发布到 Releases，不进仓库）
+*.dmg
+*.zip
+*.sha256
+
+# 私有 Lifi 等本地检出，不得提交
+.private/
+
+# 崩溃报告、日志
+*.ips
+*.crash
+*.log
+
+# 编辑器与系统文件
+.DS_Store
+.idea/
+.vscode/
+*.swp
