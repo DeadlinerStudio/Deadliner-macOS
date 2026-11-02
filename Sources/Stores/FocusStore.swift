@@ -47,9 +47,34 @@ final class FocusStore {
     }
 
     @ObservationIgnored private let database: DeadlinerDatabase
+    @ObservationIgnored private var bridge: IosOverviewStateBridge?
 
     init(database: DeadlinerDatabase) {
         self.database = database
+    }
+
+    /// 调整一条专注记录的时长（Core 只允许改短）。`completion` 在主线程回调，失败时带说明。
+    func adjust(_ id: String, seconds: Int, completion: @escaping (String?) -> Void) {
+        mutate(id, seconds: KotlinLong(value: Int64(seconds)), completion: completion)
+    }
+
+    /// 删除一条专注记录（软删除，会同步到其他设备）。
+    func delete(_ id: String, completion: @escaping (String?) -> Void) {
+        mutate(id, seconds: nil, completion: completion)
+    }
+
+    private func mutate(_ id: String, seconds: KotlinLong?, completion: @escaping (String?) -> Void) {
+        if bridge == nil { bridge = IosOverviewStateBridge(database: database) }
+        bridge?.mutateFocusSession(sessionUid: id, durationSeconds: seconds) { [weak self] outcome, error in
+            MainActor.assumeIsolated {
+                self?.refresh()
+                switch outcome.name {
+                case "APPLIED", "NO_OP": completion(nil)
+                case "INVALID_DURATION": completion("时长只能改短，且不能为 0")
+                default: completion(error ?? "操作失败（\(outcome.name)）")
+                }
+            }
+        }
     }
 
     func refresh() {

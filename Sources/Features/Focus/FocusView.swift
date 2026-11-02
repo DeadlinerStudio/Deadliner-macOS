@@ -1,18 +1,81 @@
 import SwiftUI
 
-/// 专注记录页（只读）：今天 / 本周 / 本月 / 累计 四个汇总块，下面按日期分组列出最近的专注。
+/// 专注记录页：今天 / 本周 / 本月 / 累计 四个汇总块，下面按日期分组列出最近的专注。
+/// 计时在手机上进行；Mac 可以调整记录的时长（只能改短）或删除记录，与 Android 专注管理一致。
 struct FocusView: View {
     let store: FocusStore
+    @State private var adjusting: FocusStore.Session?
+    @State private var pendingDelete: FocusStore.Session?
+    @State private var errorMessage: String?
 
     var body: some View {
         FocusContent(
             today: store.today, thisWeek: store.thisWeek, thisMonth: store.thisMonth, allTime: store.allTime,
-            sessions: store.sessions
+            sessions: store.sessions,
+            onAdjust: { adjusting = $0 },
+            onDelete: { pendingDelete = $0 }
         )
         .topAtmosphere(Color(hex: 0x10B981))
         .navigationTitle("专注")
-        .navigationSubtitle("Mac 端只读，专注计时请在手机上进行")
+        .navigationSubtitle("计时请在手机上进行；右键记录可以调整时长或删除")
         .onAppear { store.refresh() }
+        .sheet(item: $adjusting) { session in
+            FocusAdjustSheet(session: session) { seconds in
+                adjusting = nil
+                store.adjust(session.id, seconds: seconds) { errorMessage = $0 }
+            } onCancel: {
+                adjusting = nil
+            }
+        }
+        .confirmationDialog("删除这条专注记录？", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+                            presenting: pendingDelete) { session in
+            Button("删除", role: .destructive) { store.delete(session.id) { errorMessage = $0 } }
+        } message: { session in
+            Text("「\(session.title.isEmpty ? "未命名" : session.title)」\(FocusTexts.duration(session.durationSeconds))。删除会同步到其他设备。")
+        }
+        .alert("操作失败", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+}
+
+/// 调整专注时长：只能在 1 分钟到原时长之间（Core 的规则）。
+private struct FocusAdjustSheet: View {
+    let session: FocusStore.Session
+    var onSave: (Int) -> Void
+    var onCancel: () -> Void
+    @State private var minutes: Int
+
+    init(session: FocusStore.Session, onSave: @escaping (Int) -> Void, onCancel: @escaping () -> Void) {
+        self.session = session
+        self.onSave = onSave
+        self.onCancel = onCancel
+        _minutes = State(initialValue: max(1, session.durationSeconds / 60))
+    }
+
+    private var maxMinutes: Int { max(1, session.durationSeconds / 60) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("调整专注时长").font(.headline)
+            Text(verbatim: session.title.isEmpty ? "未命名" : session.title).foregroundStyle(.secondary)
+            Stepper(value: $minutes, in: 1...maxMinutes) {
+                Text("\(minutes) 分钟").font(.title3.monospacedDigit())
+            }
+            Text("原时长 \(FocusTexts.duration(session.durationSeconds))；只能改短。")
+                .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Spacer()
+                Button("取消", role: .cancel, action: onCancel).keyboardShortcut(.cancelAction)
+                Button("保存") { onSave(minutes * 60) }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(minutes * 60 >= session.durationSeconds)
+            }
+        }
+        .padding(20)
+        .frame(width: 320)
     }
 }
 
@@ -22,6 +85,8 @@ struct FocusContent: View {
     let thisMonth: FocusStore.Summary
     let allTime: FocusStore.Summary
     let sessions: [FocusStore.Session]
+    var onAdjust: ((FocusStore.Session) -> Void)?
+    var onDelete: ((FocusStore.Session) -> Void)?
     @Environment(\.palette) private var t
 
     var body: some View {
@@ -92,6 +157,13 @@ struct FocusContent: View {
             }
         }
         .padding(.vertical, 2)
+        .contextMenu {
+            if let onAdjust, let onDelete {
+                Button("调整时长…", systemImage: "timer") { onAdjust(session) }
+                    .disabled(session.durationSeconds < 120)
+                Button("删除", systemImage: "trash", role: .destructive) { onDelete(session) }
+            }
+        }
     }
 
     private var groups: [(title: String, sessions: [FocusStore.Session])] {
