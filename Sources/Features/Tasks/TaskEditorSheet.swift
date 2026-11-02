@@ -6,6 +6,8 @@ struct TaskEditorSheet: View {
     let commands: TaskCommands
     let categoryCommands: CategoryCommands
     var onClose: () -> Void
+    /// 保存成功后调用（例如把灵感标记为已整理）。
+    var onSaved: (() -> Void)?
 
     @State private var draft: TaskDraft
     @State private var categories: [CategoryItem] = []
@@ -14,7 +16,9 @@ struct TaskEditorSheet: View {
     @State private var confirmDelete = false
     @State private var managingCategories = false
 
-    init(commands: TaskCommands, categoryCommands: CategoryCommands, draft: TaskDraft, onClose: @escaping () -> Void) {
+    init(commands: TaskCommands, categoryCommands: CategoryCommands, draft: TaskDraft, onSaved: (() -> Void)? = nil,
+         onClose: @escaping () -> Void) {
+        self.onSaved = onSaved
         self.commands = commands
         self.categoryCommands = categoryCommands
         self.onClose = onClose
@@ -100,7 +104,7 @@ struct TaskEditorSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") {
                         addSubtask()
-                        perform { try commands.save(draft) }
+                        perform { try commands.save(draft); onSaved?() }
                     }
                     .disabled(!draft.isValid)
                 }

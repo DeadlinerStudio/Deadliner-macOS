@@ -10,7 +10,7 @@ struct Sidebar: View {
     @Environment(\.palette) private var t
 
     private static let groups: [(title: String?, pages: [AppModel.Page])] = [
-        (nil, [.tasks, .habits]),
+        (nil, [.tasks, .habits, .capture]),
         ("记录", [.overview, .focus, .archive]),
         (nil, [.settings]),
     ]

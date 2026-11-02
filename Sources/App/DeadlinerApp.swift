@@ -182,6 +182,9 @@ struct MainView: View {
                                  })
                 case .habits:
                     HabitsView(store: model.habitList, commands: model.habitCommands, categories: model.taskList.categories)
+                case .capture:
+                    CaptureView(store: model.capture, taskCommands: model.taskCommands, categoryCommands: model.categoryCommands,
+                                habitCommands: model.habitCommands, categories: model.taskList.categories)
                 case .overview:
                     OverviewView(store: model.overview)
                 case .focus:

@@ -7,13 +7,14 @@ import Observation
 @Observable
 final class AppModel {
     enum Page: String, CaseIterable, Identifiable {
-        case tasks, habits, overview, focus, archive, settings
+        case tasks, habits, capture, overview, focus, archive, settings
         var id: String { rawValue }
 
         var title: String {
             switch self {
             case .tasks: "任务"
             case .habits: "习惯"
+            case .capture: "灵感"
             case .overview: "概览"
             case .focus: "专注"
             case .archive: "归档"
@@ -25,6 +26,7 @@ final class AppModel {
             switch self {
             case .tasks: "checklist"
             case .habits: "target"
+            case .capture: "lightbulb"
             case .overview: "chart.bar.xaxis"
             case .focus: "timer"
             case .archive: "archivebox"
@@ -43,6 +45,7 @@ final class AppModel {
     @ObservationIgnored private(set) var archive: ArchiveStore!
     @ObservationIgnored private(set) var focus: FocusStore!
     @ObservationIgnored private(set) var overview: OverviewStore!
+    @ObservationIgnored private(set) var capture: CaptureStore!
     @ObservationIgnored private(set) var sync: SyncController!
     /// 系统通知（由 AppDelegate 在启动完成后创建）。
     @ObservationIgnored var notifications: NotificationController?
@@ -58,6 +61,7 @@ final class AppModel {
         archive = ArchiveStore(database: database) { [unowned self] in refreshAll() }
         focus = FocusStore(database: database)
         overview = OverviewStore(database: database)
+        capture = CaptureStore(database: database)
         sync = SyncController(database: database) { [unowned self] in refreshAll() }
         taskCommands = TaskCommands(database: database) { [unowned self] in refreshAll() }
         categoryCommands = CategoryCommands(database: database) { [unowned self] in refreshAll() }
@@ -77,6 +81,7 @@ final class AppModel {
         if skipped != .habits { habitList.refresh() }
         archive.refresh()
         focus.refresh()
+        capture.refresh()
         if page == .overview { overview.refresh() }
     }
 

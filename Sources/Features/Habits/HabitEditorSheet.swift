@@ -5,13 +5,17 @@ struct HabitEditorSheet: View {
     let commands: HabitCommands
     let categories: [CategoryItem]
     var onClose: () -> Void
+    /// 保存成功后调用（例如把灵感标记为已整理）。
+    var onSaved: (() -> Void)?
 
     @State private var draft: HabitDraft
     @State private var errorMessage: String?
     @State private var confirmDelete = false
     @Environment(\.palette) private var t
 
-    init(commands: HabitCommands, categories: [CategoryItem], draft: HabitDraft, onClose: @escaping () -> Void) {
+    init(commands: HabitCommands, categories: [CategoryItem], draft: HabitDraft, onSaved: (() -> Void)? = nil,
+         onClose: @escaping () -> Void) {
+        self.onSaved = onSaved
         self.commands = commands
         self.categories = categories
         self.onClose = onClose
@@ -140,7 +144,7 @@ struct HabitEditorSheet: View {
                     Button("取消", action: onClose)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { perform { try commands.save(draft) } }
+                    Button("保存") { perform { try commands.save(draft); onSaved?() } }
                         .disabled(draft.validationError != nil)
                 }
             }
