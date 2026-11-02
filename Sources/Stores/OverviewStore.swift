@@ -86,6 +86,39 @@ final class OverviewStore {
         var archivedHabits: Int
     }
 
+    /// 专注时长的一个点（某天、某周或某月）。`start` 为 `yyyy-MM-dd`。
+    struct FocusPoint: Identifiable, Equatable {
+        let start: String
+        let seconds: Int
+        var id: String { start }
+    }
+
+    /// 某个时间范围内的专注（Core `focusStatistics.snapshot`）。
+    struct FocusRange: Equatable {
+        var totalSeconds = 0
+        var sessions = 0
+        var activeDays = 0
+        var daily: [FocusPoint] = []
+        /// 按分类的时长，从多到少；没有分类的记为「未分类」。
+        var categories: [(title: String, seconds: Int)] = []
+
+        static func == (a: FocusRange, b: FocusRange) -> Bool {
+            a.totalSeconds == b.totalSeconds && a.sessions == b.sessions && a.activeDays == b.activeDays && a.daily == b.daily
+                && a.categories.map(\.title) == b.categories.map(\.title) && a.categories.map(\.seconds) == b.categories.map(\.seconds)
+        }
+
+        func seconds(on date: String) -> Int { daily.first { $0.start == date }?.seconds ?? 0 }
+    }
+
+    /// 趋势用的专注序列（Core `focusStatistics.overview`）。
+    struct FocusTrend: Equatable {
+        var todaySeconds = 0
+        var weekSeconds = 0
+        var daily: [FocusPoint] = []
+        var monthly: [FocusPoint] = []
+        var rollingWeekly: [FocusPoint] = []
+    }
+
     /// 自定义日期范围的数据（Core `loadRange`）。`asOf` 之后的日期没有完成记录。
     struct RangeDetail: Equatable {
         var start: String
@@ -113,6 +146,13 @@ final class OverviewStore {
     private(set) var monthError: String?
     private(set) var range: RangeDetail?
     private(set) var rangeError: String?
+    private(set) var focus = FocusTrend()
+    /// 所选月份、自定义范围、近 30 天的专注。
+    private(set) var focusMonth: FocusRange?
+    private(set) var focusCustom: FocusRange?
+    private(set) var focusLast30: FocusRange?
+    /// 上个月每天的完成数（用于「较上月同期」）。
+    private(set) var previousMonthDaily: [DayCount] = []
 
     @ObservationIgnored private let database: DeadlinerDatabase
     @ObservationIgnored private var bridge: IosOverviewStateBridge?
@@ -126,12 +166,56 @@ final class OverviewStore {
         bridge?.load { [weak self] state in
             MainActor.assumeIsolated { self?.apply(state) }
         }
+        refreshFocus()
+    }
+
+    private func refreshFocus() {
+        let overview = database.focusStatistics.overview()
+        func points(_ list: [FocusDurationPoint]) -> [FocusPoint] {
+            list.map { FocusPoint(start: $0.startDate, seconds: Int($0.durationSeconds)) }
+        }
+        focus = FocusTrend(todaySeconds: Int(overview.today.totalDurationSeconds),
+                           weekSeconds: Int(overview.thisWeek.totalDurationSeconds),
+                           daily: points(overview.daily), monthly: points(overview.monthly),
+                           rollingWeekly: points(overview.rollingWeekly))
+        let today = Calendar.current.startOfDay(for: Date())
+        focusLast30 = focusRange(DateRange(start: today.addingTimeInterval(-86400 * 29), end: today))
+    }
+
+    /// 某个日期范围的专注统计（起止都包含）。
+    func focusRange(_ selection: DateRange) -> FocusRange {
+        let range = FocusStatisticsDateRange(startDate: DateRange.isoString(selection.start),
+                                             endDateExclusive: DateRange.isoString(selection.endExclusive()))
+        let snapshot = database.focusStatistics.snapshot(query: FocusStatisticsQuery(range: range, taskUid: nil, categoryUid: nil,
+                                                                                    target: nil, targetKind: nil))
+        return FocusRange(
+            totalSeconds: Int(snapshot.summary.totalDurationSeconds),
+            sessions: Int(snapshot.summary.sessionCount),
+            activeDays: Int(snapshot.summary.activeDayCount),
+            daily: snapshot.daily.map { FocusPoint(start: $0.startDate, seconds: Int($0.durationSeconds)) },
+            categories: snapshot.categories
+                .map { (title: $0.categoryTitle ?? "未分类", seconds: Int($0.durationSeconds)) }
+                .filter { $0.seconds > 0 }
+                .sorted { $0.seconds > $1.seconds }
+        )
     }
 
     /// 读取某个月（`yyyy-MM-01`）的数据；结果在 `month`，失败时在 `monthError`。
     func loadMonth(_ monthStart: String) {
         if bridge == nil { bridge = IosOverviewStateBridge(database: database) }
         monthError = nil
+        if let start = OverviewDates.date(monthStart),
+           let end = Calendar.current.date(byAdding: DateComponents(month: 1, day: -1), to: start) {
+            focusMonth = focusRange(DateRange(start: start, end: end))
+        }
+        previousMonthDaily = []
+        if let previous = OverviewRange.month(monthStart, offset: -1) {
+            bridge?.loadMonth(monthStart: previous, onState: { [weak self] state in
+                MainActor.assumeIsolated {
+                    self?.previousMonthDaily = state.daily.map { DayCount(date: $0.date, completed: Int($0.completedCount), overdue: Int($0.overdueCount)) }
+                }
+            }, onError: { _ in })
+        }
         bridge?.loadMonth(monthStart: monthStart, onState: { [weak self] state in
             MainActor.assumeIsolated {
                 self?.month = MonthDetail(
@@ -153,6 +237,7 @@ final class OverviewStore {
     func loadRange(_ selection: DateRange) {
         if bridge == nil { bridge = IosOverviewStateBridge(database: database) }
         rangeError = nil
+        focusCustom = focusRange(selection)
         let start = DateRange.isoString(selection.start)
         let endExclusive = DateRange.isoString(selection.endExclusive())
         bridge?.loadRange(startDate: start, endDateExclusive: endExclusive, onState: { [weak self] state in
@@ -224,5 +309,17 @@ final class OverviewStore {
             previousOverdueTasks: Int(m.previousOverdueTasks),
             completedTitles: titles
         )
+    }
+}
+
+extension OverviewStore {
+    /// 「较上月同期」：本月 1 日到今天的完成数，与上月 1 日到同一日期（上月没有这天时取月末）比较。
+    /// 只用于当前月份；返回 (本月, 上月同期)。
+    static func samePeriod(current: [DayCount], previous: [DayCount], today: Date, calendar: Calendar = .current) -> (Int, Int)? {
+        guard !current.isEmpty, !previous.isEmpty else { return nil }
+        let day = calendar.component(.day, from: today)
+        let thisMonth = current.prefix(day).map(\.completed).reduce(0, +)
+        let lastMonth = previous.prefix(min(day, previous.count)).map(\.completed).reduce(0, +)
+        return (thisMonth, lastMonth)
     }
 }

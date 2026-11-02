@@ -213,17 +213,18 @@ struct OverviewContent: View {
     @ViewBuilder
     private var statsBody: some View {
         if range == OverviewRange.all {
-            OverviewTodayCard(today: store.today)
+            OverviewTodayCard(today: store.today, focusSeconds: store.focus.todaySeconds)
             OverviewRow(columns: columns) {
                 OverviewPeriodCard(periods: store.periods)
                 OverviewHistoryCard(history: store.history, title: "历史统计", subtitle: "全部时间")
             }
         } else if let month = store.month, month.review.monthStart == range {
-            OverviewMetricsCard(review: month.review)
+            OverviewMetricsCard(review: month.review, headline: samePeriodText(month))
             OverviewRow(columns: columns) {
-                OverviewMonthMapCard(review: month.review)
+                OverviewMonthMapCard(review: month.review, focus: store.focusMonth)
                 OverviewHistoryCard(history: month.distribution, title: "状态分布", subtitle: "截止日期在本月的任务")
             }
+            if let focus = store.focusMonth { OverviewFocusInvestmentCard(focus: focus) }
             if !month.review.completedTitles.isEmpty {
                 OverviewTitlesCard(review: month.review)
             }
@@ -248,8 +249,9 @@ struct OverviewContent: View {
                 OverviewHistoryCard(history: detail.distribution, title: "状态分布", subtitle: "截止日期在范围内的任务")
             }
             // 两个月以内用日历（可以看到具体日期），更长的范围用热力图。
+            if let focus = store.focusCustom { OverviewFocusInvestmentCard(focus: focus) }
             if detail.review.daily.count <= 62 {
-                OverviewMonthMapCard(review: detail.review)
+                OverviewMonthMapCard(review: detail.review, focus: store.focusCustom)
             } else {
                 OverviewHeatmapCard(days: detail.review.daily, title: "活动分布")
             }
@@ -261,6 +263,18 @@ struct OverviewContent: View {
         } else {
             ProgressView().frame(maxWidth: .infinity, minHeight: 200)
         }
+    }
+
+    /// 当前月份显示「本月至今完成 N 项 · 较上月同期 ↑ x」（与 Android 一致）；已结束的月份不显示。
+    private func samePeriodText(_ month: OverviewStore.MonthDetail) -> String? {
+        guard month.review.monthStart == DateRange.isoString(Calendar.current.date(
+                from: Calendar.current.dateComponents([.year, .month], from: Date())) ?? Date()),
+              let (current, previous) = OverviewStore.samePeriod(current: month.review.daily, previous: store.previousMonthDaily,
+                                                                 today: Date()) else { return nil }
+        let change = current - previous
+        let comparison = previous == 0 ? (current > 0 ? "较上月同期 +\(current) 项" : "与上月同期持平")
+            : change == 0 ? "与上月同期持平" : "较上月同期 \(change > 0 ? "↑" : "↓") \(abs(change)) 项"
+        return "本月至今完成 \(current) 项 · \(comparison)"
     }
 
     /// 与当前选择一致的范围数据（切换范围后、新数据到达前不显示旧数据）。
@@ -289,6 +303,7 @@ struct OverviewContent: View {
                 ("日均完成", Self.average(completed, store.daily.count), c.pending),
             ])
             OverviewDailyCard(days: store.daily)
+            OverviewFocusBarsCard(points: Array(store.focus.daily.suffix(7)), subtitle: "近 7 天", unit: .day)
         case .month:
             let days = Array(store.contribution.suffix(30))
             let completed = days.map(\.completed).reduce(0, +)
@@ -298,6 +313,7 @@ struct OverviewContent: View {
                 ("日均完成", Self.average(completed, days.count), c.pending),
             ])
             OverviewRangeDailyCard(days: days)
+            OverviewFocusBarsCard(points: store.focusLast30?.daily ?? [], subtitle: "近 30 天", unit: .day)
         case .year:
             OverviewSummaryCard(items: [
                 ("近 12 个月任务", "\(store.monthly.map(\.total).reduce(0, +))", c.pending),
@@ -305,6 +321,7 @@ struct OverviewContent: View {
                 ("逾期完成", "\(store.monthly.map(\.overdueCompleted).reduce(0, +))", c.overdue),
             ])
             OverviewMonthlyCard(months: store.monthly)
+            OverviewFocusBarsCard(points: Array(store.focus.monthly.suffix(12)), subtitle: "近 12 个月", unit: .month)
         case .custom:
             if let detail = currentRange {
                 let elapsed = detail.elapsedDaily
@@ -316,6 +333,7 @@ struct OverviewContent: View {
                     ("日均完成", Self.average(completed, elapsed.count), c.pending),
                 ])
                 OverviewRangeDailyCard(days: detail.review.daily, subtitle: customRange.label)
+                OverviewFocusBarsCard(points: store.focusCustom?.daily ?? [], subtitle: customRange.label, unit: .day)
             } else if let error = store.rangeError {
                 Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(t.error)
             } else {
@@ -358,6 +376,8 @@ struct OverviewColors {
     var pending: Color { t.primary }
     var overdue: Color { t.error }
     var abandoned: Color { t.abandoned }
+    /// 专注统一用青绿色，与菜单栏和专注页一致。
+    var focus: Color { Color(hex: 0x14B8A6) }
 }
 
 enum OverviewDates {
@@ -444,6 +464,7 @@ private struct BigNumber: View {
 
 struct OverviewTodayCard: View {
     let today: OverviewStore.Today
+    var focusSeconds = 0
     @Environment(\.palette) private var t
 
     var body: some View {
@@ -454,6 +475,7 @@ struct OverviewTodayCard: View {
                 BigNumber(title: "待完成", value: "\(today.pending)", tint: c.pending)
                 BigNumber(title: "今日逾期", value: "\(today.overdue)", tint: c.overdue)
                 BigNumber(title: "已放弃", value: "\(today.abandoned)", tint: c.abandoned)
+                BigNumber(title: "今日专注", value: FocusTexts.compact(focusSeconds), tint: c.focus)
             }
         }
     }
@@ -777,12 +799,17 @@ struct OverviewMetricsCard: View {
     /// 对比的说法：某个月为「较前一月」，自定义范围为「较前一时段」（等长）。
     var comparison = "较前一月"
     var emptyText = "这个月没有任务"
+    /// 卡片顶部的一行说明（例如「较上月同期」）。
+    var headline: String?
     @Environment(\.palette) private var t
 
     var body: some View {
         let c = OverviewColors(t: t)
         let month = subtitle ?? review.monthStart.map { OverviewDates.label($0, "yyyy 年 M 月") }
         OverviewCard(title: "数据汇总", subtitle: month) {
+            if let headline {
+                Text(headline).font(.callout.weight(.medium)).foregroundStyle(c.completed)
+            }
             if review.totalTasks == 0 && review.completedTasks == 0 {
                 EmptyChart(text: emptyText)
             } else {
@@ -832,11 +859,14 @@ struct OverviewMetricsCard: View {
 
 struct OverviewMonthMapCard: View {
     let review: OverviewStore.MonthReview
+    /// 有专注的日子在格子右上角标一个点；点日期显示当天明细。
+    var focus: OverviewStore.FocusRange?
+    @State private var selectedDay: String?
     @Environment(\.palette) private var t
 
     var body: some View {
         let title = review.monthStart.map { OverviewDates.label($0, "M月") + "活动分布" } ?? "活动分布"
-        OverviewCard(title: title, subtitle: "每日完成数") {
+        OverviewCard(title: title, subtitle: focus == nil ? "每日完成数" : "每日完成数 · 点为有专注") {
             if review.daily.isEmpty {
                 EmptyChart()
             } else {
@@ -864,15 +894,132 @@ struct OverviewMonthMapCard: View {
     private func cell(_ day: OverviewStore.DayCount?, peak: Int) -> some View {
         if let day {
             let fill = day.completed == 0 ? t.onSurface.opacity(0.06) : t.primary.opacity(0.2 + 0.7 * Double(day.completed) / Double(peak))
+            let focusSeconds = focus?.seconds(on: day.date) ?? 0
             Text(OverviewDates.label(day.date, day.date.hasSuffix("-01") ? "M/d" : "d"))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(day.completed * 2 > peak ? .white : t.onSurface)
                 .frame(maxWidth: .infinity)
                 .frame(height: 30)
                 .background(fill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .help("完成 \(day.completed)" + (day.overdue > 0 ? "，逾期 \(day.overdue)" : ""))
+                .overlay(alignment: .topTrailing) {
+                    if focusSeconds > 0 {
+                        Circle().fill(OverviewColors(t: t).focus).frame(width: 5, height: 5).padding(4)
+                    }
+                }
+                .overlay {
+                    if selectedDay == day.date {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(t.onSurface.opacity(0.5), lineWidth: 1.5)
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { selectedDay = day.date }
+                .popover(isPresented: Binding(get: { selectedDay == day.date }, set: { if !$0 { selectedDay = nil } })) {
+                    dayDetail(day, focusSeconds: focusSeconds)
+                }
+                .help("完成 \(day.completed)" + (day.overdue > 0 ? "，逾期 \(day.overdue)" : "") +
+                      (focusSeconds > 0 ? "，专注 \(FocusTexts.duration(focusSeconds))" : ""))
         } else {
             Color.clear.frame(maxWidth: .infinity).frame(height: 30)
+        }
+    }
+
+    /// 当天明细（与 Android 点击日期的弹窗一致）。
+    private func dayDetail(_ day: OverviewStore.DayCount, focusSeconds: Int) -> some View {
+        let c = OverviewColors(t: t)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(OverviewDates.label(day.date, "M月d日 EEEE")).font(.headline)
+            Label("完成 \(day.completed) 项", systemImage: "checkmark.circle").foregroundStyle(c.completed)
+            if day.overdue > 0 { Label("逾期 \(day.overdue) 项", systemImage: "exclamationmark.circle").foregroundStyle(c.overdue) }
+            Label(focusSeconds > 0 ? "专注 \(FocusTexts.duration(focusSeconds))" : "没有专注", systemImage: "timer")
+                .foregroundStyle(focusSeconds > 0 ? c.focus : t.onSurfaceVariant)
+        }
+        .font(.callout)
+        .padding(14)
+        .frame(minWidth: 180, alignment: .leading)
+    }
+}
+
+/// 专注时长柱状图（每日或每月）。
+struct OverviewFocusBarsCard: View {
+    enum Unit { case day, month }
+    let points: [OverviewStore.FocusPoint]
+    var subtitle: String
+    var unit: Unit = .day
+    @Environment(\.palette) private var t
+
+    var body: some View {
+        let total = points.map(\.seconds).reduce(0, +)
+        OverviewCard(title: "专注时长", subtitle: total > 0 ? "\(subtitle) · 合计 \(FocusTexts.duration(total))" : subtitle) {
+            if total == 0 {
+                EmptyChart(text: "这段时间没有专注")
+            } else {
+                let stride = max(1, Int((Double(points.count) / 6).rounded(.up)))
+                Chart(points) { point in
+                    BarMark(x: .value("日期", OverviewDates.date(point.start) ?? Date(), unit: unit == .day ? .day : .month),
+                            y: .value("分钟", Double(point.seconds) / 60))
+                        .foregroundStyle(OverviewColors(t: t).focus.gradient)
+                        .cornerRadius(3)
+                }
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisGridLine()
+                        AxisValueLabel { if let minutes = value.as(Double.self) { Text(FocusTexts.compact(Int(minutes * 60))) } }
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: unit == .day ? .day : .month, count: stride)) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let date = value.as(Date.self) {
+                                let calendar = Calendar.current
+                                Text(verbatim: unit == .day
+                                     ? "\(calendar.component(.month, from: date))/\(calendar.component(.day, from: date))"
+                                     : "\(calendar.component(.month, from: date))月")
+                            }
+                        }
+                    }
+                }
+                .frame(height: 160)
+            }
+        }
+    }
+}
+
+/// 时间投入：专注总时长、次数、活跃天数，以及按分类的分布（与 Android 月度复盘的「时间投入」一致）。
+struct OverviewFocusInvestmentCard: View {
+    let focus: OverviewStore.FocusRange
+    @Environment(\.palette) private var t
+
+    var body: some View {
+        let c = OverviewColors(t: t)
+        OverviewCard(title: "时间投入", subtitle: "专注") {
+            if focus.totalSeconds == 0 {
+                EmptyChart(text: "这段时间没有专注")
+            } else {
+                HStack {
+                    BigNumber(title: "专注时长", value: FocusTexts.compact(focus.totalSeconds), tint: c.focus)
+                    BigNumber(title: "专注次数", value: "\(focus.sessions)", tint: c.focus)
+                    BigNumber(title: "有专注的天数", value: "\(focus.activeDays)", tint: c.focus)
+                }
+                let peak = max(1, focus.categories.first?.seconds ?? 1)
+                VStack(spacing: 10) {
+                    ForEach(Array(focus.categories.prefix(6).enumerated()), id: \.offset) { _, item in
+                        HStack(spacing: 12) {
+                            Text(verbatim: item.title).font(.callout).lineLimit(1).frame(width: 90, alignment: .leading)
+                            GeometryReader { proxy in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(t.onSurface.opacity(0.06))
+                                    Capsule().fill(c.focus.gradient)
+                                        .frame(width: max(8, proxy.size.width * Double(item.seconds) / Double(peak)))
+                                }
+                            }
+                            .frame(height: 10)
+                            Text(FocusTexts.compact(item.seconds)).font(.callout.monospacedDigit())
+                                .foregroundStyle(t.onSurfaceVariant).frame(minWidth: 44, alignment: .trailing)
+                        }
+                    }
+                }
+            }
         }
     }
 }

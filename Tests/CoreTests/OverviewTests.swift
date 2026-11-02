@@ -143,6 +143,24 @@ final class OverviewTests: XCTestCase {
         XCTAssertNil(OverviewRange.month("2026-11-01", offset: 1, now: now))
     }
 
+    func testSamePeriodComparison() {
+        let calendar = Calendar.current
+        func days(_ counts: [Int], month: Int) -> [OverviewStore.DayCount] {
+            counts.enumerated().map { OverviewStore.DayCount(date: String(format: "2026-%02d-%02d", month, $0.offset + 1), completed: $0.element) }
+        }
+        let current = days([1, 0, 2] + Array(repeating: 0, count: 27), month: 11)
+        let previous = days([3, 1, 0, 5] + Array(repeating: 1, count: 27), month: 10)
+        let today = calendar.date(from: DateComponents(year: 2026, month: 11, day: 3))!
+        let result = OverviewStore.samePeriod(current: current, previous: previous, today: today)
+        XCTAssertEqual(result?.0, 3)
+        XCTAssertEqual(result?.1, 4)  // 上月 1～3 日
+        // 3 月 31 日对比只有 28 天的 2 月：取到月末。
+        let march31 = calendar.date(from: DateComponents(year: 2026, month: 3, day: 31))!
+        let feb = days(Array(repeating: 1, count: 28), month: 2)
+        XCTAssertEqual(OverviewStore.samePeriod(current: days(Array(repeating: 1, count: 31), month: 3), previous: feb, today: march31)?.1, 28)
+        XCTAssertNil(OverviewStore.samePeriod(current: [], previous: feb, today: march31))
+    }
+
     func testHeatmapWeeksStartOnMonday() {
         // 2026-10-28 是周三：前面空出周一、周二。
         let days = (28...31).map { OverviewStore.DayCount(date: "2026-10-\($0)", completed: 1) }
