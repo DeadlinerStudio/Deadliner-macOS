@@ -7,6 +7,9 @@ struct Sidebar: View {
     var syncStatus: SyncController.Status?
     /// 「立即同步」按钮的动作；为 nil 时不显示按钮。
     var syncNow: (() -> Void)?
+    /// 顶部的个人资料；为 nil 时不显示。
+    var profile: ProfileStore?
+    var editProfile: () -> Void = {}
     @Environment(\.palette) private var t
 
     private static let groups: [(title: String?, pages: [AppModel.Page])] = [
@@ -29,8 +32,42 @@ struct Sidebar: View {
             }
         }
         .listStyle(.sidebar)
+        .safeAreaInset(edge: .top) {
+            if let profile { profileHeader(profile) }
+        }
         .safeAreaInset(edge: .bottom) {
             if let syncStatus { syncFooter(syncStatus) }
+        }
+    }
+
+    /// 头像与昵称，点击编辑个人资料。
+    private func profileHeader(_ profile: ProfileStore) -> some View {
+        Button(action: editProfile) {
+            HStack(spacing: 10) {
+                ProfileAvatar(store: profile, size: 30)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(profile.displayName).font(.callout.weight(.semibold)).lineLimit(1)
+                    Text(Self.greeting(Date())).font(.caption).foregroundStyle(t.onSurfaceVariant)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("编辑个人资料")
+    }
+
+    /// 按时间段的问候（与 Android 首页问候的时间段一致）。
+    static func greeting(_ date: Date, calendar: Calendar = .current) -> String {
+        switch calendar.component(.hour, from: date) {
+        case 5..<9: "早上好"
+        case 9..<12: "上午好"
+        case 12..<14: "中午好"
+        case 14..<18: "下午好"
+        case 18..<23: "晚上好"
+        default: "夜深了，早点休息"
         }
     }
 

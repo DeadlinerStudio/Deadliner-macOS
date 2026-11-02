@@ -216,6 +216,8 @@ final class TaskListSnapshotTests: XCTestCase {
         habit.targetCount = 2000
         try model.habitCommands.save(habit)
         model.start()
+        // 截图不需要新手引导弹窗。
+        UserDefaults.standard.set(true, forKey: Onboarding.doneKey)
 
         for (scheme, tokens) in [(ColorScheme.light, DeadlinerPalette.light), (ColorScheme.dark, DeadlinerPalette.dark)] {
             for page in [AppModel.Page.tasks, .habits, .settings] {

@@ -67,7 +67,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         do {
-            model = AppModel(container: try MacCoreContainer.makeDefault())
+            let model = AppModel(container: try MacCoreContainer.makeDefault())
+            // 已经设置过同步的用户（更新前就在使用）不再显示新手引导。
+            if model.sync.settings.enabled, UserDefaults.standard.object(forKey: Onboarding.doneKey) == nil {
+                UserDefaults.standard.set(true, forKey: Onboarding.doneKey)
+            }
+            self.model = model
         } catch {
             startupError = error.localizedDescription
         }
@@ -163,11 +168,14 @@ struct RootView: View {
 
 struct MainView: View {
     @Bindable var model: AppModel
+    @State private var editingProfile = false
+    @AppStorage(Onboarding.doneKey) private var onboardingDone = false
     @Environment(\.palette) private var t
 
     var body: some View {
         NavigationSplitView {
-            Sidebar(page: $model.page, syncStatus: model.sync.status, syncNow: { model.sync.syncNow() })
+            Sidebar(page: $model.page, syncStatus: model.sync.status, syncNow: { model.sync.syncNow() },
+                    profile: model.profile, editProfile: { editingProfile = true })
                 .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
         } detail: {
             Group {
@@ -196,6 +204,16 @@ struct MainView: View {
                 }
             }
             .environment(\.searchFocusRequest, model.searchFocusRequest)
+        }
+        .sheet(isPresented: $editingProfile) {
+            ProfileSheet(store: model.profile) { editingProfile = false }.deadlinerTheme()
+        }
+        .sheet(isPresented: Binding(get: { !onboardingDone }, set: { if !$0 { onboardingDone = true } })) {
+            OnboardingView(openSyncSettings: { model.page = .settings },
+                           notificationsChanged: { model.notifications?.refresh(force: true) },
+                           finish: { onboardingDone = true })
+                .deadlinerTheme()
+                .interactiveDismissDisabled()
         }
     }
 }

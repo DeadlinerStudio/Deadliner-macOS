@@ -418,6 +418,9 @@ struct SettingsView: View {
     private var aboutSection: some View {
         Section("关于") {
             LabeledContent("版本", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
+            LabeledContent("新手引导") {
+                Button("重新显示") { UserDefaults.standard.set(false, forKey: Onboarding.doneKey) }
+            }
             LabeledContent("Core") {
                 Text(MacCoreContainer.coreVersion)
                     .font(.callout.monospaced())

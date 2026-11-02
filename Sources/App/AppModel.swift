@@ -46,6 +46,7 @@ final class AppModel {
     @ObservationIgnored private(set) var focus: FocusStore!
     @ObservationIgnored private(set) var overview: OverviewStore!
     @ObservationIgnored private(set) var capture: CaptureStore!
+    @ObservationIgnored private(set) var profile: ProfileStore!
     @ObservationIgnored private(set) var sync: SyncController!
     /// 系统通知（由 AppDelegate 在启动完成后创建）。
     @ObservationIgnored var notifications: NotificationController?
@@ -62,6 +63,7 @@ final class AppModel {
         focus = FocusStore(database: database)
         overview = OverviewStore(database: database)
         capture = CaptureStore(database: database)
+        profile = ProfileStore(database: database)
         sync = SyncController(database: database) { [unowned self] in refreshAll() }
         taskCommands = TaskCommands(database: database) { [unowned self] in refreshAll() }
         categoryCommands = CategoryCommands(database: database) { [unowned self] in refreshAll() }
@@ -82,6 +84,7 @@ final class AppModel {
         archive.refresh()
         focus.refresh()
         capture.refresh()
+        profile.refresh()
         if page == .overview { overview.refresh() }
     }
 
