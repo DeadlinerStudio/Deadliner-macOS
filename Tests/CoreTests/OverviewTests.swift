@@ -66,17 +66,25 @@ final class OverviewTests: XCTestCase {
         XCTAssertNil(overview.monthError)
         XCTAssertEqual(overview.month?.review.monthStart, thisMonth)
 
+        let today = Calendar.current.startOfDay(for: now)
+        let custom = DateRange(start: today.addingTimeInterval(-86400 * 20), end: today.addingTimeInterval(86400 * 10))
+        overview.loadRange(custom)
+        try await waitUntil { self.overview.range != nil || self.overview.rangeError != nil }
+
         let pages: [(String, OverviewSection, String, TrendRange)] = [
             ("stats-all", .stats, OverviewRange.all, .week),
             ("stats-month", .stats, thisMonth, .week),
             ("trends-week", .trends, OverviewRange.all, .week),
             ("trends-month", .trends, OverviewRange.all, .month),
             ("trends-year", .trends, OverviewRange.all, .year),
+            ("stats-custom", .stats, OverviewRange.custom, .week),
+            ("trends-custom", .trends, OverviewRange.all, .custom),
         ]
         for (name, section, range, trend) in pages {
             for scheme in [ColorScheme.light, .dark] {
                 try capture(
-                    OverviewContent(store: overview, section: section, range: .constant(range), trend: .constant(trend), layout: .double)
+                    OverviewContent(store: overview, section: section, range: .constant(range), trend: .constant(trend), layout: .double,
+                                    customRange: custom)
                         .deadlinerTheme()
                         .environment(\.colorScheme, scheme),
                     scheme: scheme,
@@ -84,6 +92,55 @@ final class OverviewTests: XCTestCase {
                 )
             }
         }
+    }
+
+    func testCustomRangeComesFromCore() async throws {
+        let commands = TaskCommands(database: container.database) {}
+        var done = TaskDraft()
+        done.title = "示例范围内完成"
+        done.dueAt = Date().addingTimeInterval(3600)
+        let doneId = try commands.save(done)
+        try commands.toggleComplete(doneId)
+        var future = TaskDraft()
+        future.title = "示例未来到期"
+        future.dueAt = Date().addingTimeInterval(86400 * 20)
+        _ = try commands.save(future)
+
+        overview = OverviewStore(database: container.database)
+        let today = Calendar.current.startOfDay(for: Date())
+        let selection = DateRange(start: today.addingTimeInterval(-86400 * 10), end: today.addingTimeInterval(86400 * 30))
+        overview.loadRange(selection)
+        try await waitUntil { self.overview.range != nil || self.overview.rangeError != nil }
+        let detail = try XCTUnwrap(overview.range)
+        XCTAssertEqual(detail.review.daily.count, selection.dayCount)
+        XCTAssertEqual(detail.distribution.completed, 1)
+        XCTAssertEqual(detail.distribution.onTime, 1)
+        XCTAssertEqual(detail.periods.map(\.count).reduce(0, +), 1)
+        XCTAssertTrue(detail.extendsIntoFuture)
+        XCTAssertEqual(detail.elapsedDaily.count, 11)
+        XCTAssertEqual(detail.review.completedTitles, ["示例范围内完成"])
+    }
+
+    func testDateRangeEncodingPresetsAndMonthPaging() throws {
+        let calendar = Calendar.current
+        let start = calendar.date(from: DateComponents(year: 2026, month: 10, day: 12))!
+        let end = calendar.date(from: DateComponents(year: 2026, month: 12, day: 31))!
+        let range = DateRange(start: end, end: start)  // 顺序颠倒也能纠正
+        XCTAssertEqual(range.start, start)
+        XCTAssertEqual(range.dayCount, 81)
+        XCTAssertEqual(range.encoded, "2026-10-12|2026-12-31")
+        XCTAssertEqual(DateRange.decode(range.encoded), range)
+        XCTAssertNil(DateRange.decode("bad"))
+        XCTAssertEqual(DateRange.isoString(range.endExclusive()), "2027-01-01")
+        XCTAssertTrue(range.contains(end.addingTimeInterval(3600 * 23)))
+        XCTAssertFalse(range.contains(range.endExclusive()))
+
+        let now = calendar.date(from: DateComponents(year: 2026, month: 11, day: 2))!
+        let presets = DateRange.presets(now: now)
+        XCTAssertEqual(presets.map(\.range.dayCount), [7, 30, 92, 365])
+        XCTAssertEqual(OverviewRange.month("2026-11-01", offset: -1, now: now), "2026-10-01")
+        XCTAssertEqual(OverviewRange.month("2026-01-01", offset: -1, now: now), "2025-12-01")
+        XCTAssertNil(OverviewRange.month("2026-11-01", offset: 1, now: now))
     }
 
     func testHeatmapWeeksStartOnMonday() {

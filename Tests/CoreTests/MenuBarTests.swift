@@ -54,6 +54,9 @@ final class MenuBarSummaryTests: XCTestCase {
         XCTAssertEqual(summary.upcoming(in: .threeDays, now: now).map(\.id), ["overdue", "today", "tomorrow", "sunday"])
         XCTAssertEqual(summary.upcoming(in: .week, now: now).map(\.id), ["overdue", "today", "tomorrow", "sunday"])
         XCTAssertEqual(summary.upcoming(in: .all, now: now).count, 5)
+        // 自定义：只含截止日期在范围内的任务（不自动带上逾期的）。
+        let custom = DateRange(start: now.addingTimeInterval(86400), end: now.addingTimeInterval(86400 * 4))
+        XCTAssertEqual(summary.upcoming(in: .custom, now: now, custom: custom).map(\.id), ["tomorrow", "sunday", "next-week"])
         XCTAssertEqual(PanelStat.decode(nil), PanelStat.defaults)
         XCTAssertEqual(PanelStat.decode("overdue,focusThisWeek"), [.overdue, .focusThisWeek])
     }

@@ -99,14 +99,18 @@ struct MenuBarSummary: Equatable {
                  dueAt: task.dueAt)
     }
 
-    /// 「即将到期」列表在所选范围内的任务（逾期的始终包含）。
-    func upcoming(in range: UpcomingRange, now: Date, calendar: Calendar = .current) -> [TaskLine] {
+    /// 「即将到期」列表在所选范围内的任务。预设范围总是包含已逾期的任务；
+    /// 自定义范围只包含截止日期落在范围内的任务。
+    func upcoming(in range: UpcomingRange, now: Date, custom: DateRange? = nil, calendar: Calendar = .current) -> [TaskLine] {
+        if range == .custom, let custom {
+            return upcoming.filter { $0.dueAt.map { custom.contains($0, calendar: calendar) } ?? false }
+        }
         let todayStart = calendar.startOfDay(for: now)
         let end: Date? = switch range {
         case .today: calendar.date(byAdding: .day, value: 1, to: todayStart)
         case .threeDays: calendar.date(byAdding: .day, value: 3, to: todayStart)
         case .week: weekEnd
-        case .all: nil
+        case .all, .custom: nil
         }
         guard let end else { return upcoming }
         return upcoming.filter { ($0.dueAt ?? .distantFuture) < end }

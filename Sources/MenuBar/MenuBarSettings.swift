@@ -10,6 +10,7 @@ enum MenuBarSettings {
     static let focusChartKey = "menubar.focusChart"
     static let statsKey = "menubar.stats"
     static let upcomingRangeKey = "menubar.upcomingRange"
+    static let upcomingCustomRangeKey = "menubar.upcomingCustomRange"
 }
 
 /// 面板顶部的数据格（最多 4 个）。
@@ -65,7 +66,7 @@ enum PanelStat: String, CaseIterable, Identifiable {
 
 /// 「即将到期」列表的时间范围（逾期的任务始终显示）。
 enum UpcomingRange: String, CaseIterable, Identifiable {
-    case today, threeDays, week, all
+    case today, threeDays, week, all, custom
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -73,6 +74,7 @@ enum UpcomingRange: String, CaseIterable, Identifiable {
         case .threeDays: "3 天内"
         case .week: "本周"
         case .all: "全部"
+        case .custom: "自定义"
         }
     }
 }

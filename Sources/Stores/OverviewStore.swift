@@ -86,6 +86,19 @@ final class OverviewStore {
         var archivedHabits: Int
     }
 
+    /// 自定义日期范围的数据（Core `loadRange`）。`asOf` 之后的日期没有完成记录。
+    struct RangeDetail: Equatable {
+        var start: String
+        var endExclusive: String
+        var asOf: String
+        var review: MonthReview
+        var distribution: History
+        var periods: [PeriodCount]
+        /// 截至今天的部分（用于汇总数字，避免把未来的空白日计入日均）。
+        var elapsedDaily: [DayCount] { review.daily.filter { $0.date <= asOf } }
+        var extendsIntoFuture: Bool { endExclusive > asOf && review.daily.contains { $0.date > asOf } }
+    }
+
     private(set) var today = Today()
     private(set) var history = History()
     private(set) var periods: [PeriodCount] = Period.allCases.map { PeriodCount(period: $0, count: 0) }
@@ -98,6 +111,8 @@ final class OverviewStore {
     private(set) var errorMessage: String?
     private(set) var month: MonthDetail?
     private(set) var monthError: String?
+    private(set) var range: RangeDetail?
+    private(set) var rangeError: String?
 
     @ObservationIgnored private let database: DeadlinerDatabase
     @ObservationIgnored private var bridge: IosOverviewStateBridge?
@@ -134,6 +149,32 @@ final class OverviewStore {
         })
     }
 
+    /// 读取自定义范围（起止都包含在内）。
+    func loadRange(_ selection: DateRange) {
+        if bridge == nil { bridge = IosOverviewStateBridge(database: database) }
+        rangeError = nil
+        let start = DateRange.isoString(selection.start)
+        let endExclusive = DateRange.isoString(selection.endExclusive())
+        bridge?.loadRange(startDate: start, endDateExclusive: endExclusive, onState: { [weak self] state in
+            MainActor.assumeIsolated {
+                let counts = Dictionary(state.completionBuckets.map { ($0.period.name, Int($0.completedCount)) }, uniquingKeysWith: +)
+                self?.range = RangeDetail(
+                    start: state.startDate,
+                    endExclusive: state.endDateExclusive,
+                    asOf: state.asOfDate,
+                    review: Self.review(monthStart: nil, daily: state.daily, metrics: state.metrics, titles: state.completedTaskTitles),
+                    distribution: Self.history(state.statusDistribution),
+                    periods: Period.allCases.map { PeriodCount(period: $0, count: counts[$0.rawValue] ?? 0) }
+                )
+            }
+        }, onError: { [weak self] message in
+            MainActor.assumeIsolated {
+                self?.range = nil
+                self?.rangeError = message
+            }
+        })
+    }
+
     func stop() {
         bridge?.close()
         bridge = nil
@@ -163,10 +204,14 @@ final class OverviewStore {
     }
 
     private static func review(_ review: OverviewLastMonth) -> MonthReview {
-        let m = review.metrics
-        return MonthReview(
-            monthStart: review.monthStart,
-            daily: review.daily.map { DayCount(date: $0.date, completed: Int($0.completedCount), overdue: Int($0.overdueCount)) },
+        Self.review(monthStart: review.monthStart, daily: review.daily, metrics: review.metrics, titles: review.completedTaskTitles)
+    }
+
+    private static func review(monthStart: String?, daily: [OverviewDailyStat], metrics m: OverviewMonthlyMetrics,
+                               titles: [String]) -> MonthReview {
+        MonthReview(
+            monthStart: monthStart,
+            daily: daily.map { DayCount(date: $0.date, completed: Int($0.completedCount), overdue: Int($0.overdueCount)) },
             totalTasks: Int(m.totalTasks),
             completedTasks: Int(m.completedTasks),
             completionRate: m.completionRate,
@@ -177,7 +222,7 @@ final class OverviewStore {
             previousCompletedTasks: Int(m.previousCompletedTasks),
             previousCompletionRate: m.previousCompletionRate,
             previousOverdueTasks: Int(m.previousOverdueTasks),
-            completedTitles: review.completedTaskTitles
+            completedTitles: titles
         )
     }
 }

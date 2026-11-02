@@ -10,6 +10,7 @@ struct MenuBarPanel: View {
     @AppStorage(MenuBarSettings.focusChartKey) private var focusChartRaw = FocusChartOrientation.vertical.rawValue
     @AppStorage(MenuBarSettings.statsKey) private var statsRaw = PanelStat.encode(PanelStat.defaults)
     @AppStorage(MenuBarSettings.upcomingRangeKey) private var upcomingRaw = UpcomingRange.all.rawValue
+    @AppStorage(MenuBarSettings.upcomingCustomRangeKey) private var upcomingCustomRaw = ""
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
@@ -22,6 +23,7 @@ struct MenuBarPanel: View {
                 focusOrientation: FocusChartOrientation(rawValue: focusChartRaw) ?? .vertical,
                 stats: Array(PanelStat.decode(statsRaw).prefix(PanelStat.maxCount)),
                 upcomingRange: UpcomingRange(rawValue: upcomingRaw) ?? .all,
+                upcomingCustomRange: DateRange.decode(upcomingCustomRaw),
                 actions: .init(
                     completeTask: { id in try? model.taskCommands.toggleComplete(id) },
                     checkHabit: { habit in model.habitList.applyPrimaryAction(habit) },
@@ -55,6 +57,7 @@ struct MenuBarPanelContent: View {
     var focusOrientation: FocusChartOrientation = .vertical
     var stats: [PanelStat] = PanelStat.defaults
     var upcomingRange: UpcomingRange = .all
+    var upcomingCustomRange: DateRange?
     var actions: Actions?
     @State private var hoveredFocusDay: String?
     @Environment(\.palette) private var t
@@ -190,17 +193,18 @@ struct MenuBarPanelContent: View {
 
     @ViewBuilder
     private var tasks: some View {
-        let lines = summary.upcoming(in: upcomingRange, now: now)
+        let lines = summary.upcoming(in: upcomingRange, now: now, custom: upcomingCustomRange)
+        let rangeTitle = upcomingRange == .custom ? (upcomingCustomRange?.label ?? "自定义") : upcomingRange.title
         let limit = style == .dashboard ? 4 : 6
         HStack {
-            sectionTitle(upcomingRange == .all ? "即将到期" : "即将到期 · \(upcomingRange.title)")
+            sectionTitle(upcomingRange == .all ? "即将到期" : "即将到期 · \(rangeTitle)")
             Spacer()
             if lines.count > limit {
                 Text("还有 \(lines.count - limit) 个").font(.caption).foregroundStyle(.secondary).padding(.top, 2)
             }
         }
         if lines.isEmpty {
-            Text(upcomingRange == .all ? "没有有截止时间的待办" : "\(upcomingRange.title)没有到期的待办")
+            Text(upcomingRange == .all ? "没有有截止时间的待办" : "\(rangeTitle)没有到期的待办")
                 .font(.callout).foregroundStyle(.secondary)
         } else {
             VStack(spacing: 2) {

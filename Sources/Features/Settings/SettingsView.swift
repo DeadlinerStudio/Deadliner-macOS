@@ -47,6 +47,8 @@ struct SettingsView: View {
     @AppStorage(MenuBarSettings.focusChartKey) private var focusChartRaw = FocusChartOrientation.vertical.rawValue
     @AppStorage(MenuBarSettings.statsKey) private var statsRaw = PanelStat.encode(PanelStat.defaults)
     @AppStorage(MenuBarSettings.upcomingRangeKey) private var upcomingRaw = UpcomingRange.all.rawValue
+    @AppStorage(MenuBarSettings.upcomingCustomRangeKey) private var upcomingCustomRaw = ""
+    @State private var editingUpcomingRange = false
     @AppStorage(MenuBarSettings.sectionsKey) private var sectionsRaw = PanelSection.encode(PanelSection.defaults)
     @Environment(\.palette) private var t
 
@@ -234,7 +236,26 @@ struct SettingsView: View {
                         ForEach(UpcomingRange.allCases) { Text($0.title).tag($0.rawValue) }
                     }
                     .pickerStyle(.segmented)
-                    .help("已逾期的任务始终显示")
+                    .help("预设范围总是显示已逾期的任务；自定义范围只显示截止日期在范围内的任务")
+                    .onChange(of: upcomingRaw) {
+                        if upcomingRaw == UpcomingRange.custom.rawValue && DateRange.decode(upcomingCustomRaw) == nil {
+                            editingUpcomingRange = true
+                        }
+                    }
+                    if upcomingRaw == UpcomingRange.custom.rawValue {
+                        LabeledContent("自定义范围") {
+                            Button((DateRange.decode(upcomingCustomRaw) ?? .fallback).label) { editingUpcomingRange = true }
+                        }
+                        .sheet(isPresented: $editingUpcomingRange) {
+                            DateRangeSheet(initial: DateRange.decode(upcomingCustomRaw) ?? .fallback) { selection in
+                                upcomingCustomRaw = selection.encoded
+                                editingUpcomingRange = false
+                            } onCancel: {
+                                editingUpcomingRange = false
+                                if DateRange.decode(upcomingCustomRaw) == nil { upcomingRaw = UpcomingRange.all.rawValue }
+                            }
+                        }
+                    }
                 }
                 if PanelSection.decode(sectionsRaw).contains(.focusChart) {
                     Picker("专注图表", selection: $focusChartRaw) {
