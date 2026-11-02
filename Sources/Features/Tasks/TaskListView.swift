@@ -266,7 +266,7 @@ struct TaskListContent: View {
                     }
                     .readableWidth(layout.maxContentWidth)
                     .safeAreaInset(edge: .bottom) { archiveHint.padding(.top, 14) }
-                    .environment(\.cardLayout, layout)
+                    .environment(\.cardSweepKey, Self.sweepKey(tasks, layout: layout))
                     .transaction(value: layout) { $0.animation = nil }
                     .padding(.horizontal, 24)
                     .padding(.top, 16)
@@ -275,6 +275,19 @@ struct TaskListContent: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    /// 列表的签名：排列方式、顺序，以及每个任务影响进度的字段。只随数据变化，不随时间流逝变化。
+    static func sweepKey(_ tasks: [TaskItem], layout: CardLayout) -> String {
+        var hasher = Hasher()
+        for task in tasks {
+            hasher.combine(task.id)
+            hasher.combine(task.state)
+            hasher.combine(task.startAt)
+            hasher.combine(task.dueAt)
+            hasher.combine(task.updatedAt)
+        }
+        return "\(layout.rawValue)-\(hasher.finalize())"
     }
 
     @ViewBuilder
