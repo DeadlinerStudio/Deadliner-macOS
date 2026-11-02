@@ -82,7 +82,7 @@ scripts/package.sh ../Deadliner-for-macOS-package   # 打包 DMG 与 ZIP（临�
   - [#1](https://github.com/DeadlinerStudio/DeadlinerCore/pull/1)：4 个 `Ios*StateBridge` 从 `iosMain` 移到 `appleMain`，供 macOS 使用
   - [#2](https://github.com/DeadlinerStudio/DeadlinerCore/pull/2)：`BackupService.restore` 声明 `@Throws`，导入无效备份时报错而不退出
   - [#3](https://github.com/DeadlinerStudio/DeadlinerCore/pull/3)：防止同步时分类被「未命名分类」覆盖
-  - 按日期范围读取概览统计（`loadRange`），用于自定义时间段
+  - [#4](https://github.com/DeadlinerStudio/DeadlinerCore/pull/4)：按日期范围读取概览统计（`loadRange`），用于自定义时间段
 - Lifi（闭源 AI）使用 Core 官方的公开回退 `-PlifiMode=stub`，AI 功能不可用。
 - `scripts/deadliner-mac.init.gradle` 在构建时为 Core 加上 macOS framework 导出，不修改 Core 的文件。
 - Core 中用 `require()` 校验的数据（习惯周期、目标、记录方式、WebDAV 地址）在交给 Core 之前先在 Swift 中检查，避免未捕获的 Kotlin 异常导致崩溃。
