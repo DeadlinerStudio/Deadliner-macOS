@@ -292,7 +292,7 @@ struct TaskListContent: View {
         VStack(spacing: 10) {
             Image(systemName: "checklist")
                 .font(.system(size: 36))
-            Text(searchText.isEmpty && !isFiltered ? "还没有任务。点右下角的 + 新建，或配置同步后从手机拉取。" : "没有找到匹配的任务")
+            Text(searchText.isEmpty && !isFiltered ? "暂无任务" : "没有找到匹配的任务")
                 .font(.callout)
             if searchText.isEmpty, !isFiltered, let onSetupSync {
                 Button("配置同步", action: onSetupSync)

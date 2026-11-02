@@ -27,11 +27,11 @@ struct TaskEditorSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("标题", text: $draft.title, prompt: Text("任务标题"))
+                    TextField("任务名称", text: $draft.title, prompt: Text("任务名称"))
                         .labelsHidden()
                         .multilineTextAlignment(.leading)
                         .font(.title3.weight(.semibold))
-                    TextField("备注", text: $draft.note, prompt: Text("备注"), axis: .vertical)
+                    TextField("备注（可选）", text: $draft.note, prompt: Text("备注"), axis: .vertical)
                         .labelsHidden()
                         .multilineTextAlignment(.leading)
                         .lineLimit(3...6)

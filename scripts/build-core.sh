@@ -2,18 +2,27 @@
 # 构建 DeadlinerCore 的 macOS framework，并部署到 Frameworks/Shared.framework。
 #
 # - 不修改 Core 仓库：framework 导出由 scripts/deadliner-mac.init.gradle 在构建时补上。
-# - Lifi 默认使用 Core 官方公开回退（-PlifiMode=stub），AI 调用会抛 LifiUnavailableException。
+# - Lifi 默认与 iOS 一致使用 private；公开构建请显式设置 DEADLINER_LIFI_MODE=stub。
 #
 # 用法：scripts/build-core.sh [debug|release]
 # 环境变量：
-#   DEADLINER_CORE_DIR   Core 仓库位置（默认 ../upstream-latest/deadliner-core）
-#   DEADLINER_LIFI_MODE  stub（默认）/ auto / private
+#   DEADLINER_CORE_DIR   Core 仓库位置（默认 ../DeadlinerCore）
+#   DEADLINER_LIFI_MODE  private（默认）/ stub / auto
 #   CONFIGURATION        Xcode 传入的 Debug / Release，未指定参数时使用
 set -euo pipefail
 
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-core_dir="${DEADLINER_CORE_DIR:-$project_dir/../upstream-latest/deadliner-core}"
-lifi_mode="${DEADLINER_LIFI_MODE:-stub}"
+core_dir="${DEADLINER_CORE_DIR:-$project_dir/../DeadlinerCore}"
+lifi_mode="${DEADLINER_LIFI_MODE:-private}"
+
+case "$lifi_mode" in
+  private|stub|auto) ;;
+  *) printf 'error: DEADLINER_LIFI_MODE must be private, stub or auto.\n' >&2; exit 2 ;;
+esac
+if [[ "$lifi_mode" == private && ! -f "$core_dir/.private/lifi/lifi-api-version" ]]; then
+  printf 'error: Private Lifi missing. Run %s/runscript/setupLifi.sh or set DEADLINER_LIFI_MODE=stub.\n' "$core_dir" >&2
+  exit 1
+fi
 
 configuration="${1:-${CONFIGURATION:-Debug}}"
 case "$(printf '%s' "$configuration" | tr '[:upper:]' '[:lower:]')" in

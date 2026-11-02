@@ -75,12 +75,20 @@ scripts/package.sh ../Deadliner-for-macOS-package   # 打包 DMG 与 ZIP（临�
 
 **Core 的接入方式**
 
-- Core 位置默认为 `../upstream-latest/deadliner-core`，可以用 `DEADLINER_CORE_DIR` 指定。
+- Core 位置默认为 `../DeadlinerCore`，可以用 `DEADLINER_CORE_DIR` 指定。
 - 需要包含以下改动的 Core（已向 DeadlinerCore 的 `byos` 分支提交 PR，合并前请使用包含它们的分支）：
   - [#1](https://github.com/DeadlinerStudio/DeadlinerCore/pull/1)：4 个 `Ios*StateBridge` 从 `iosMain` 移到 `appleMain`，供 macOS 使用
   - [#2](https://github.com/DeadlinerStudio/DeadlinerCore/pull/2)：`BackupService.restore` 声明 `@Throws`，导入无效备份时报错而不退出
   - [#3](https://github.com/DeadlinerStudio/DeadlinerCore/pull/3)：防止同步时分类被「未命名分类」覆盖
-- Lifi（闭源 AI）使用 Core 官方的公开回退 `-PlifiMode=stub`，AI 功能不可用。
+- Lifi 模式统一由 `DEADLINER_LIFI_MODE` 管理：默认 `private`（与 iOS / Android / HarmonyOS 相同），需要先运行 Core 的 `runscript/setupLifi.sh`；公开构建使用 `stub`（AI 不可用），`auto` 根据本地安装情况选择。
+- 构建前可统一设置：
+
+  ```bash
+  export DEADLINER_CORE_DIR="/Users/aritxonly/Codes/ProjectDeadliner/DeadlinerCore"
+  export DEADLINER_LIFI_MODE=private
+  ```
+
+  IDE 从 Finder 启动时不一定继承 shell 环境；同级目录布局无需配置路径，Xcode 也可在 Build Settings 中设置同名变量。
 - `scripts/deadliner-mac.init.gradle` 在构建时为 Core 加上 macOS framework 导出，不修改 Core 的文件。
 - Core 中用 `require()` 校验的数据（习惯周期、目标、记录方式、WebDAV 地址）在交给 Core 之前先在 Swift 中检查，避免未捕获的 Kotlin 异常导致崩溃。
 

@@ -49,7 +49,7 @@ targets:
         PRODUCT_NAME: Deadliner for macOS
         PRODUCT_BUNDLE_IDENTIFIER: com.deadliner.macos
     preBuildScripts:
-      - name: Build DeadlinerCore
+      - name: Sync KMP Core
         script: '"${PROJECT_DIR}/scripts/build-core.sh"'
         basedOnDependencyAnalysis: false
 

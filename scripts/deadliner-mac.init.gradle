@@ -1,11 +1,34 @@
 // Mac 宿主构建 Core 时使用：不修改 Core 仓库，仅在本次构建中导出 macOS framework。
-// Lifi 走 Core 自带的 -PlifiMode=stub 公开回退实现。
+// Lifi 模式由 build-core.sh 通过 -PlifiMode 传给 Core。
 allprojects {
     if (path == ':shared') {
         pluginManager.withPlugin('org.jetbrains.kotlin.multiplatform') {
             def kmp = extensions.getByName('kotlin')
             kmp.targets.matching { it.name == 'macosArm64' }.configureEach { t ->
                 t.binaries.framework { baseName = 'Shared' }
+            }
+        }
+    }
+}
+
+// 兼容状态桥接尚未迁入 appleMain 的 Core checkout，仅复用平台无关桥接。
+allprojects {
+    if (path == ':shared') {
+        pluginManager.withPlugin('org.jetbrains.kotlin.multiplatform') {
+            def bridgeNames = ['IosTaskListStateBridge', 'IosHabitListStateBridge',
+                               'IosOverviewStateBridge', 'IosFocusTimerStateBridge']
+            def generated = layout.buildDirectory.dir('generated/macosStateBridges')
+            def syncBridges = tasks.register('syncMacosStateBridges', Sync) {
+                from('src/iosMain/kotlin') {
+                    bridgeNames.each { include "**/${it}.kt" }
+                }
+                into(generated)
+            }
+            extensions.getByName('kotlin').sourceSets.matching { it.name == 'macosArm64Main' }.configureEach {
+                kotlin.srcDir(generated)
+            }
+            tasks.matching { it.name == 'compileKotlinMacosArm64' }.configureEach {
+                dependsOn(syncBridges)
             }
         }
     }
