@@ -49,32 +49,6 @@ struct GroupedRow<Trailing: View>: View {
     }
 }
 
-/// 撞色「+」按钮（安卓「撞色主页按钮」）：珊瑚色玻璃圆形。
-struct AccentFab: View {
-    let label: String
-    var action: () -> Void
-    @Environment(\.palette) private var t
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "plus")
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 56, height: 56)
-                .contentShape(Circle())
-                // 着色留出透明度，让背后的内容透过来；不另加彩色阴影（阴影透过玻璃会显脏）。
-                .deadlinerGlass(in: Circle(), tint: t.accentFab.opacity(0.72), interactive: true)
-                .scaleEffect(hovering ? 1.05 : 1)
-        }
-        .buttonStyle(.plain)
-        .help(label)
-        .accessibilityLabel(label)
-        .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.15), value: hovering)
-    }
-}
-
 /// 自动换行的横向排列（分类标签、图标选择）。
 struct FlowLayout: Layout {
     var spacing: CGFloat = 8

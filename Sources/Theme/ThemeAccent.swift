@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// 主题色。名称与取色参照 iOS 版的主题选项（只参考取值，代码独立实现）。
-/// 「经典」保留与手机一致的主色与珊瑚色「+」；其他主题的主色、「+」与系统控件强调色都跟随主题。
+/// 「经典」保留与手机一致的主色；其他主题的主色与系统控件强调色都跟随主题。
 enum ThemeAccent: String, CaseIterable, Identifiable {
     case classic, cool, blue, brown, cyan, gray, green, indigo, mint, orange, pink, purple, red, teal, yellow
 

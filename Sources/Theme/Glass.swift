@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// 玻璃效果兼容层：macOS 26 及以上使用系统 Liquid Glass，macOS 14～25 退回系统毛玻璃。
-/// 只用于浮在内容之上的元素（「+」按钮、悬停操作、选中的日期等）；卡片本身保持色块，不做成玻璃。
+/// 只用于浮在内容之上的元素（悬停操作、选中的日期等）；卡片本身保持色块，不做成玻璃。
 private struct LegacyGlassKey: EnvironmentKey {
     static let defaultValue = false
 }
@@ -37,7 +37,7 @@ private struct DeadlinerGlass<S: InsettableShape>: ViewModifier {
 }
 
 extension View {
-    /// Deadliner 的玻璃效果。`tint` 为玻璃着色（例如珊瑚色「+」），`interactive` 用于可点击的元素。
+    /// Deadliner 的玻璃效果。`tint` 为玻璃着色（例如菜单栏的「新建任务」），`interactive` 用于可点击的元素。
     func deadlinerGlass<S: InsettableShape>(in shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
         modifier(DeadlinerGlass(shape: shape, tint: tint, interactive: interactive))
     }

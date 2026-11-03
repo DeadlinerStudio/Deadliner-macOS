@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import DeadlinerTestHost
 
@@ -19,6 +20,27 @@ final class TaskStatusTests: XCTestCase {
         XCTAssertEqual(TaskStatus.indicator(task(due: -60), now: now), .passed)
         XCTAssertEqual(TaskStatus.indicator(task(state: .completed, due: -60), now: now), .completed)
         XCTAssertEqual(TaskStatus.indicator(task(state: .abandoned, due: 60), now: now), .abandoned)
+        XCTAssertEqual(TaskStatus.indicator(task(start: 3600, due: 7200), now: now), .notStarted)
+        XCTAssertEqual(TaskStatus.indicator(task(start: -3600, due: 86400 * 3), now: now), .undergo)
+        XCTAssertEqual(TaskStatus.indicator(task(state: .completed, start: 3600, due: 7200), now: now), .completed)
+    }
+
+    func testCustomStatusColorsRoundTripAndReset() {
+        var raw = StatusColorSettings.updating("", .passed, to: Color(hex: 0x12AB34))
+        raw = StatusColorSettings.updating(raw, .notStarted, to: Color(hex: 0xFFFFFF))
+        XCTAssertEqual(raw, "notStarted=#FFFFFF;passed=#12AB34")
+        let decoded = StatusColorSettings.decode(raw + ";bogus=#000000;near=zzz")
+        XCTAssertEqual(Set(decoded.keys), [.notStarted, .passed])
+        XCTAssertEqual(StatusColorSettings.hex(decoded[.passed]!), "#12AB34")
+
+        var palette = DeadlinerPalette.light
+        palette.statusOverrides = decoded
+        XCTAssertEqual(StatusColorSettings.hex(IndicatorStatus.passed.solid(palette)), "#12AB34")
+        XCTAssertEqual(StatusColorSettings.hex(IndicatorStatus.near.solid(palette)),
+                       StatusColorSettings.hex(IndicatorStatus.near.defaultColor(palette)))
+
+        XCTAssertEqual(StatusColorSettings.updating(raw, .notStarted, to: nil), "passed=#12AB34")
+        XCTAssertEqual(StatusColorSettings.updating("passed=#12AB34", .passed, to: nil), "")
     }
 
     func testRemainingProgressIsRemainingFraction() {

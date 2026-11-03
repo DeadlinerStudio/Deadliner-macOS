@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// 任务页：工具栏（标题、排序、新建、系统搜索框）+ 顶部氛围光 + 自动分列的卡片网格（不出现横向滚动），
-/// 右下角珊瑚色玻璃「+」。
+/// 任务页：工具栏（标题、排序、新建、系统搜索框）+ 顶部氛围光 + 自动分列的卡片网格（不出现横向滚动）。
 struct TaskListView: View {
     @Bindable var store: TaskListStore
     let commands: TaskCommands
@@ -97,12 +96,6 @@ struct TaskListView: View {
             ToolbarItem {
                 Button("新建任务", systemImage: "plus") { store.editor = .init(draft: TaskDraft()) }
                     .help("新建任务（⌘N）")
-            }
-        }
-        .overlay(alignment: .bottomTrailing) {
-            if selection == nil {
-                AccentFab(label: "新建任务") { store.editor = .init(draft: TaskDraft()) }
-                    .padding(28)
             }
         }
         .overlay(alignment: .bottom) {

@@ -21,6 +21,8 @@ struct DeadlinerPalette {
     let abandoned: Color
     var accentFab: Color
     let completedCheck: Color
+    /// 用户在设置中自定义的状态色；没有的状态使用默认色。
+    var statusOverrides: [IndicatorStatus: Color] = [:]
 
     private static let surfaces = (
         page: Color(nsColor: .windowBackgroundColor),
@@ -79,8 +81,22 @@ enum MiuixCard {
 }
 
 /// 卡片状态色与透明度对应 iOS DDLStatusStyle。
-enum IndicatorStatus {
-    case undergo, near, passed, completed, abandoned
+/// 「未开始」（开始时间还没到）默认与「进行中」同色，可以在设置中单独改。
+enum IndicatorStatus: String, CaseIterable, Identifiable {
+    case notStarted, undergo, near, passed, completed, abandoned
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .notStarted: "未开始"
+        case .undergo: "进行中"
+        case .near: "即将到期"
+        case .passed: "已逾期"
+        case .completed: "已完成"
+        case .abandoned: "已放弃"
+        }
+    }
 
     struct Colors {
         let indicator: Color
@@ -90,12 +106,11 @@ enum IndicatorStatus {
     }
 
     func colors(_ t: DeadlinerPalette) -> Colors {
-        let (role, indicatorAlpha, backgroundAlpha): (Color, Double, Double) = switch self {
-        case .undergo: (t.primary, 0.55, 0.18)
-        case .near: (t.tertiary, 0.65, 0.20)
-        case .passed: (t.error, 0.65, 0.20)
-        case .completed: (t.secondary, 0.65, 0.20)
-        case .abandoned: (t.abandoned, 0.65, 0.18)
+        let role = solid(t)
+        let (indicatorAlpha, backgroundAlpha): (Double, Double) = switch self {
+        case .notStarted, .undergo: (0.55, 0.18)
+        case .near, .passed, .completed: (0.65, 0.20)
+        case .abandoned: (0.65, 0.18)
         }
         return Colors(
             indicator: role.opacity(indicatorAlpha),
@@ -107,8 +122,13 @@ enum IndicatorStatus {
 
     /// 星标使用不透明的角色色。
     func solid(_ t: DeadlinerPalette) -> Color {
+        t.statusOverrides[self] ?? defaultColor(t)
+    }
+
+    /// 没有自定义时的状态色。
+    func defaultColor(_ t: DeadlinerPalette) -> Color {
         switch self {
-        case .undergo: t.primary
+        case .notStarted, .undergo: t.primary
         case .near: t.tertiary
         case .passed: t.error
         case .completed: t.secondary
@@ -150,11 +170,14 @@ extension EnvironmentValues {
 struct DeadlinerThemeModifier: ViewModifier {
     @Environment(\.colorScheme) private var scheme
     @AppStorage(ThemeAccent.storageKey) private var accentRaw = ThemeAccent.classic.rawValue
+    @AppStorage(StatusColorSettings.storageKey) private var statusColorsRaw = ""
 
     func body(content: Content) -> some View {
         let accent = ThemeAccent(rawValue: accentRaw) ?? .classic
-        content
-            .environment(\.palette, .of(scheme, accent: accent))
+        var palette = DeadlinerPalette.of(scheme, accent: accent)
+        palette.statusOverrides = StatusColorSettings.decode(statusColorsRaw)
+        return content
+            .environment(\.palette, palette)
             .tint(accent.color)
     }
 }

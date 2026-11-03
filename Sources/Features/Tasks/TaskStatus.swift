@@ -11,6 +11,7 @@ enum TaskStatus {
     static func indicator(_ task: TaskItem, now: Date) -> IndicatorStatus {
         if task.isAbandoned { return .abandoned }
         if task.isCompleted { return .completed }
+        if let start = task.startAt, now < start { return .notStarted }
         guard let due = task.dueAt else { return .undergo }
         if now > due { return .passed }
         if due.timeIntervalSince(now) <= nearThreshold { return .near }

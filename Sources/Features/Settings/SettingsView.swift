@@ -60,6 +60,7 @@ struct SettingsView: View {
     @State private var backupMessage: String?
     @State private var pendingImport: PendingImport?
     @AppStorage(TaskDisplaySettings.forwardProgressKey) private var forwardProgress = false
+    @AppStorage(StatusColorSettings.storageKey) private var statusColorsRaw = ""
     @AppStorage(TaskDisplaySettings.detailedRemainingKey) private var detailedRemaining = true
 
     private struct PendingImport: Identifiable {
@@ -272,6 +273,7 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
     private var taskCardSection: some View {
         Section("任务卡片") {
             Toggle("正向进度条", isOn: $forwardProgress)
@@ -280,6 +282,27 @@ struct SettingsView: View {
             Toggle("剩余时间详细显示", isOn: $detailedRemaining)
             Text("开启时显示「2天 3小时」，关闭时只显示「2天」。")
                 .font(.caption).foregroundStyle(.secondary)
+        }
+        Section {
+            ForEach(IndicatorStatus.allCases) { status in
+                HStack {
+                    ColorPicker(status.title, selection: Binding(
+                        get: { status.solid(t) },
+                        set: { statusColorsRaw = StatusColorSettings.updating(statusColorsRaw, status, to: $0) }
+                    ), supportsOpacity: false)
+                    if t.statusOverrides[status] != nil {
+                        Button("恢复默认") { statusColorsRaw = StatusColorSettings.updating(statusColorsRaw, status, to: nil) }
+                            .buttonStyle(.borderless)
+                    }
+                }
+            }
+            if !statusColorsRaw.isEmpty {
+                Button("全部恢复默认") { statusColorsRaw = "" }
+            }
+        } header: {
+            Text("状态颜色")
+        } footer: {
+            Text("用于任务卡片的底色和进度条，以及菜单栏面板。「未开始」指开始时间还没到的任务。颜色只保存在这台 Mac 上。")
         }
     }
 
@@ -298,7 +321,7 @@ struct SettingsView: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 60), spacing: 8)], spacing: 10) {
                     ForEach(ThemeAccent.allCases) { accentSwatch($0) }
                 }
-                Text("「经典」与手机配色一致；其他主题会改变主色、「+」按钮与系统控件的颜色，状态色不变。")
+                Text("「经典」与手机配色一致；其他主题会改变主色与系统控件的颜色；状态色在「状态颜色」中单独设置。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

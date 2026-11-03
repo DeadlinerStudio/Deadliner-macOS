@@ -45,10 +45,6 @@ struct HabitsView: View {
                     .help("新建习惯")
             }
         }
-        .overlay(alignment: .bottomTrailing) {
-            AccentFab(label: "新建习惯") { store.editor = .init(draft: HabitDraft()) }
-                .padding(28)
-        }
         .sheet(item: $store.editor) { request in
             HabitEditorSheet(commands: commands, categories: categories.values.sorted { $0.sortOrder < $1.sortOrder }, draft: request.draft) {
                 store.editor = nil
