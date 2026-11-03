@@ -1,49 +1,10 @@
 import Charts
 import SwiftUI
 
-/// 概览页：总览 / 趋势两部分，数据全部来自 Core（iOS 的「AI 月度洞察」暂缓）。
-///
-/// 范围只在 Core 提供的数据内选择：总览可选「全部时间」或某个月（Core `loadMonth`）；
-/// 趋势可选周（近 7 天）/ 月（近 30 天）/ 年（近 12 个月）。
+/// 桌面概览入口；复用下方统计卡片，导航与区间查询由工作台组织。
 struct OverviewView: View {
     let store: OverviewStore
-    @AppStorage(CardLayout.storageKey) private var layoutRaw = CardLayout.single.rawValue
-    @AppStorage("overview.section") private var sectionRaw = OverviewSection.stats.rawValue
-    @AppStorage("overview.range") private var range = OverviewRange.all
-    @AppStorage("overview.trendRange") private var trendRaw = TrendRange.week.rawValue
-    @Environment(\.palette) private var t
-
-    var body: some View {
-        OverviewContent(
-            store: store,
-            section: OverviewSection(rawValue: sectionRaw) ?? .stats,
-            range: $range,
-            trend: Binding(get: { TrendRange(rawValue: trendRaw) ?? .week }, set: { trendRaw = $0.rawValue }),
-            layout: CardLayout(rawValue: layoutRaw) ?? .single
-        )
-        .topAtmosphere(t.primary)
-        .navigationTitle("概览")
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Picker("分区", selection: $sectionRaw) {
-                    ForEach(OverviewSection.allCases) { Text($0.title).tag($0.rawValue) }
-                }
-                .pickerStyle(.segmented)
-                .fixedSize()
-            }
-            ToolbarItem {
-                Button { reload() } label: { Label("刷新", systemImage: "arrow.clockwise") }
-                    .help("重新计算统计")
-            }
-        }
-        .onAppear { reload() }
-        .onChange(of: range) { reload() }
-    }
-
-    private func reload() {
-        store.refresh()
-        if range != OverviewRange.all { store.loadMonth(range) }
-    }
+    var body: some View { OverviewWorkbench(store: store) }
 }
 
 enum OverviewSection: String, CaseIterable, Identifiable {
@@ -147,7 +108,7 @@ struct OverviewContent: View {
             OverviewMetricsCard(review: month.review)
             OverviewRow(columns: columns) {
                 OverviewMonthMapCard(review: month.review)
-                OverviewHistoryCard(history: month.distribution, title: "状态分布", subtitle: "截止日期在本月的任务")
+                OverviewHistoryCard(history: month.distribution, title: "状态分布", subtitle: "完成按完成日期，其余按截止日期")
             }
             if !month.review.completedTitles.isEmpty {
                 OverviewTitlesCard(review: month.review)
@@ -235,12 +196,16 @@ enum OverviewDates {
         return f
     }()
 
-    static func date(_ raw: String) -> Date? { iso.date(from: raw) }
+    static func date(_ raw: String) -> Date? {
+        iso.timeZone = .current
+        return iso.date(from: raw)
+    }
 
     static func label(_ raw: String, _ format: String) -> String {
         guard let date = date(raw) else { return raw }
         let f = DateFormatter()
         f.locale = Locale(identifier: "zh_CN")
+        f.calendar = OverviewPeriod.calendar
         f.dateFormat = format
         return f.string(from: date)
     }
@@ -431,6 +396,7 @@ struct OverviewHeatmapCard: View {
                 let gap: CGFloat = 3
                 let labelWidth: CGFloat = 18
                 let cell = min(22, max(8, (width - labelWidth - gap * CGFloat(weeks.count)) / CGFloat(max(1, weeks.count))))
+                ScrollView(.horizontal) {
                 VStack(alignment: .leading, spacing: gap) {
                     HStack(spacing: gap) {
                         Color.clear.frame(width: labelWidth, height: 12)
@@ -459,6 +425,7 @@ struct OverviewHeatmapCard: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 .background(GeometryReader { proxy in
                     Color.clear
                         .onAppear { width = proxy.size.width }
@@ -634,6 +601,7 @@ struct OverviewWeeklyCard: View {
 
 struct OverviewMetricsCard: View {
     let review: OverviewStore.MonthReview
+    var comparisonLabel = "较前一月"
     @Environment(\.palette) private var t
 
     var body: some View {
@@ -663,7 +631,7 @@ struct OverviewMetricsCard: View {
         return VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.caption).foregroundStyle(t.onSurfaceVariant)
             Text(value).font(.system(size: 22, weight: .bold, design: .rounded)).foregroundStyle(tint)
-            Text(text.map { "较前一月 \($0)" } ?? "\u{00A0}")
+            Text(text.map { "\(comparisonLabel) \($0)" } ?? "\u{00A0}")
                 .font(.caption2)
                 .foregroundStyle(improving == false ? t.error : t.onSurfaceVariant)
         }
@@ -739,7 +707,7 @@ struct OverviewTitlesCard: View {
     @Environment(\.palette) private var t
 
     var body: some View {
-        let month = review.monthStart.map { OverviewDates.label($0, "M月") } ?? "本月"
+        let month = review.monthStart.map { OverviewDates.label($0, "M月") } ?? "所选区间"
         OverviewCard(title: "\(month)完成的任务", subtitle: "\(review.completedTitles.count) 个") {
             FlowLayout(spacing: 6) {
                 ForEach(Array(review.completedTitles.enumerated()), id: \.offset) { _, title in
