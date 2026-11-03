@@ -37,7 +37,7 @@ fi
 
 mkdir -p "$out_dir"
 suffix=""
-[[ "${DEADLINER_LIFI_MODE:-stub}" == "private" ]] && suffix="-private"
+[[ "${DEADLINER_LIFI_MODE:-private}" != "stub" ]] && suffix="-private"
 base="Deadliner-for-macOS-$version-arm64$suffix"
 zip="$out_dir/$base.zip"
 rm -f "$zip"

@@ -25,7 +25,7 @@ final class AppModel {
         var systemImage: String {
             switch self {
             case .tasks: "checklist"
-            case .habits: "target"
+            case .habits: "leaf"
             case .capture: "lightbulb"
             case .overview: "chart.bar.xaxis"
             case .focus: "timer"

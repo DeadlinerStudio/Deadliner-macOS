@@ -1,11 +1,6 @@
 import SwiftUI
 
-/// Deadliner 的颜色。
-///
-/// - 页面、分组、文字等表面颜色使用 **系统语义颜色**，跟随 macOS 的深浅色、强调色与对比度设置。
-/// - 主色与状态色保持与 Android 一致（深色值取自手机实测）。任务指示色规则来自安卓
-///   TaskIndicatorColorFactory：「多彩任务指示标」关闭时，进行中 = Primary、即将到期 = Tertiary、
-///   已逾期 = Error、已完成 = Secondary、已放弃 = 灰色；卡片为底色叠加角色色低透明度，进度条为角色色水平渐变。
+/// 状态色对齐 iOS DDLStatusStyle；表面使用 macOS 系统语义颜色。
 struct DeadlinerPalette {
     let isDark: Bool
     // 表面（系统语义颜色）
@@ -18,7 +13,7 @@ struct DeadlinerPalette {
     let onSurface: Color
     let onSurfaceVariant: Color
     let cardBase: Color
-    // 品牌与状态（与 Android 一致）
+    // 品牌与状态（与 iOS 一致）
     var primary: Color
     let secondary: Color
     let tertiary: Color
@@ -43,9 +38,9 @@ struct DeadlinerPalette {
         pageBg: surfaces.page, groupBg: surfaces.group, fieldBg: surfaces.field,
         segmentedBg: surfaces.segmented, segmentedSelected: surfaces.segmentedSelected, searchBg: surfaces.search,
         onSurface: surfaces.label, onSurfaceVariant: surfaces.secondaryLabel, cardBase: surfaces.page,
-        primary: Color(hex: 0x4078EF), secondary: Color(hex: 0xC0C6DA), tertiary: Color(hex: 0xD9BCDC),
-        error: Color(hex: 0xF2B8AE), abandoned: Color(hex: 0x8E8E93), accentFab: Color(hex: 0xD06262),
-        completedCheck: Color(hex: 0x8FD3A8)
+        primary: .blue, secondary: .green, tertiary: .orange,
+        error: .red, abandoned: .gray, accentFab: Color(hex: 0xFF6D6D),
+        completedCheck: .green
     )
 
     static let light = DeadlinerPalette(
@@ -53,9 +48,9 @@ struct DeadlinerPalette {
         pageBg: surfaces.page, groupBg: surfaces.group, fieldBg: surfaces.field,
         segmentedBg: surfaces.segmented, segmentedSelected: surfaces.segmentedSelected, searchBg: surfaces.search,
         onSurface: surfaces.label, onSurfaceVariant: surfaces.secondaryLabel, cardBase: surfaces.group,
-        primary: Color(hex: 0x3478F6), secondary: Color(hex: 0x5B6274), tertiary: Color(hex: 0x8B6A8E),
-        error: Color(hex: 0xC9443A), abandoned: Color(hex: 0x8E8E93), accentFab: Color(hex: 0xE06A65),
-        completedCheck: Color(hex: 0x2E9E5B)
+        primary: .blue, secondary: .green, tertiary: .orange,
+        error: .red, abandoned: .gray, accentFab: Color(hex: 0xFF6D6D),
+        completedCheck: .green
     )
 
     static func of(_ scheme: ColorScheme, accent: ThemeAccent = .classic) -> DeadlinerPalette {
@@ -83,7 +78,7 @@ enum MiuixCard {
     static let minColumnWidth: CGFloat = 340
 }
 
-/// 卡片状态色（对应安卓 DeadlineStatusResolver 的五种状态）。
+/// 卡片状态色与透明度对应 iOS DDLStatusStyle。
 enum IndicatorStatus {
     case undergo, near, passed, completed, abandoned
 

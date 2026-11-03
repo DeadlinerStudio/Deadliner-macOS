@@ -153,6 +153,25 @@ final class OverviewStore {
     private(set) var focusLast30: FocusRange?
     /// 上个月每天的完成数（用于「较上月同期」）。
     private(set) var previousMonthDaily: [DayCount] = []
+    /// 工作台所选区间的专注。
+    private(set) var focusInterval: FocusRange?
+    private(set) var monthLoading = false
+    private(set) var previousMonth: MonthReview?
+    private(set) var comparisonError: String?
+    private(set) var annual: [DayCount] = []
+    private(set) var annualError: String?
+    private(set) var annualLoading = false
+    private(set) var interval: MonthReview?
+    private(set) var intervalDistribution = History()
+    private(set) var intervalPeriods: [PeriodCount] = []
+    private(set) var intervalError: String?
+    private(set) var intervalLoading = false
+    @ObservationIgnored private var selectedMonth: String?
+    @ObservationIgnored private var selectedInterval: (String, String)?
+    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var monthGeneration = 0
+    @ObservationIgnored private var intervalGeneration = 0
+    @ObservationIgnored private var annualGeneration = 0
 
     @ObservationIgnored private let database: DeadlinerDatabase
     @ObservationIgnored private var bridge: IosOverviewStateBridge?
@@ -163,9 +182,18 @@ final class OverviewStore {
 
     func refresh() {
         if bridge == nil { bridge = IosOverviewStateBridge(database: database) }
+        generation += 1
+        let request = generation
+        isLoading = true
         bridge?.load { [weak self] state in
-            MainActor.assumeIsolated { self?.apply(state) }
+            MainActor.assumeIsolated {
+                guard let self, self.generation == request else { return }
+                self.apply(state)
+            }
         }
+        if let selectedMonth { loadMonth(selectedMonth) }
+        if let selectedInterval { loadInterval(start: selectedInterval.0, end: selectedInterval.1) }
+        loadAnnual()
         refreshFocus()
     }
 
@@ -184,8 +212,12 @@ final class OverviewStore {
 
     /// 某个日期范围的专注统计（起止都包含）。
     func focusRange(_ selection: DateRange) -> FocusRange {
-        let range = FocusStatisticsDateRange(startDate: DateRange.isoString(selection.start),
-                                             endDateExclusive: DateRange.isoString(selection.endExclusive()))
+        focusRange(start: DateRange.isoString(selection.start), endExclusive: DateRange.isoString(selection.endExclusive()))
+    }
+
+    /// 某个日期范围的专注统计（`yyyy-MM-dd`，结束日期不包含）。
+    func focusRange(start: String, endExclusive: String) -> FocusRange {
+        let range = FocusStatisticsDateRange(startDate: start, endDateExclusive: endExclusive)
         let snapshot = database.focusStatistics.snapshot(query: FocusStatisticsQuery(range: range, taskUid: nil, categoryUid: nil,
                                                                                     target: nil, targetKind: nil))
         return FocusRange(
@@ -203,6 +235,9 @@ final class OverviewStore {
     /// 读取某个月（`yyyy-MM-01`）的数据；结果在 `month`，失败时在 `monthError`。
     func loadMonth(_ monthStart: String) {
         if bridge == nil { bridge = IosOverviewStateBridge(database: database) }
+        selectedMonth = monthStart
+        monthGeneration += 1
+        let request = monthGeneration
         monthError = nil
         if let start = OverviewDates.date(monthStart),
            let end = Calendar.current.date(byAdding: DateComponents(month: 1, day: -1), to: start) {
@@ -216,19 +251,39 @@ final class OverviewStore {
                 }
             }, onError: { _ in })
         }
+        comparisonError = nil
+        monthLoading = true
+        month = nil
+        previousMonth = nil
         bridge?.loadMonth(monthStart: monthStart, onState: { [weak self] state in
             MainActor.assumeIsolated {
-                self?.month = MonthDetail(
+                guard let self, self.monthGeneration == request else { return }
+                self.monthLoading = false
+                self.month = MonthDetail(
                     review: Self.review(state.review),
-                    distribution: Self.history(state.statusDistribution),
+                    distribution: Self.exclusiveHistory(state.statusDistribution),
                     archivedTasks: Int(state.archivedTaskCount),
                     archivedHabits: Int(state.archivedHabitCount)
                 )
             }
         }, onError: { [weak self] message in
             MainActor.assumeIsolated {
-                self?.month = nil
-                self?.monthError = message
+                guard let self, self.monthGeneration == request else { return }
+                self.monthLoading = false
+                self.monthError = message
+            }
+        })
+        guard let date = OverviewDates.date(monthStart) else { return }
+        let previous = OverviewPeriod.key(OverviewPeriod.shift(date, months: -1))
+        bridge?.loadMonth(monthStart: previous, onState: { [weak self] state in
+            MainActor.assumeIsolated {
+                guard let self, self.monthGeneration == request else { return }
+                self.previousMonth = Self.review(state.review)
+            }
+        }, onError: { [weak self] message in
+            MainActor.assumeIsolated {
+                guard let self, self.monthGeneration == request else { return }
+                self.comparisonError = message
             }
         })
     }
@@ -260,7 +315,70 @@ final class OverviewStore {
         })
     }
 
+    func loadInterval(start: String, end: String) {
+        if bridge == nil { bridge = IosOverviewStateBridge(database: database) }
+        selectedInterval = (start, end)
+        intervalGeneration += 1
+        let request = intervalGeneration
+        intervalLoading = true
+        intervalError = nil
+        interval = nil
+        // 无效范围交给 Core 的 loadRange 报错；不传给专注统计，避免未捕获的 Kotlin 异常。
+        focusInterval = start < end ? focusRange(start: start, endExclusive: end) : nil
+        bridge?.loadRange(startDate: start, endDateExclusive: end, onState: { [weak self] state in
+            MainActor.assumeIsolated {
+                guard let self, self.intervalGeneration == request else { return }
+                self.intervalLoading = false
+                self.interval = Self.metrics(state.metrics, monthStart: nil,
+                    daily: state.daily.map { DayCount(date: $0.date, completed: Int($0.completedCount), overdue: Int($0.overdueCount)) },
+                    titles: state.completedTaskTitles)
+                self.intervalDistribution = Self.exclusiveHistory(state.statusDistribution)
+                let counts = Dictionary(state.completionBuckets.map { ($0.period.name, Int($0.completedCount)) }, uniquingKeysWith: +)
+                self.intervalPeriods = Period.allCases.map { PeriodCount(period: $0, count: counts[$0.rawValue] ?? 0) }
+            }
+        }, onError: { [weak self] message in
+            MainActor.assumeIsolated {
+                guard let self, self.intervalGeneration == request else { return }
+                self.intervalLoading = false
+                self.intervalError = message
+            }
+        })
+    }
+
+    private func loadAnnual() {
+        annualGeneration += 1
+        let request = annualGeneration
+        annualLoading = true
+        annualError = nil
+        let now = Date()
+        let start = OverviewPeriod.calendar.date(from: OverviewPeriod.calendar.dateComponents([.year], from: now))!
+        let end = OverviewPeriod.calendar.date(byAdding: .day, value: 1, to: now)!
+        bridge?.loadRange(startDate: OverviewPeriod.key(start), endDateExclusive: OverviewPeriod.key(end), onState: { [weak self] state in
+            MainActor.assumeIsolated {
+                guard let self, self.annualGeneration == request else { return }
+                self.annualLoading = false
+                self.annual = state.daily.map { DayCount(date: $0.date, completed: Int($0.completedCount)) }
+            }
+        }, onError: { [weak self] message in
+            MainActor.assumeIsolated {
+                guard let self, self.annualGeneration == request else { return }
+                self.annualLoading = false
+                self.annualError = message
+            }
+        })
+    }
+
+    /// 月/区间状态互斥；旧 History 的 pending 则含逾期。
+    static func exclusiveHistory(_ h: OverviewHistory) -> History {
+        History(completed: Int(h.completed), pending: Int(h.pending + h.overdue),
+                abandoned: Int(h.abandoned), overdue: Int(h.overdue))
+    }
+
     func stop() {
+        generation += 1
+        monthGeneration += 1
+        intervalGeneration += 1
+        annualGeneration += 1
         bridge?.close()
         bridge = nil
     }
@@ -289,14 +407,22 @@ final class OverviewStore {
     }
 
     private static func review(_ review: OverviewLastMonth) -> MonthReview {
-        Self.review(monthStart: review.monthStart, daily: review.daily, metrics: review.metrics, titles: review.completedTaskTitles)
+        metrics(review.metrics, monthStart: review.monthStart,
+                daily: review.daily.map { DayCount(date: $0.date, completed: Int($0.completedCount), overdue: Int($0.overdueCount)) },
+                titles: review.completedTaskTitles)
     }
 
     private static func review(monthStart: String?, daily: [OverviewDailyStat], metrics m: OverviewMonthlyMetrics,
                                titles: [String]) -> MonthReview {
+        metrics(m, monthStart: monthStart,
+                daily: daily.map { DayCount(date: $0.date, completed: Int($0.completedCount), overdue: Int($0.overdueCount)) },
+                titles: titles)
+    }
+
+    private static func metrics(_ m: OverviewMonthlyMetrics, monthStart: String?, daily: [DayCount], titles: [String]) -> MonthReview {
         MonthReview(
             monthStart: monthStart,
-            daily: daily.map { DayCount(date: $0.date, completed: Int($0.completedCount), overdue: Int($0.overdueCount)) },
+            daily: daily,
             totalTasks: Int(m.totalTasks),
             completedTasks: Int(m.completedTasks),
             completionRate: m.completionRate,
