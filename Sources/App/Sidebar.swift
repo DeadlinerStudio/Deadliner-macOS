@@ -10,7 +10,11 @@ struct Sidebar: View {
     /// 顶部的个人资料；为 nil 时不显示。
     var profile: ProfileStore?
     var editProfile: () -> Void = {}
+    /// 「任务」「习惯」角标的数据来源；为 nil 时不显示角标。
+    var taskList: TaskListStore?
+    var habitList: HabitListStore?
     @Environment(\.palette) private var t
+    @State private var hoveringProfile = false
 
     private static let groups: [(title: String?, pages: [AppModel.Page])] = [
         (nil, [.tasks, .habits, .capture]),
@@ -24,7 +28,13 @@ struct Sidebar: View {
                 let group = Self.groups[index]
                 Section {
                     ForEach(group.pages) { page in
-                        Label(page.title, systemImage: page.systemImage).tag(page)
+                        Label {
+                            Text(page.title)
+                        } icon: {
+                            IconTile(systemImage: page.systemImage, color: page.tint)
+                        }
+                        .badge(badge(for: page))
+                        .tag(page)
                     }
                 } header: {
                     if let title = group.title { Text(title) }
@@ -40,22 +50,66 @@ struct Sidebar: View {
         }
     }
 
+    /// 侧栏角标：任务为今天到期与已逾期的进行中任务，习惯为今天还没打卡的习惯；0 时不显示。
+    private func badge(for page: AppModel.Page) -> Int {
+        switch page {
+        case .tasks: taskList.map { Self.dueTaskCount($0.tasks, now: Date()) } ?? 0
+        case .habits: habitList.map { Self.pendingHabitCount(selectedDate: $0.selectedDate, daily: $0.dailyHabits, week: $0.week, now: Date()) } ?? 0
+        default: 0
+        }
+    }
+
+    /// 进行中、截止时间不晚于今天结束的任务数（含已逾期）。
+    static func dueTaskCount(_ tasks: [TaskItem], now: Date, calendar: Calendar = .current) -> Int {
+        guard let endOfToday = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) else { return 0 }
+        return tasks.filter { task in
+            guard task.state == .active, let due = task.dueAt else { return false }
+            return due < endOfToday
+        }.count
+    }
+
+    /// 今天应打卡、还没完成的习惯数。习惯页选中的是今天时按习惯逐个计算，否则用本周概览里今天的数字。
+    static func pendingHabitCount(selectedDate: String, daily: [HabitItem], week: [HabitDay], now: Date) -> Int {
+        let today = HabitDates.string(now)
+        if selectedDate == today {
+            return daily.filter { $0.isDue && !$0.isCompleted }.count
+        }
+        guard let day = week.first(where: { $0.date == today }) else { return 0 }
+        return max(0, day.total - day.completed)
+    }
+
     /// 头像与昵称，点击编辑个人资料。
     private func profileHeader(_ profile: ProfileStore) -> some View {
         Button(action: editProfile) {
             HStack(spacing: 10) {
-                ProfileAvatar(store: profile, size: 30)
-                VStack(alignment: .leading, spacing: 0) {
+                ProfileAvatar(store: profile, size: 34)
+                    .overlay(Circle().strokeBorder(t.primary.opacity(0.35), lineWidth: 1.5).padding(-2.5))
+                VStack(alignment: .leading, spacing: 1) {
                     Text(profile.displayName).font(.callout.weight(.semibold)).lineLimit(1)
-                    Text(Self.greeting(Date())).font(.caption).foregroundStyle(t.onSurfaceVariant)
+                    Text("\(Self.greeting(Date())) · \(Date().formatted(.dateTime.month().day().weekday()))")
+                        .font(.caption)
+                        .foregroundStyle(t.onSurfaceVariant)
+                        .lineLimit(1)
                 }
                 Spacer(minLength: 0)
+                Image(systemName: "pencil")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(t.onSurfaceVariant)
+                    .opacity(hoveringProfile ? 1 : 0)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(t.onSurface.opacity(hoveringProfile ? 0.08 : 0.04))
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 4)
+            .padding(.bottom, 2)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hoveringProfile = $0 }
         .help("编辑个人资料")
     }
 
@@ -110,5 +164,20 @@ struct Sidebar: View {
             }
         }
         .padding(8)
+    }
+}
+
+extension AppModel.Page {
+    /// 侧栏图标方块的颜色，每页一种。
+    var tint: Color {
+        switch self {
+        case .tasks: .blue
+        case .habits: .green
+        case .capture: .orange
+        case .overview: .indigo
+        case .focus: .red
+        case .archive: .brown
+        case .settings: .gray
+        }
     }
 }

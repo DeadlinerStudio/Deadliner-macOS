@@ -26,7 +26,7 @@ enum FontPreference {
     static let serifKey = "font.serif"
 }
 
-/// 设置（系统分组表单）：WebDAV 同步、同步状态、外观、关于。
+/// 设置：左侧分类列表（彩色图标），右侧是所选分类的系统分组表单（参照「系统设置」）。
 /// 同时用于侧栏中的「设置」页与 ⌘, 打开的设置窗口。
 struct SettingsView: View {
     let sync: SyncController
@@ -36,6 +36,9 @@ struct SettingsView: View {
     var notifications: NotificationController?
     /// 导入备份后刷新各页面。
     var onBackupImported: (() -> Void)?
+    /// 固定显示的分类（截图测试）；为 nil 时使用记住的分类。
+    var pinnedCategory: SettingsCategory?
+    @AppStorage(SettingsCategory.storageKey) private var categoryRaw = SettingsCategory.sync.rawValue
     @AppStorage("appearance") private var appearance = AppearanceMode.system.rawValue
     @AppStorage(ThemeAccent.storageKey) private var accentRaw = ThemeAccent.classic.rawValue
     @AppStorage(GlowStyle.storageKey) private var glowRaw = GlowStyle.immersive.rawValue
@@ -74,20 +77,35 @@ struct SettingsView: View {
     @AppStorage(NotificationSettings.taskDueKey) private var notifyTaskDue = true
     @AppStorage(NotificationSettings.habitsKey) private var notifyHabits = true
 
-    var body: some View {
-        Form {
-            syncSection
-            if !checks.isEmpty { probeSection }
-            statusSection
-            if notifications != nil { notificationSection }
-            if backup != nil { backupSection }
-            menuBarSection
-            taskCardSection
-            appearanceSection
-            aboutSection
+    /// 可用的分类：没有通知控制器或备份时不显示对应分类。
+    private var categories: [SettingsCategory] {
+        SettingsCategory.allCases.filter {
+            switch $0 {
+            case .notifications: notifications != nil
+            case .backup: backup != nil
+            default: true
+            }
         }
-        .formStyle(.grouped)
-        .readableWidth(760)
+    }
+
+    private var category: SettingsCategory {
+        let chosen = pinnedCategory ?? SettingsCategory(rawValue: categoryRaw) ?? .sync
+        return categories.contains(chosen) ? chosen : .sync
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            categoryList
+                .frame(width: 190)
+            Divider()
+            Form {
+                categoryHeader(category)
+                content(for: category)
+            }
+            .formStyle(.grouped)
+            .readableWidth(680)
+            .id(category)
+        }
         .navigationTitle("设置")
         .onAppear { form = sync.settings }
         .alert("云端没有找到同步文件", isPresented: Binding(
@@ -101,6 +119,60 @@ struct SettingsView: View {
             Button("新建同步文件") { sync.confirmCreatingRemoteFile() }
         } message: {
             Text(verbatim: "在 \(sync.remoteFileURL) 没有找到同步文件。\n\n如果手机已经在使用同步，通常是服务器地址不一致（例如少了一层文件夹）。请对照手机「云与同步 → WebDAV」中的地址。\n\n只有这是第一台开始同步的设备时，才选择「新建同步文件」。")
+        }
+    }
+
+    // MARK: - Categories
+
+    private var categoryList: some View {
+        List(selection: Binding(get: { category }, set: { if let value = $0 { categoryRaw = value.rawValue } })) {
+            ForEach(categories) { item in
+                Label {
+                    Text(item.title)
+                } icon: {
+                    IconTile(systemImage: item.systemImage, color: item.tint)
+                }
+                .badge(item == .sync && syncFailed ? Text("!") : nil)
+                .tag(item)
+            }
+        }
+        .listStyle(.sidebar)
+    }
+
+    private var syncFailed: Bool {
+        if case .failed = sync.status { return true }
+        return false
+    }
+
+    /// 分类顶部的大图标、标题与说明。
+    private func categoryHeader(_ item: SettingsCategory) -> some View {
+        Section {
+            HStack(spacing: 12) {
+                IconTile(systemImage: item.systemImage, color: item.tint, size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title).font(.title3.weight(.bold))
+                    Text(item.subtitle).font(.callout).foregroundStyle(t.onSurfaceVariant)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 4)
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    @ViewBuilder
+    private func content(for item: SettingsCategory) -> some View {
+        switch item {
+        case .sync:
+            syncSection
+            if !checks.isEmpty { probeSection }
+            statusSection
+        case .notifications: notificationSection
+        case .backup: backupSection
+        case .menuBar: menuBarSection
+        case .taskCard: taskCardSection
+        case .appearance: appearanceSection
+        case .about: aboutSection
         }
     }
 
@@ -284,6 +356,7 @@ struct SettingsView: View {
                 .font(.caption).foregroundStyle(.secondary)
         }
         Section {
+            TaskStatusPreview()
             ForEach(IndicatorStatus.allCases) { status in
                 HStack {
                     ColorPicker(status.title, selection: Binding(
@@ -321,11 +394,12 @@ struct SettingsView: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 60), spacing: 8)], spacing: 10) {
                     ForEach(ThemeAccent.allCases) { accentSwatch($0) }
                 }
-                Text("「经典」与手机配色一致；其他主题会改变主色与系统控件的颜色；状态色在「状态颜色」中单独设置。")
+                Text("「经典」与手机配色一致；其他主题会改变主色与系统控件的颜色；状态色在「任务卡片 → 状态颜色」中单独设置。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             .padding(.vertical, 4)
+            TaskStatusPreview(statuses: [.undergo, .notStarted])
         }
     }
 

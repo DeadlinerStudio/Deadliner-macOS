@@ -41,7 +41,7 @@ struct DeadlinerApp: App {
                 SettingsView(sync: model.sync, backup: LocalBackup(database: model.container.database), notifications: model.notifications, onBackupImported: { model.refreshAll() })
                     .modifier(AppearancePreferences())
                     .deadlinerTheme()
-                    .frame(width: 640, height: 720)
+                    .frame(width: 800, height: 620)
             }
         }
     }
@@ -175,7 +175,8 @@ struct MainView: View {
     var body: some View {
         NavigationSplitView {
             Sidebar(page: $model.page, syncStatus: model.sync.status, syncNow: { model.sync.syncNow() },
-                    profile: model.profile, editProfile: { editingProfile = true })
+                    profile: model.profile, editProfile: { editingProfile = true },
+                    taskList: model.taskList, habitList: model.habitList)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
         } detail: {
             Group {

@@ -176,11 +176,18 @@ final class TaskListSnapshotTests: XCTestCase {
         let sync = SyncController(database: container.database,
                                   keychain: KeychainPasswordStore(service: "com.deadliner.macos.snapshot.\(UUID().uuidString)"),
                                   defaults: defaults) {}
+        // 只构造、不启动：不注册系统通知，也不读写真实数据。
+        let backup = LocalBackup(database: container.database)
+        let notifications = NotificationController(database: container.database) { _, _ in }
         for (scheme, tokens) in [(ColorScheme.light, DeadlinerPalette.light), (ColorScheme.dark, DeadlinerPalette.dark)] {
-            try capture(
-                SettingsView(sync: sync).environment(\.palette, tokens).environment(\.colorScheme, scheme),
-                size: NSSize(width: 820, height: 900), scheme: scheme, name: "settings-\(scheme == .dark ? "dark" : "light")"
-            )
+            for category in SettingsCategory.allCases {
+                try capture(
+                    SettingsView(sync: sync, backup: backup, notifications: notifications, pinnedCategory: category)
+                        .environment(\.palette, tokens).environment(\.colorScheme, scheme),
+                    size: NSSize(width: 820, height: 720), scheme: scheme,
+                    name: "settings-\(category.rawValue)-\(scheme == .dark ? "dark" : "light")"
+                )
+            }
         }
     }
 
@@ -220,6 +227,14 @@ final class TaskListSnapshotTests: XCTestCase {
         UserDefaults.standard.set(true, forKey: Onboarding.doneKey)
 
         for (scheme, tokens) in [(ColorScheme.light, DeadlinerPalette.light), (ColorScheme.dark, DeadlinerPalette.dark)] {
+            // 分栏里的侧栏在屏幕外窗口中画不出毛玻璃，单独截一张看图标方块与角标。
+            try capture(
+                Sidebar(page: .constant(.habits), syncStatus: .succeeded(now), syncNow: {}, profile: model.profile,
+                        taskList: model.taskList, habitList: model.habitList)
+                    .background(tokens.pageBg)
+                    .environment(\.palette, tokens).environment(\.colorScheme, scheme),
+                size: NSSize(width: 240, height: 560), scheme: scheme, name: "sidebar-\(scheme == .dark ? "dark" : "light")"
+            )
             for page in [AppModel.Page.tasks, .habits, .settings] {
                 model.page = page
                 RunLoop.main.run(until: Date().addingTimeInterval(0.6))
