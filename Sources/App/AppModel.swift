@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import Shared
 
 /// 应用级状态：Core 容器、各页面的订阅层与写入命令、当前页面。
 /// 任何写入完成后调用 `refreshAll()`，让所有页面重新读取 Core。
@@ -44,6 +45,9 @@ final class AppModel {
     @ObservationIgnored private(set) var habitList: HabitListStore!
     @ObservationIgnored private(set) var archive: ArchiveStore!
     @ObservationIgnored private(set) var focus: FocusStore!
+    @ObservationIgnored private(set) var focusTimer: FocusTimerStore!
+    /// 任务 / 习惯正在专注计时、又要改变状态时，等待用户确认。
+    var timerConflict: TimerConflict?
     @ObservationIgnored private(set) var overview: OverviewStore!
     @ObservationIgnored private(set) var capture: CaptureStore!
     @ObservationIgnored private(set) var profile: ProfileStore!
@@ -68,6 +72,20 @@ final class AppModel {
         taskCommands = TaskCommands(database: database) { [unowned self] in refreshAll() }
         categoryCommands = CategoryCommands(database: database) { [unowned self] in refreshAll() }
         habitCommands = HabitCommands(database: database) { [unowned self] in refreshAll() }
+        let alarm: FocusAlarmPort = AppDelegate.isRunningTests ? FocusAlarmPortCompanion.shared.NONE : FocusAlarmScheduler()
+        focusTimer = FocusTimerStore(database: database, alarm: alarm) { [unowned self] in refreshAll() }
+        taskCommands.onTimerConflict = { [unowned self] in timerConflict = $0 }
+        habitCommands.onTimerConflict = { [unowned self] in timerConflict = $0 }
+        habitCommands.isTiming = { [unowned self] in focusTimer.isTiming(habit: $0) }
+    }
+
+    /// 确认冲突：先结束并保存这次专注，再执行原来的操作（Core 在同一事务中完成）。
+    func resolveTimerConflict(_ conflict: TimerConflict, completion: @escaping (String?) -> Void) {
+        if conflict.isHabit {
+            focusTimer.resolveHabitChange(conflict.targetId, delete: conflict.delete, completion: completion)
+        } else {
+            focusTimer.resolveTaskChange(conflict.targetId, action: conflict.action, delete: conflict.delete, completion: completion)
+        }
     }
 
     func start() {
@@ -75,6 +93,7 @@ final class AppModel {
         habitList.start()
         archive.refresh()
         focus.refresh()
+        focusTimer.start()
         sync.start()
     }
 
@@ -120,6 +139,7 @@ final class AppModel {
         taskList.stop()
         habitList.stop()
         overview.stop()
+        focusTimer.stop()
         notifications?.stop()
         container.close()
     }

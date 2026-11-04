@@ -121,15 +121,28 @@ final class HabitCommands {
         return habit.uid
     }
 
+    /// 正在专注计时的习惯不能直接归档或删除（Core 会抛出异常），先交给界面确认结束计时。
+    var isTiming: (String) -> Bool = { _ in false }
+    var onTimerConflict: ((TimerConflict) -> Void)?
+
     func archive(_ uid: String) throws {
+        if handledTimerConflict(uid, delete: false) { return }
         let outcome = database.habits.applyStatusAction(uid: uid, action: HabitStatusAction.archive, occurredAt: CoreClock.now()).outcome
         guard ["APPLIED", "NO_OP"].contains(outcome.name) else { throw HabitCommandError.notFound }
         didChange()
     }
 
     func delete(_ uid: String) {
+        if handledTimerConflict(uid, delete: true) { return }
         database.habits.delete(uid: uid, updatedAt: CoreClock.now())
         didChange()
+    }
+
+    private func handledTimerConflict(_ uid: String, delete: Bool) -> Bool {
+        guard isTiming(uid) else { return false }
+        let title = draft(for: uid)?.name ?? ""
+        onTimerConflict?(TimerConflict(targetId: uid, title: title, isHabit: true, action: nil, delete: delete))
+        return true
     }
 
     // MARK: - Conversions

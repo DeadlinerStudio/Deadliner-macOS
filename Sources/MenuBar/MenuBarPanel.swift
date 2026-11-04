@@ -13,6 +13,19 @@ struct MenuBarPanel: View {
     @AppStorage(MenuBarSettings.upcomingCustomRangeKey) private var upcomingCustomRaw = ""
 
     var body: some View {
+        VStack(spacing: 0) {
+            if let running = model.focusTimer.running {
+                FocusPanelTimerRow(timer: model.focusTimer, running: running) {
+                    close()
+                    NSApp.activate(ignoringOtherApps: true)
+                    (NSApp.delegate as? AppDelegate)?.openFocusWindowAction?()
+                }
+            }
+            summaryContent
+        }
+    }
+
+    private var summaryContent: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             MenuBarPanelContent(
                 summary: model.menuBarSummary(now: context.date),

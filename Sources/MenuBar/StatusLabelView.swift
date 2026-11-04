@@ -79,6 +79,14 @@ struct LiveStatusLabel: View {
     @AppStorage(MenuBarSettings.fieldsKey) private var fieldsRaw = StatusField.encode(StatusField.defaults)
 
     var body: some View {
+        if let running = model.focusTimer.running {
+            FocusStatusLabel(running: running)
+        } else {
+            summaryLabel
+        }
+    }
+
+    private var summaryLabel: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             StatusLabelView(
                 summary: model.menuBarSummary(now: context.date),

@@ -47,6 +47,10 @@ struct TaskEditorSheet: View {
                     Toggle("标星", isOn: $draft.isStarred)
                 }
 
+                if let id = draft.id, draft.isActive {
+                    FocusStartSection(targetId: id, isHabit: false)
+                }
+
                 Section {
                     FlowLayout(spacing: 8) {
                         CategoryChoiceChip(title: "无分类", selected: draft.categoryId == nil) { draft.categoryId = nil }

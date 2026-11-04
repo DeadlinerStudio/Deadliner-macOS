@@ -35,6 +35,17 @@ struct DeadlinerApp: App {
             }
         }
 
+        // 专注计时窗：可以置顶，关闭窗口不会结束计时。
+        Window("专注", id: FocusTimerWindow.id) {
+            if let model = appDelegate.model {
+                FocusTimerWindowView(timer: model.focusTimer)
+                    .modifier(AppearancePreferences())
+                    .deadlinerTheme()
+            }
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.topTrailing)
+
         // ⌘, 打开的系统设置窗口（与侧栏中的「设置」页内容相同）。
         Settings {
             if let model = appDelegate.model {
@@ -55,6 +66,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBar: MenuBarController?
     /// 由主窗口内容在出现时提供，用于在主窗口关闭后从菜单栏重新打开它。
     var openMainWindowAction: (() -> Void)?
+    /// 打开专注计时窗（倒计时结束的通知点开时使用）。
+    var openFocusWindowAction: (() -> Void)?
 
     /// 作为单元测试的宿主运行时为 true。此时不打开正式数据库、不启动同步，
     /// 避免测试读到用户的同步设置而连接真实的 WebDAV。
@@ -83,6 +96,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppearancePreferences.apply(UserDefaults.standard.string(forKey: "appearance") ?? AppearanceMode.system.rawValue)
         menuBar = MenuBarController(model: model) { [weak self] in self?.showMainWindow() }
         let notifications = NotificationController(database: model.container.database) { [weak self, weak model] _, kind in
+            if kind == "FOCUS_TIMER" {
+                NSApp.activate(ignoringOtherApps: true)
+                self?.openFocusWindowAction?()
+                return
+            }
             model?.page = kind.hasPrefix("HABIT") ? .habits : .tasks
             self?.showMainWindow()
         }
@@ -102,6 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         model?.refreshAll()
+        model?.focusTimer.reconcile()
         model?.sync.setForeground(true)
         model?.notifications?.refresh()
     }
@@ -156,6 +175,7 @@ struct RootView: View {
                 .onAppear {
                     model.start()
                     appDelegate.openMainWindowAction = { openWindow(id: "main") }
+                    appDelegate.openFocusWindowAction = { openWindow(id: FocusTimerWindow.id) }
                 }
         } else {
             Text("数据库打开失败：\(appDelegate.startupError ?? "未知错误")")
@@ -169,6 +189,7 @@ struct RootView: View {
 struct MainView: View {
     @Bindable var model: AppModel
     @State private var editingProfile = false
+    @State private var timerConflictError: String?
     @AppStorage(Onboarding.doneKey) private var onboardingDone = false
     @Environment(\.palette) private var t
 
@@ -205,6 +226,7 @@ struct MainView: View {
                 }
             }
             .environment(\.searchFocusRequest, model.searchFocusRequest)
+            .environment(\.focusTimer, model.focusTimer)
         }
         .sheet(isPresented: $editingProfile) {
             ProfileSheet(store: model.profile) { editingProfile = false }.deadlinerTheme()
@@ -215,6 +237,23 @@ struct MainView: View {
                            finish: { onboardingDone = true })
                 .deadlinerTheme()
                 .interactiveDismissDisabled()
+        }
+        .confirmationDialog(
+            model.timerConflict.map { "「\($0.title)」正在专注计时" } ?? "",
+            isPresented: Binding(get: { model.timerConflict != nil }, set: { if !$0 { model.timerConflict = nil } }),
+            presenting: model.timerConflict
+        ) { conflict in
+            Button("结束专注并继续") {
+                model.resolveTimerConflict(conflict) { message in timerConflictError = message }
+            }
+            Button("取消", role: .cancel) {}
+        } message: { _ in
+            Text("会先结束并保存这次专注，再执行刚才的操作。")
+        }
+        .alert("无法完成操作", isPresented: Binding(get: { timerConflictError != nil }, set: { if !$0 { timerConflictError = nil } })) {
+            Button("好") {}
+        } message: {
+            Text(timerConflictError ?? "")
         }
     }
 }

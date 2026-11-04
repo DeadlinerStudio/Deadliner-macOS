@@ -130,6 +130,10 @@ struct HabitEditorSheet: View {
                     Text("提醒会随同步保存到手机；Mac 端的系统通知会在后续版本支持。")
                 }
 
+                if let id = draft.id {
+                    FocusStartSection(targetId: id, isHabit: true)
+                }
+
                 if isEditing {
                     Section {
                         Button("归档习惯") { perform { try commands.archive(draft.id!) } }

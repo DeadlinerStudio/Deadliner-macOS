@@ -17,6 +17,8 @@ struct TaskDraft: Equatable {
     var categoryId: String?
     var isStarred = false
     var subtasks: [Subtask] = []
+    /// 是否进行中（只有进行中的任务可以开始专注）。
+    var isActive = true
 
     var isValid: Bool { !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 }
@@ -32,11 +34,21 @@ enum TaskCommandError: LocalizedError, Equatable {
         switch self {
         case .notFound: "任务不存在，可能已在其他设备上删除"
         case .invalidTransition: "当前状态下不能执行这个操作"
-        case .focusTimerRunning: "这个任务正在专注计时，请先在手机上结束计时"
+        case .focusTimerRunning: "这个任务正在专注计时，请先结束计时"
         case .emptyTitle: "标题不能为空"
         case .noDeadline: "这个任务没有有效的截止时间"
         }
     }
+}
+
+/// 任务或习惯正在专注计时、又要改变状态（完成、放弃、归档、删除）时，由界面确认是否先结束计时。
+struct TimerConflict: Identifiable {
+    let id = UUID()
+    let targetId: String
+    let title: String
+    let isHabit: Bool
+    let action: TaskAction?
+    let delete: Bool
 }
 
 /// 任务的写入命令。所有规则都由 Core 决定：
@@ -46,6 +58,8 @@ enum TaskCommandError: LocalizedError, Equatable {
 final class TaskCommands {
     private let database: DeadlinerDatabase
     private let didChange: () -> Void
+    /// 任务正在专注计时时由界面接手（确认后先结束计时再执行）；没有设置时报错。
+    var onTimerConflict: ((TimerConflict) -> Void)?
 
     init(database: DeadlinerDatabase, didChange: @escaping () -> Void) {
         self.database = database
@@ -66,7 +80,8 @@ final class TaskCommands {
             subtasks: task.subtasks
                 .filter { !$0.isDeleted }
                 .sorted { $0.sortOrder < $1.sortOrder }
-                .map { TaskDraft.Subtask(id: $0.uid, content: $0.content, isCompleted: $0.isCompleted) }
+                .map { TaskDraft.Subtask(id: $0.uid, content: $0.content, isCompleted: $0.isCompleted) },
+            isActive: task.state == TaskState.active
         )
     }
 
@@ -135,7 +150,9 @@ final class TaskCommands {
     }
 
     func delete(_ uid: String) throws {
-        try check(database.tasks.delete(uid: uid, updatedAt: CoreClock.now()).outcome)
+        let outcome = database.tasks.delete(uid: uid, updatedAt: CoreClock.now()).outcome
+        if handledTimerConflict(outcome, uid: uid, action: nil, delete: true) { return }
+        try check(outcome)
         didChange()
     }
 
@@ -147,8 +164,17 @@ final class TaskCommands {
     }
 
     private func apply(_ action: TaskAction, to uid: String) throws {
-        try check(database.tasks.applyAction(uid: uid, action: action, occurredAt: CoreClock.now()).outcome)
+        let outcome = database.tasks.applyAction(uid: uid, action: action, occurredAt: CoreClock.now()).outcome
+        if handledTimerConflict(outcome, uid: uid, action: action, delete: false) { return }
+        try check(outcome)
         didChange()
+    }
+
+    private func handledTimerConflict(_ outcome: TaskActionOutcome, uid: String, action: TaskAction?, delete: Bool) -> Bool {
+        guard outcome.name == "TIMER_REQUIRES_RESOLUTION", let onTimerConflict else { return false }
+        let title = database.tasks.find(uid: uid)?.title ?? ""
+        onTimerConflict(TimerConflict(targetId: uid, title: title, isHabit: false, action: action, delete: delete))
+        return true
     }
 
     private func check(_ outcome: TaskActionOutcome) throws {

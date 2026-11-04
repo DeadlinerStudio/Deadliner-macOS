@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// 专注记录页：今天 / 本周 / 本月 / 累计 四个汇总块，下面按日期分组列出最近的专注。
-/// 计时在手机上进行；Mac 可以调整记录的时长（只能改短）或删除记录，与 Android 专注管理一致。
+/// 在任务或习惯的编辑器中开始专注（计时窗）；这里可以调整记录的时长（只能改短）或删除记录，与 Android 专注管理一致。
 struct FocusView: View {
     let store: FocusStore
     @State private var adjusting: FocusStore.Session?
@@ -17,7 +17,7 @@ struct FocusView: View {
         )
         .topAtmosphere(Color(hex: 0x10B981))
         .navigationTitle("专注")
-        .navigationSubtitle("计时请在手机上进行；右键记录可以调整时长或删除")
+        .navigationSubtitle("在任务或习惯中开始专注；右键记录可以调整时长或删除")
         .onAppear { store.refresh() }
         .sheet(item: $adjusting) { session in
             FocusAdjustSheet(session: session) { seconds in
