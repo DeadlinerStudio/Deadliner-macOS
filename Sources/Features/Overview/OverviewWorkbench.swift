@@ -167,8 +167,10 @@ struct OverviewWorkbench: View {
         if scope == "所选月" { monthControls }
         if scope == "自定义" {
             HStack {
-                DatePicker("开始", selection: $draftStart, in: ...Date(), displayedComponents: .date)
-                DatePicker("结束（含）", selection: $draftEnd, in: ...Date(), displayedComponents: .date)
+                Text("开始").foregroundStyle(.secondary)
+                DeadlinerDatePicker(selection: $draftStart, components: .date, in: .through(Date()))
+                Text("结束（含）").foregroundStyle(.secondary)
+                DeadlinerDatePicker(selection: $draftEnd, components: .date, in: .through(Date()))
                 Button("应用范围", action: loadRange).buttonStyle(.borderedProminent)
             }
         }

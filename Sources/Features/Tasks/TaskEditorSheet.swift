@@ -150,19 +150,16 @@ struct TaskEditorSheet: View {
     }
 }
 
-/// 可选日期：开关打开时显示系统日期时间选择器。
+/// 可选日期：一行标题加 Deadliner 日期选择，面板里可选「不设时间」。
 struct OptionalDateRow: View {
     let title: String
     @Binding var date: Date?
-    var components: DatePickerComponents = [.date, .hourAndMinute]
+    var components: DeadlinerDatePickerMode = .dateAndTime
     var defaultValue: () -> Date
 
     var body: some View {
-        Toggle(title, isOn: Binding(get: { date != nil }, set: { date = $0 ? (date ?? defaultValue()) : nil }))
-        if let value = date {
-            DatePicker(title, selection: Binding(get: { value }, set: { date = $0 }), displayedComponents: components)
-                .labelsHidden()
-                .frame(maxWidth: .infinity, alignment: .trailing)
+        LabeledContent(title) {
+            DeadlinerDatePicker(selection: $date, components: components, defaultValue: defaultValue)
         }
     }
 }

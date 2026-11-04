@@ -79,54 +79,66 @@ struct DateRange: Equatable {
     }()
 }
 
-/// 选择起止日期：左右两个日历，上方快捷选项。
+/// 选择起止日期：左右两个相邻月份的月历，先点起点再点终点；上方快捷选项。
 struct DateRangeSheet: View {
     let initial: DateRange
     var onDone: (DateRange) -> Void
     var onCancel: () -> Void
+    var now: Date = Date()
     @State private var start: Date
     @State private var end: Date
+    @State private var month: Date
+    @State private var pickingEnd = false
+    @Environment(\.palette) private var t
 
-    init(initial: DateRange, onDone: @escaping (DateRange) -> Void, onCancel: @escaping () -> Void) {
+    init(initial: DateRange, now: Date = Date(), onDone: @escaping (DateRange) -> Void, onCancel: @escaping () -> Void) {
         self.initial = initial
+        self.now = now
         self.onDone = onDone
         self.onCancel = onCancel
         _start = State(initialValue: initial.start)
         _end = State(initialValue: initial.end)
+        _month = State(initialValue: DeadlinerDateMath.monthStart(initial.start))
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("选择时间范围").font(.headline)
             HStack(spacing: 8) {
-                ForEach(DateRange.presets(), id: \.title) { preset in
-                    Button(preset.title) {
+                ForEach(DateRange.presets(now: now), id: \.title) { preset in
+                    let selected = preset.range == DateRange(start: start, end: end)
+                    Button {
                         start = preset.range.start
                         end = preset.range.end
+                        month = DeadlinerDateMath.monthStart(start)
+                        pickingEnd = false
+                    } label: {
+                        Text(preset.title)
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(selected ? Color.white : t.primary)
+                            .padding(.horizontal, 10)
+                            .frame(height: 26)
+                            .background(selected ? t.primary : t.primary.opacity(t.isDark ? 0.22 : 0.12), in: Capsule())
+                            .contentShape(Capsule())
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .buttonStyle(.plain)
                 }
             }
             HStack(alignment: .top, spacing: 20) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("开始").font(.caption).foregroundStyle(.secondary)
-                    DatePicker("开始", selection: $start, displayedComponents: .date)
-                        .datePickerStyle(.graphical)
-                        .labelsHidden()
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("结束").font(.caption).foregroundStyle(.secondary)
-                    DatePicker("结束", selection: $end, in: start..., displayedComponents: .date)
-                        .datePickerStyle(.graphical)
-                        .labelsHidden()
-                }
+                grid(month, showsPrevious: true, showsNext: false)
+                grid(DeadlinerDateMath.shiftMonth(month, by: 1), showsPrevious: false, showsNext: true)
             }
+            .frame(width: 580)
             HStack {
                 let range = DateRange(start: start, end: end)
-                Text(verbatim: "\(range.label) · 共 \(range.dayCount) 天")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: "\(range.label) · 共 \(range.dayCount) 天")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Text(pickingEnd ? "再点一天作为结束日期" : "点一天重新选择开始日期")
+                        .font(.caption)
+                        .foregroundStyle(pickingEnd ? t.primary : .secondary)
+                }
                 Spacer()
                 Button("取消", role: .cancel, action: onCancel)
                     .keyboardShortcut(.cancelAction)
@@ -136,6 +148,30 @@ struct DateRangeSheet: View {
             }
         }
         .padding(20)
-        .onChange(of: start) { if end < start { end = start } }
+    }
+
+    private func grid(_ shown: Date, showsPrevious: Bool, showsNext: Bool) -> some View {
+        let calendar = Calendar.current
+        return DeadlinerMonthGrid(
+            month: shown, today: now,
+            isEndpoint: { calendar.isDate($0, inSameDayAs: start) || calendar.isDate($0, inSameDayAs: end) },
+            isInRange: { $0 > start && $0 < end },
+            showsPrevious: showsPrevious, showsNext: showsNext,
+            onPage: { month = DeadlinerDateMath.shiftMonth(month, by: $0) },
+            onPick: pick
+        )
+    }
+
+    /// 第一次点击定起点，第二次定终点；终点早于起点时互换。
+    private func pick(_ day: Date) {
+        let day = Calendar.current.startOfDay(for: day)
+        if pickingEnd {
+            if day < start { end = start; start = day } else { end = day }
+            pickingEnd = false
+        } else {
+            start = day
+            end = day
+            pickingEnd = true
+        }
     }
 }

@@ -78,7 +78,9 @@ struct HabitEditorSheet: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    DatePicker(draft.scheduleKind == .once ? "日期" : "开始日期", selection: $draft.startOn, displayedComponents: .date)
+                    LabeledContent(draft.scheduleKind == .once ? "日期" : "开始日期") {
+                        DeadlinerDatePicker(selection: $draft.startOn, components: .date)
+                    }
                     if draft.scheduleKind != .once {
                         OptionalDateRow(title: "结束日期", date: $draft.endOn, components: .date) {
                             Calendar.current.date(byAdding: .month, value: 1, to: draft.startOn) ?? draft.startOn
@@ -118,7 +120,9 @@ struct HabitEditorSheet: View {
                 Section {
                     Toggle("每天提醒", isOn: $draft.reminderEnabled)
                     if draft.reminderEnabled {
-                        DatePicker("提醒时间", selection: $draft.reminderTime, displayedComponents: .hourAndMinute)
+                        LabeledContent("提醒时间") {
+                            DeadlinerDatePicker(selection: $draft.reminderTime, components: .time)
+                        }
                     }
                 } header: {
                     Text("提醒")
