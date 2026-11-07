@@ -298,9 +298,9 @@ struct FocusPanelTimerRow: View {
                 .disabled(timer.isBusy || !running.canFinish)
         }
         .buttonStyle(.borderless)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(t.primary.opacity(0.10))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(t.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 

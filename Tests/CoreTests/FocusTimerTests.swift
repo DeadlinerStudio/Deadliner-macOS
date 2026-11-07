@@ -152,9 +152,38 @@ final class FocusTimerTests: XCTestCase {
         try await _Concurrency.Task.sleep(nanoseconds: 1_200_000_000)
         try save(FocusRunningView(timer: timer, running: try XCTUnwrap(timer.running)).padding(20), "running", width: 320, height: 380)
         try save(FocusPanelTimerRow(timer: timer, running: try XCTUnwrap(timer.running)) {}, "panel-row", width: 340, height: 56)
+        // 整个菜单栏面板（窗口渲染，按钮等 AppKit 控件也能画出来）：计时行应在面板的玻璃背景之内。
+        let summary = MenuBarSummary.make(tasks: [], habits: [], today: nil, focusTodaySeconds: 0, focusDays: [], now: Date())
+        for scheme in [ColorScheme.light, .dark] {
+            let row = AnyView(FocusPanelTimerRow(timer: timer, running: try XCTUnwrap(timer.running)) {})
+            try windowCapture(MenuBarPanelContent(summary: summary, style: .list, sections: [.tasks], syncStatus: .idle,
+                                                  now: Date(), timerRow: row)
+                .padding(30)
+                .background(LinearGradient(colors: [.purple, .orange], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .environment(\.focusTimer, timer).deadlinerTheme().environment(\.colorScheme, scheme),
+                size: NSSize(width: 420, height: 420), scheme: scheme, name: "focus-panel-\(scheme == .dark ? "dark" : "light")")
+        }
         timer.finish()
         try await waitUntil { self.timer.result != nil }
         try save(FocusResultView(timer: timer, result: try XCTUnwrap(timer.result)) {}.padding(20), "result", width: 320, height: 380)
+    }
+
+    private func windowCapture<V: View>(_ view: V, size: NSSize, scheme: ColorScheme, name: String) throws {
+        let hosting = NSHostingView(rootView: view)
+        hosting.frame = NSRect(origin: .zero, size: size)
+        let window = NSWindow(contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+        window.contentView = hosting
+        window.setFrameOrigin(NSPoint(x: -10_000, y: -10_000))
+        window.orderBack(nil)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        hosting.layoutSubtreeIfNeeded()
+        let rep = try XCTUnwrap(hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds))
+        hosting.cacheDisplay(in: hosting.bounds, to: rep)
+        window.orderOut(nil)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("deadliner-snapshots/\(name).png")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try XCTUnwrap(rep.representation(using: .png, properties: [:])).write(to: url)
     }
 
     func testClockAndMessages() {

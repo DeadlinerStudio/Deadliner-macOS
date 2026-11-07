@@ -101,7 +101,7 @@ final class MenuBarController: NSObject {
             }
         )
         .deadlinerTheme()
-        let hosting = NSHostingView(rootView: content)
+        let hosting = PanelHostingView(rootView: content)
         let size = hosting.fittingSize
         let width = max(320, size.width)
         let height = max(200, size.height)
@@ -124,6 +124,15 @@ final class MenuBarController: NSObject {
         var origin = NSPoint(x: buttonFrame.midX - width / 2, y: buttonFrame.minY - height - 6)
         origin.x = min(max(origin.x, screenFrame.minX + 8), screenFrame.maxX - width - 8)
         panel.setFrameOrigin(origin)
+        // 内容高度变化（例如面板打开时开始或结束专注）时，窗口跟着变，上边缘保持贴着菜单栏。
+        hosting.onFittingSizeChange = { [weak panel] size in
+            guard let panel else { return }
+            var frame = panel.frame
+            let top = frame.maxY
+            frame.size.height = max(200, size.height)
+            frame.origin.y = top - frame.size.height
+            panel.setFrame(frame, display: true)
+        }
         panel.orderFrontRegardless()
         panel.makeKey()
         self.panel = panel
@@ -163,6 +172,23 @@ final class MenuBarController: NSObject {
         insideClickMonitor = nil
         activationObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         activationObservers = []
+    }
+}
+
+/// 面板的 NSHostingView：SwiftUI 内容尺寸变化时通知控制器调整窗口。
+private final class PanelHostingView<Content: View>: NSHostingView<Content> {
+    var onFittingSizeChange: ((CGSize) -> Void)?
+    private var lastHeight: CGFloat = 0
+
+    override func invalidateIntrinsicContentSize() {
+        super.invalidateIntrinsicContentSize()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let size = self.fittingSize
+            guard abs(size.height - self.lastHeight) > 0.5 else { return }
+            self.lastHeight = size.height
+            self.onFittingSizeChange?(size)
+        }
     }
 }
 

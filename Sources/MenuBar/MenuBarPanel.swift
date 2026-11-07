@@ -13,19 +13,6 @@ struct MenuBarPanel: View {
     @AppStorage(MenuBarSettings.upcomingCustomRangeKey) private var upcomingCustomRaw = ""
 
     var body: some View {
-        VStack(spacing: 0) {
-            if let running = model.focusTimer.running {
-                FocusPanelTimerRow(timer: model.focusTimer, running: running) {
-                    close()
-                    NSApp.activate(ignoringOtherApps: true)
-                    (NSApp.delegate as? AppDelegate)?.openFocusWindowAction?()
-                }
-            }
-            summaryContent
-        }
-    }
-
-    private var summaryContent: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             MenuBarPanelContent(
                 summary: model.menuBarSummary(now: context.date),
@@ -37,6 +24,7 @@ struct MenuBarPanel: View {
                 stats: Array(PanelStat.decode(statsRaw).prefix(PanelStat.maxCount)),
                 upcomingRange: UpcomingRange(rawValue: upcomingRaw) ?? .all,
                 upcomingCustomRange: DateRange.decode(upcomingCustomRaw),
+                timerRow: timerRow,
                 actions: .init(
                     completeTask: { id in try? model.taskCommands.toggleComplete(id) },
                     checkHabit: { habit in model.habitList.applyPrimaryAction(habit) },
@@ -48,6 +36,16 @@ struct MenuBarPanel: View {
                 )
             )
         }
+    }
+
+    /// 正在专注时，面板标题下方的计时行（在面板的玻璃背景之内）。
+    private var timerRow: AnyView? {
+        guard let running = model.focusTimer.running else { return nil }
+        return AnyView(FocusPanelTimerRow(timer: model.focusTimer, running: running) {
+            close()
+            NSApp.activate(ignoringOtherApps: true)
+            (NSApp.delegate as? AppDelegate)?.openFocusWindowAction?()
+        })
     }
 }
 
@@ -71,6 +69,8 @@ struct MenuBarPanelContent: View {
     var stats: [PanelStat] = PanelStat.defaults
     var upcomingRange: UpcomingRange = .all
     var upcomingCustomRange: DateRange?
+    /// 专注计时行（由 `MenuBarPanel` 提供，这里不依赖 Core）。
+    var timerRow: AnyView?
     var actions: Actions?
     @State private var hoveredFocusDay: String?
     @Environment(\.palette) private var t
@@ -78,6 +78,11 @@ struct MenuBarPanelContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
+            if let timerRow {
+                timerRow
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+            }
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(sections) { section in
                     sectionView(section)
