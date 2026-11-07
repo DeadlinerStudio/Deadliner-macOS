@@ -150,7 +150,19 @@ struct FocusContent: View {
             }
         } label: {
             Label {
-                Text(session.title.isEmpty ? "（未命名）" : session.title).lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(session.title.isEmpty ? "（未命名）" : session.title).lineLimit(1)
+                    // 超前、提前完成的任务加一个与卡片同色的标签。
+                    if let timing = session.timing, timing == .ahead || timing == .early {
+                        let color = timing.status.solid(t)
+                        Text(timing.title)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(color)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background(color.opacity(0.15), in: Capsule())
+                    }
+                }
             } icon: {
                 Image(systemName: session.isHabit ? "target" : "checklist")
                     .foregroundStyle(session.isHabit ? Color(hex: 0x10B981) : t.primary)

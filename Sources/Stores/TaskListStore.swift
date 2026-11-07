@@ -31,6 +31,8 @@ final class TaskListStore {
     /// 分类筛选：nil 为全部，`uncategorized` 为未分类，其余为分类 ID。
     var categoryFilter: String?
     static let uncategorized = "__uncategorized"
+    /// 完成时机筛选（超前 / 提前 / 按时 / 逾期完成）；nil 为不筛选。
+    var timingFilter: CompletionTiming?
     /// 正在打开的编辑器（新建或编辑）。
     var editor: EditorRequest?
 
@@ -80,6 +82,9 @@ final class TaskListStore {
             filtered = filtered.filter {
                 categoryFilter == Self.uncategorized ? ($0.categoryId.flatMap { categories[$0] } == nil) : $0.categoryId == categoryFilter
             }
+        }
+        if let timingFilter {
+            filtered = filtered.filter { CompletionTiming.of($0) == timingFilter }
         }
         return Self.sorted(filtered, by: sortOrder)
     }

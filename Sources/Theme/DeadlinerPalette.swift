@@ -83,7 +83,7 @@ enum MiuixCard {
 /// 卡片状态色与透明度对应 iOS DDLStatusStyle。
 /// 「未开始」（开始时间还没到）默认与「进行中」同色，可以在设置中单独改。
 enum IndicatorStatus: String, CaseIterable, Identifiable {
-    case notStarted, undergo, near, passed, completed, abandoned
+    case notStarted, undergo, near, passed, completed, completedAhead, completedEarly, abandoned
 
     var id: String { rawValue }
 
@@ -94,6 +94,8 @@ enum IndicatorStatus: String, CaseIterable, Identifiable {
         case .near: "即将到期"
         case .passed: "已逾期"
         case .completed: "已完成"
+        case .completedAhead: "超前完成"
+        case .completedEarly: "提前完成"
         case .abandoned: "已放弃"
         }
     }
@@ -109,7 +111,7 @@ enum IndicatorStatus: String, CaseIterable, Identifiable {
         let role = solid(t)
         let (indicatorAlpha, backgroundAlpha): (Double, Double) = switch self {
         case .notStarted, .undergo: (0.55, 0.18)
-        case .near, .passed, .completed: (0.65, 0.20)
+        case .near, .passed, .completed, .completedAhead, .completedEarly: (0.65, 0.20)
         case .abandoned: (0.65, 0.18)
         }
         return Colors(
@@ -132,6 +134,9 @@ enum IndicatorStatus: String, CaseIterable, Identifiable {
         case .near: t.tertiary
         case .passed: t.error
         case .completed: t.secondary
+        // 超前、提前完成只在 Mac 上显示；默认用与「已完成」相近、但能区分的颜色。
+        case .completedAhead: .cyan
+        case .completedEarly: .teal
         case .abandoned: t.abandoned
         }
     }

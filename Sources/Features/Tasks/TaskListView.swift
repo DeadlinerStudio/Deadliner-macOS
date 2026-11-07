@@ -41,7 +41,7 @@ struct TaskListView: View {
                 onSetupSync: onSetupSync,
                 layout: CardLayout(rawValue: layoutRaw) ?? .single,
                 selection: selection,
-                isFiltered: store.categoryFilter != nil,
+                isFiltered: store.categoryFilter != nil || store.timingFilter != nil,
                 archiveMatches: archiveMatches(store.searchText),
                 onShowArchive: onShowArchive.map { show in { show(store.searchText) } }
             )
@@ -70,11 +70,17 @@ struct TaskListView: View {
                         Text("未分类").tag(Optional(TaskListStore.uncategorized))
                     }
                     .pickerStyle(.inline)
+                    Picker("完成时机", selection: $store.timingFilter) {
+                        Text("全部任务").tag(CompletionTiming?.none)
+                        Divider()
+                        ForEach(CompletionTiming.allCases) { Text($0.title).tag(Optional($0)) }
+                    }
+                    .pickerStyle(.inline)
                 } label: {
-                    Label("分类筛选", systemImage: store.categoryFilter == nil
+                    Label("筛选", systemImage: store.categoryFilter == nil && store.timingFilter == nil
                           ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
                 }
-                .help("按分类筛选")
+                .help("按分类或完成时机筛选")
             }
             ToolbarItem {
                 Button(selection == nil ? "选择" : "完成选择", systemImage: selection == nil ? "checkmark.circle" : "checkmark.circle.fill") {

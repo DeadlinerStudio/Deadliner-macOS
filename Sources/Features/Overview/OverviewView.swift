@@ -984,3 +984,51 @@ struct OverviewTitlesCard: View {
         }
     }
 }
+
+/// 完成时机：所选月份 / 区间内完成的任务里，超前、提前、按时、逾期完成各多少。
+/// 由开始时间、截止时间和完成时间在 Mac 上推算（手机上不显示），颜色与任务卡片相同，可在设置中自定义。
+struct OverviewCompletionTimingCard: View {
+    let counts: [CompletionTiming: Int]
+    var subtitle: String?
+    @Environment(\.palette) private var t
+
+    var body: some View {
+        let total = CompletionTiming.allCases.reduce(0) { $0 + (counts[$1] ?? 0) }
+        OverviewCard(title: "完成时机", subtitle: subtitle ?? "按开始、截止与完成时间推算") {
+            if total == 0 {
+                EmptyChart(text: "这段时间没有可比较的已完成任务")
+            } else {
+                GeometryReader { proxy in
+                    HStack(spacing: 2) {
+                        ForEach(CompletionTiming.allCases) { timing in
+                            let count = counts[timing] ?? 0
+                            if count > 0 {
+                                timing.status.solid(t)
+                                    .frame(width: max(4, proxy.size.width * CGFloat(count) / CGFloat(total) - 2))
+                            }
+                        }
+                    }
+                    .clipShape(Capsule())
+                }
+                .frame(height: 12)
+                ForEach(CompletionTiming.allCases) { timing in
+                    HStack {
+                        Circle().fill(timing.status.solid(t)).frame(width: 9, height: 9)
+                        Text(timing.title)
+                        Spacer()
+                        Text("\(counts[timing] ?? 0)").monospacedDigit().fontWeight(.semibold)
+                        Text(Self.percent(counts[timing] ?? 0, of: total))
+                            .monospacedDigit().foregroundStyle(.secondary).frame(width: 44, alignment: .trailing)
+                    }
+                    .font(.callout)
+                }
+                Text("超前：开始前就完成；提前：比截止日早至少一天。没有截止时间的任务只计超前完成。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    static func percent(_ value: Int, of total: Int) -> String {
+        total > 0 ? "\(Int((Double(value) / Double(total) * 100).rounded()))%" : "–"
+    }
+}

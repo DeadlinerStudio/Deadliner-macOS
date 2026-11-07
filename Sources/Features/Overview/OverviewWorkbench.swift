@@ -106,6 +106,7 @@ struct OverviewWorkbench: View {
                 }
             }
             if let focus = store.focusMonth { OverviewFocusInvestmentCard(focus: focus) }
+            OverviewCompletionTimingCard(counts: store.monthTiming, subtitle: "所选月份完成的任务")
         } else { ProgressView("加载月份…").frame(maxWidth: .infinity, minHeight: 240) }
     }
 
@@ -207,6 +208,7 @@ struct OverviewWorkbench: View {
             }
             OverviewActivityChart(days: review.daily, title: "区间完成活动")
             if let focus = store.focusInterval { OverviewFocusInvestmentCard(focus: focus) }
+            OverviewCompletionTimingCard(counts: store.intervalTiming, subtitle: "所选区间完成的任务")
             Text("完成活动按实际完成日期；待办、逾期、放弃及指标按截止日期。指标中的逾期沿用 Core 未完成口径，含放弃。")
                 .font(.caption).foregroundStyle(.secondary)
             if !review.completedTitles.isEmpty { OverviewTitlesCard(review: review) }

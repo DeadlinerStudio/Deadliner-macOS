@@ -24,6 +24,8 @@ struct TaskItem: Identifiable, Equatable {
     var subtaskTotal: Int
     var createdAt: Date?
     var updatedAt: Date?
+    /// 勾选完成的时刻（取消完成后为 nil，归档后保留）。
+    var completedAt: Date? = nil
 
     /// 已归档的任务按「已完成」显示，放弃后归档的按「已放弃」显示。
     var isCompleted: Bool { state == .completed || state == .archived }
@@ -45,7 +47,8 @@ extension TaskItem {
             subtaskDone: subtasks.filter(\.isCompleted).count,
             subtaskTotal: subtasks.count,
             createdAt: CoreDates.parseInstant(task.createdAt),
-            updatedAt: CoreDates.parseInstant(task.updatedAt)
+            updatedAt: CoreDates.parseInstant(task.updatedAt),
+            completedAt: CoreDates.parseInstant(task.completedAt)
         )
     }
 }

@@ -30,6 +30,8 @@ final class FocusStore {
         var endedAt: Date?
         var durationSeconds: Int
         var completionKind: String
+        /// 所专注的任务的完成时机（任务已完成时）。
+        var timing: CompletionTiming? = nil
     }
 
     private(set) var today = Summary(totalSeconds: 0, sessionCount: 0)
@@ -84,6 +86,8 @@ final class FocusStore {
         thisMonth = Summary(core: overview.thisMonth.summary)
         allTime = Summary(core: overview.allTime)
         recentDays = overview.daily.suffix(7).map { DayPoint(date: $0.startDate, seconds: Int($0.durationSeconds)) }
+        let tasks = Dictionary(database.tasks.list().filter { !$0.isDeleted }.map { ($0.uid, TaskItem(core: $0)) },
+                               uniquingKeysWith: { first, _ in first })
         sessions = database.focusSessions.recent(limit: 300)
             .filter { !$0.isDeleted }
             .map {
@@ -95,7 +99,8 @@ final class FocusStore {
                     startedAt: CoreDates.parseInstant($0.startedAt),
                     endedAt: CoreDates.parseInstant($0.endedAt),
                     durationSeconds: Int($0.durationSeconds),
-                    completionKind: $0.completionKind.name
+                    completionKind: $0.completionKind.name,
+                    timing: $0.boundTarget.kind.name == "TASK" ? tasks[$0.boundTarget.uid].flatMap { CompletionTiming.of($0) } : nil
                 )
             }
     }

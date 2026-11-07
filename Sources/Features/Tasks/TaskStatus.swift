@@ -10,7 +10,7 @@ enum TaskStatus {
 
     static func indicator(_ task: TaskItem, now: Date) -> IndicatorStatus {
         if task.isAbandoned { return .abandoned }
-        if task.isCompleted { return .completed }
+        if task.isCompleted { return CompletionTiming.of(task)?.status.completedVariant ?? .completed }
         if let start = task.startAt, now < start { return .notStarted }
         guard let due = task.dueAt else { return .undergo }
         if now > due { return .passed }
@@ -43,11 +43,21 @@ enum TaskStatus {
 
     private static func fullRemainingText(_ task: TaskItem, now: Date) -> String {
         if task.isAbandoned { return "已放弃" }
-        if task.isCompleted { return "已完成" }
+        if task.isCompleted { return completedText(task) }
         if let start = task.startAt, now < start { return "\(span(start.timeIntervalSince(now)))后开始" }
         guard let due = task.dueAt else { return "" }
         if now > due { return "已逾期 \(span(now.timeIntervalSince(due)))" }
         return span(due.timeIntervalSince(now))
+    }
+
+    /// 已完成任务右上角：超前完成 / 提前 N 天完成 / 逾期完成 / 已完成。
+    static func completedText(_ task: TaskItem) -> String {
+        switch CompletionTiming.of(task) {
+        case .ahead: "超前完成"
+        case .early: CompletionTiming.daysBeforeDue(task).map { "提前 \($0) 天完成" } ?? "提前完成"
+        case .late: "逾期完成"
+        case .onTime, nil: "已完成"
+        }
     }
 
     static func span(_ interval: TimeInterval) -> String {

@@ -155,6 +155,9 @@ final class OverviewStore {
     private(set) var previousMonthDaily: [DayCount] = []
     /// 工作台所选区间的专注。
     private(set) var focusInterval: FocusRange?
+    /// 所选月份 / 区间内完成的任务按完成时机的数量（Mac 端推算，见 `CompletionTiming`）。
+    private(set) var monthTiming: [CompletionTiming: Int] = [:]
+    private(set) var intervalTiming: [CompletionTiming: Int] = [:]
     private(set) var monthLoading = false
     private(set) var previousMonth: MonthReview?
     private(set) var comparisonError: String?
@@ -235,6 +238,9 @@ final class OverviewStore {
     /// 读取某个月（`yyyy-MM-01`）的数据；结果在 `month`，失败时在 `monthError`。
     func loadMonth(_ monthStart: String) {
         if bridge == nil { bridge = IosOverviewStateBridge(database: database) }
+        if let start = OverviewDates.date(monthStart), let end = Calendar.current.date(byAdding: .month, value: 1, to: start) {
+            monthTiming = timing(from: DateRange.isoString(start), to: DateRange.isoString(end))
+        }
         selectedMonth = monthStart
         monthGeneration += 1
         let request = monthGeneration
@@ -325,6 +331,7 @@ final class OverviewStore {
         interval = nil
         // 无效范围交给 Core 的 loadRange 报错；不传给专注统计，避免未捕获的 Kotlin 异常。
         focusInterval = start < end ? focusRange(start: start, endExclusive: end) : nil
+        intervalTiming = timing(from: start, to: end)
         bridge?.loadRange(startDate: start, endDateExclusive: end, onState: { [weak self] state in
             MainActor.assumeIsolated {
                 guard let self, self.intervalGeneration == request else { return }
@@ -372,6 +379,13 @@ final class OverviewStore {
     static func exclusiveHistory(_ h: OverviewHistory) -> History {
         History(completed: Int(h.completed), pending: Int(h.pending + h.overdue),
                 abandoned: Int(h.abandoned), overdue: Int(h.overdue))
+    }
+
+    /// 完成时间在 `[start, end)`（本地日期 `yyyy-MM-dd`）内的任务按完成时机计数。
+    func timing(from start: String, to end: String) -> [CompletionTiming: Int] {
+        guard let from = OverviewDates.date(start), let to = OverviewDates.date(end) else { return [:] }
+        let tasks = database.tasks.list().filter { !$0.isDeleted }.map(TaskItem.init(core:))
+        return CompletionTiming.counts(tasks, from: from, to: to)
     }
 
     func stop() {

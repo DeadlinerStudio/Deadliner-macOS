@@ -84,12 +84,16 @@ struct TaskStatusPreview: View {
         case .undergo: ("阅读论文", nil, day * 4, .active, true)
         case .near: ("提交作业", nil, 3600 * 5, .active, false)
         case .passed: ("整理笔记", nil, -day, .active, false)
-        case .completed: ("购买咖啡豆", nil, day, .completed, false)
+        case .completed: ("购买咖啡豆", nil, 60, .completed, false)
+        case .completedAhead: ("预习下周课程", day * 2, day * 5, .completed, false)
+        case .completedEarly: ("交实验报告", nil, day * 3, .completed, false)
         case .abandoned: ("旧的计划", nil, day, .abandoned, false)
         }
+        // 已完成的示例都在「现在」完成：「已完成」示例在截止前一分钟完成（按时完成）。
         return TaskItem(id: "preview-\(status.rawValue)", title: title, note: status.title,
                         startAt: start.map { now.addingTimeInterval($0) }, dueAt: now.addingTimeInterval(due),
                         state: state, isStarred: starred, categoryId: nil, subtaskDone: 0, subtaskTotal: 0,
-                        createdAt: now.addingTimeInterval(-day * 3), updatedAt: nil)
+                        createdAt: now.addingTimeInterval(-day * 3), updatedAt: nil,
+                        completedAt: state == .completed ? now : nil)
     }
 }
