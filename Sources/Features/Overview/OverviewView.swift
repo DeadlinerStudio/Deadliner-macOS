@@ -454,24 +454,46 @@ struct OverviewHistoryCard: View {
     let history: OverviewStore.History
     var title = "历史统计"
     var subtitle: String?
+    /// 已完成中超前、提前完成各多少（Mac 端推算）；有值时环图和图例里把它们从「已完成」中分出来。
+    var completedTiming: [CompletionTiming: Int]?
     @Environment(\.palette) private var t
+
+    private struct Slice: Identifiable {
+        let id: String
+        let count: Int
+        let color: Color
+        var indented = false
+    }
 
     var body: some View {
         let c = OverviewColors(t: t)
-        let slices: [(String, Int, Color)] = [
-            ("已完成", history.completed, c.completed),
-            ("未完成", history.onTime, c.pending),
-            ("逾期", history.overdue, c.overdue),
-            ("已放弃", history.abandoned, c.abandoned),
+        let ahead = min(history.completed, completedTiming?[.ahead] ?? 0)
+        let early = min(history.completed - ahead, completedTiming?[.early] ?? 0)
+        let splits = completedTiming != nil && ahead + early > 0
+        // 环图：已完成拆成超前、提前与其余；图例：「已完成」下面缩进列出超前、提前。
+        let sectors: [Slice] = (splits ? [
+            Slice(id: "超前完成", count: ahead, color: IndicatorStatus.completedAhead.solid(t)),
+            Slice(id: "提前完成", count: early, color: IndicatorStatus.completedEarly.solid(t)),
+            Slice(id: "已完成", count: history.completed - ahead - early, color: c.completed),
+        ] : [Slice(id: "已完成", count: history.completed, color: c.completed)]) + [
+            Slice(id: "未完成", count: history.onTime, color: c.pending),
+            Slice(id: "逾期", count: history.overdue, color: c.overdue),
+            Slice(id: "已放弃", count: history.abandoned, color: c.abandoned),
         ]
+        let legend: [Slice] = [Slice(id: "已完成", count: history.completed, color: c.completed)]
+            + (splits ? [
+                Slice(id: "超前完成", count: ahead, color: IndicatorStatus.completedAhead.solid(t), indented: true),
+                Slice(id: "提前完成", count: early, color: IndicatorStatus.completedEarly.solid(t), indented: true),
+            ] : [])
+            + sectors.filter { !["已完成", "超前完成", "提前完成"].contains($0.id) }
         OverviewCard(title: title, subtitle: subtitle) {
             if history.total == 0 {
                 EmptyChart()
             } else {
                 HStack(spacing: 24) {
-                    Chart(slices, id: \.0) { slice in
-                        SectorMark(angle: .value("数量", slice.1), innerRadius: .ratio(0.62), angularInset: 1.5)
-                            .foregroundStyle(slice.2)
+                    Chart(sectors) { slice in
+                        SectorMark(angle: .value("数量", slice.count), innerRadius: .ratio(0.62), angularInset: 1.5)
+                            .foregroundStyle(slice.color)
                             .cornerRadius(4)
                     }
                     .chartBackground { _ in
@@ -482,13 +504,16 @@ struct OverviewHistoryCard: View {
                     }
                     .frame(width: 150, height: 150)
                     VStack(alignment: .leading, spacing: 10) {
-                        ForEach(slices, id: \.0) { slice in
+                        ForEach(legend) { slice in
                             HStack(spacing: 8) {
-                                Circle().fill(slice.2).frame(width: 9, height: 9)
-                                Text(slice.0).font(.callout)
+                                Circle().fill(slice.color).frame(width: slice.indented ? 7 : 9, height: slice.indented ? 7 : 9)
+                                Text(slice.id).font(slice.indented ? .caption : .callout)
+                                    .foregroundStyle(slice.indented ? t.onSurfaceVariant : t.onSurface)
                                 Spacer(minLength: 12)
-                                Text("\(slice.1)").font(.callout.monospacedDigit()).foregroundStyle(t.onSurfaceVariant)
+                                Text("\(slice.count)").font((slice.indented ? Font.caption : .callout).monospacedDigit())
+                                    .foregroundStyle(t.onSurfaceVariant)
                             }
+                            .padding(.leading, slice.indented ? 16 : 0)
                         }
                     }
                     .frame(maxWidth: 220)
@@ -677,6 +702,8 @@ struct OverviewRangeDailyCard: View {
 
 struct OverviewMonthlyCard: View {
     let months: [OverviewStore.MonthCount]
+    /// 每月的超前、提前完成数（Mac 端推算，键为月初）。
+    var timings: [String: [CompletionTiming: Int]] = [:]
     @Environment(\.palette) private var t
 
     var body: some View {
@@ -697,9 +724,17 @@ struct OverviewMonthlyCard: View {
                         LineMark(x: .value("月份", label), y: .value("数量", month.overdueCompleted))
                             .foregroundStyle(by: .value("类型", "逾期完成"))
                             .symbol(.circle)
+                        LineMark(x: .value("月份", label), y: .value("数量", timings[month.monthStart]?[.ahead] ?? 0))
+                            .foregroundStyle(by: .value("类型", "超前完成"))
+                            .symbol(.circle)
+                        LineMark(x: .value("月份", label), y: .value("数量", timings[month.monthStart]?[.early] ?? 0))
+                            .foregroundStyle(by: .value("类型", "提前完成"))
+                            .symbol(.circle)
                     }
                 }
-                .chartForegroundStyleScale(["任务总数": c.pending, "已完成": c.completed, "逾期完成": c.overdue])
+                .chartForegroundStyleScale(["任务总数": c.pending, "已完成": c.completed, "逾期完成": c.overdue,
+                                            "超前完成": IndicatorStatus.completedAhead.solid(t),
+                                            "提前完成": IndicatorStatus.completedEarly.solid(t)])
                 .frame(height: 200)
             }
         }
@@ -1030,5 +1065,39 @@ struct OverviewCompletionTimingCard: View {
 
     static func percent(_ value: Int, of total: Int) -> String {
         total > 0 ? "\(Int((Double(value) / Double(total) * 100).rounded()))%" : "–"
+    }
+}
+
+/// 总览「近期趋势」：最近 7 天每天完成数，超前、提前完成在柱内分段显示。
+struct OverviewRecentTimingChart: View {
+    let days: [OverviewStore.DayCount]
+    var timings: [String: [CompletionTiming: Int]] = [:]
+    @Environment(\.palette) private var t
+
+    private struct Segment: Identifiable {
+        let date: String
+        let kind: String
+        let count: Int
+        var id: String { date + kind }
+    }
+
+    var body: some View {
+        let segments = days.flatMap { day -> [Segment] in
+            let ahead = min(day.completed, timings[day.date]?[.ahead] ?? 0)
+            let early = min(day.completed - ahead, timings[day.date]?[.early] ?? 0)
+            return [Segment(date: day.date, kind: "已完成", count: day.completed - ahead - early),
+                    Segment(date: day.date, kind: "提前完成", count: early),
+                    Segment(date: day.date, kind: "超前完成", count: ahead)]
+        }
+        Chart(segments) { segment in
+            BarMark(x: .value("日期", OverviewDates.label(segment.date, "E")), y: .value("完成", segment.count))
+                .foregroundStyle(by: .value("类型", segment.kind))
+                .cornerRadius(3)
+        }
+        .chartForegroundStyleScale(["已完成": OverviewColors(t: t).completed,
+                                    "提前完成": IndicatorStatus.completedEarly.solid(t),
+                                    "超前完成": IndicatorStatus.completedAhead.solid(t)])
+        .chartLegend(position: .bottom, spacing: 6)
+        .frame(height: 120)
     }
 }

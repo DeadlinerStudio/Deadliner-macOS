@@ -158,6 +158,9 @@ final class OverviewStore {
     /// 所选月份 / 区间内完成的任务按完成时机的数量（Mac 端推算，见 `CompletionTiming`）。
     private(set) var monthTiming: [CompletionTiming: Int] = [:]
     private(set) var intervalTiming: [CompletionTiming: Int] = [:]
+    /// 每天 / 每月完成的任务按完成时机的数量（键为 `yyyy-MM-dd` / 月初 `yyyy-MM-01`），用于近期趋势与每月趋势。
+    private(set) var dayTimings: [String: [CompletionTiming: Int]] = [:]
+    private(set) var monthTimings: [String: [CompletionTiming: Int]] = [:]
     private(set) var monthLoading = false
     private(set) var previousMonth: MonthReview?
     private(set) var comparisonError: String?
@@ -194,6 +197,7 @@ final class OverviewStore {
                 self.apply(state)
             }
         }
+        refreshTimings()
         if let selectedMonth { loadMonth(selectedMonth) }
         if let selectedInterval { loadInterval(start: selectedInterval.0, end: selectedInterval.1) }
         loadAnnual()
@@ -379,6 +383,22 @@ final class OverviewStore {
     static func exclusiveHistory(_ h: OverviewHistory) -> History {
         History(completed: Int(h.completed), pending: Int(h.pending + h.overdue),
                 abandoned: Int(h.abandoned), overdue: Int(h.overdue))
+    }
+
+    private func refreshTimings() {
+        let calendar = Calendar.current
+        var days: [String: [CompletionTiming: Int]] = [:]
+        var months: [String: [CompletionTiming: Int]] = [:]
+        for task in database.tasks.list() where !task.isDeleted {
+            let item = TaskItem(core: task)
+            guard let done = item.completedAt, let timing = CompletionTiming.of(item, calendar: calendar) else { continue }
+            let day = calendar.startOfDay(for: done)
+            let month = calendar.date(from: calendar.dateComponents([.year, .month], from: done)) ?? day
+            days[DateRange.isoString(day), default: [:]][timing, default: 0] += 1
+            months[DateRange.isoString(month), default: [:]][timing, default: 0] += 1
+        }
+        dayTimings = days
+        monthTimings = months
     }
 
     /// 完成时间在 `[start, end)`（本地日期 `yyyy-MM-dd`）内的任务按完成时机计数。

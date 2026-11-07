@@ -281,6 +281,29 @@ final class OverviewTests: XCTestCase {
         try png.write(to: output)
     }
 
+    func testCompletionTimingFeedsMonthResultAndTrends() async throws {
+        let commands = TaskCommands(database: container.database) {}
+        var ahead = TaskDraft()
+        ahead.title = "示例超前"
+        ahead.startAt = Date().addingTimeInterval(86400 * 2)
+        ahead.dueAt = Date().addingTimeInterval(86400 * 5)
+        try commands.toggleComplete(try commands.save(ahead))
+        var early = TaskDraft()
+        early.title = "示例提前"
+        early.dueAt = Date().addingTimeInterval(86400 * 3)
+        try commands.toggleComplete(try commands.save(early))
+
+        overview = OverviewStore(database: container.database)
+        overview.refresh()
+        overview.loadMonth(OverviewPeriod.key(OverviewPeriod.month()))
+        try await waitUntil { !self.overview.isLoading && !self.overview.monthLoading }
+        let today = OverviewPeriod.key(Date())
+        XCTAssertEqual(overview.dayTimings[today], [.ahead: 1, .early: 1])
+        XCTAssertEqual(overview.monthTimings[OverviewPeriod.key(OverviewPeriod.month())], [.ahead: 1, .early: 1])
+        XCTAssertEqual(overview.monthTiming, [.ahead: 1, .early: 1])
+        XCTAssertEqual(overview.month?.distribution.completed, 2)
+    }
+
     func testHeatmapWeeksStartOnMonday() {
         // 2026-10-28 是周三：前面空出周一、周二。
         let days = (28...31).map { OverviewStore.DayCount(date: "2026-10-\($0)", completed: 1) }

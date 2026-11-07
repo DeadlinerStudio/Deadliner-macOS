@@ -134,8 +134,8 @@ enum IndicatorStatus: String, CaseIterable, Identifiable {
         case .near: t.tertiary
         case .passed: t.error
         case .completed: t.secondary
-        // 超前、提前完成只在 Mac 上显示；默认用与「已完成」相近、但能区分的颜色。
-        case .completedAhead: .cyan
+        // 超前、提前完成只在 Mac 上显示；默认颜色彼此、以及与「已完成」都能明显区分。
+        case .completedAhead: .indigo
         case .completedEarly: .teal
         case .abandoned: t.abandoned
         }

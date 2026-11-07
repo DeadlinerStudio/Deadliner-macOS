@@ -126,7 +126,8 @@ struct OverviewWorkbench: View {
                 Spacer()
                 Button("任务统计") { tab = .tasks; scope = "所选月"; loadRange() }
             }
-            OverviewHistoryCard(history: detail.distribution, title: "所选月成果", subtitle: "完成活动与当前状态")
+            OverviewHistoryCard(history: detail.distribution, title: "所选月成果", subtitle: "完成活动与当前状态",
+                                completedTiming: store.monthTiming)
         }
         .padding(18).background(t.groupBg, in: RoundedRectangle(cornerRadius: MiuixRadius.card))
     }
@@ -141,10 +142,7 @@ struct OverviewWorkbench: View {
         OverviewCard(title: "近期趋势", subtitle: "最近 7 天") {
             if let error = store.errorMessage { OverviewError(message: error, retry: refresh) }
             else {
-                Chart(store.daily) { day in
-                    BarMark(x: .value("日期", day.date), y: .value("完成", day.completed))
-                        .foregroundStyle(OverviewColors(t: t).completed).cornerRadius(3)
-                }.chartXAxis(.hidden).frame(height: 90)
+                OverviewRecentTimingChart(days: store.daily, timings: store.dayTimings)
                 Button("展开趋势分析") { tab = .trends }
             }
         }
@@ -203,7 +201,8 @@ struct OverviewWorkbench: View {
                 .font(.callout).foregroundStyle(.secondary)
             OverviewMetricsCard(review: review, comparison: "较上一等长周期")
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .top), count: min(columns, 2)), spacing: 18) {
-                OverviewHistoryCard(history: store.intervalDistribution, title: "状态分布", subtitle: "四种状态互斥")
+                OverviewHistoryCard(history: store.intervalDistribution, title: "状态分布", subtitle: "四种状态互斥",
+                                    completedTiming: store.intervalTiming)
                 OverviewPeriodCard(periods: store.intervalPeriods)
             }
             OverviewActivityChart(days: review.daily, title: "区间完成活动")
@@ -341,7 +340,7 @@ struct OverviewTrendWorkspace: View {
                 else if let error = store.annualError { OverviewError(message: error) { store.refresh() } }
                 else { OverviewHeatmapCard(days: store.annual) }
             case "每日完成": OverviewDailyCard(days: store.daily)
-            case "每月趋势": OverviewMonthlyCard(months: store.monthly)
+            case "每月趋势": OverviewMonthlyCard(months: store.monthly, timings: store.monthTimings)
             case "专注时长": OverviewFocusBarsCard(points: store.focusLast30?.daily ?? [], subtitle: "近 30 天", unit: .day)
             default: OverviewWeeklyCard(weeks: store.weekly)
             }
