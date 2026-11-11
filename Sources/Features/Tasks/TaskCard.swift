@@ -73,7 +73,7 @@ struct TaskCard: View {
         .padding(.horizontal, MiuixCard.padX)
         .padding(.vertical, MiuixCard.padY)
         .frame(height: MiuixCard.height)
-        .background { CardBackground(colors: colors, sweepFrom: IndicatorStatus.undergo.colors(t), progress: progress) }
+        .background { CardBackground(colors: colors, sweepFrom: IndicatorStatus.undergo.colors(t), progress: progress, forward: forwardProgress) }
         .overlay(alignment: .bottomTrailing) {
             if let actions, hovering, selected == nil { hoverActions(actions) }
         }
@@ -172,11 +172,13 @@ struct TaskCard: View {
 ///
 /// 进度条不跟随数值做隐式动画：列表刷新（完成、编辑、同步）时卡片可能换位置，隐式动画会把位置变化
 /// 一起动画化，色块就会从旧位置飘过来。改为：列表内容或排列方式一变（`cardSweepKey`），
-/// 就在卡片当前位置重新创建色块，从满格缩回当前值；每分钟的时间流逝只静默更新进度。
+/// 就在卡片当前位置重新创建色块，从满格缩回当前值（正向进度条时从零向右增长到当前值）；
+/// 每分钟的时间流逝只静默更新进度。
 private struct CardBackground: View {
     let colors: IndicatorStatus.Colors
     let sweepFrom: IndicatorStatus.Colors
     let progress: Double
+    var forward = false
     @Environment(\.cardSweepKey) private var sweepKey
 
     var body: some View {
@@ -184,7 +186,7 @@ private struct CardBackground: View {
             colors.base
             colors.overlay
             if progress > 0 {
-                SweepBar(colors: colors, sweepFrom: sweepFrom, progress: progress)
+                SweepBar(colors: colors, sweepFrom: sweepFrom, progress: progress, forward: forward)
                     // 新的 key 就是新的色块：不在新旧位置之间插值，也不做淡入淡出。
                     .id(sweepKey)
                     .transition(.identity)
@@ -194,10 +196,12 @@ private struct CardBackground: View {
 }
 
 /// 一次性的进度色块：出现时为满格（「进行中」的颜色），排好位置后缩回当前进度并过渡到当前状态色。
+/// 正向进度条（随时间增长）时反过来：从零开始向右增长到当前进度。
 private struct SweepBar: View {
     let colors: IndicatorStatus.Colors
     let sweepFrom: IndicatorStatus.Colors
     let progress: Double
+    var forward = false
     @State private var sweeping = true
 
     var body: some View {
@@ -205,7 +209,7 @@ private struct SweepBar: View {
             gradient(sweepFrom)
             gradient(colors).opacity(sweeping ? 0 : 1)
         }
-        .scaleEffect(x: sweeping ? 1 : progress, y: 1, anchor: .leading)
+        .scaleEffect(x: sweeping ? (forward ? 0.001 : 1) : progress, y: 1, anchor: .leading)
         .onAppear {
             // 等卡片在当前位置排好之后再开始动画，否则位置变化会被一起动画化。
             DispatchQueue.main.async {

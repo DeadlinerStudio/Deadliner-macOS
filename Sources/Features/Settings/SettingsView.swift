@@ -65,6 +65,8 @@ struct SettingsView: View {
     @AppStorage(TaskDisplaySettings.forwardProgressKey) private var forwardProgress = false
     @AppStorage(StatusColorSettings.storageKey) private var statusColorsRaw = ""
     @AppStorage(TaskDisplaySettings.detailedRemainingKey) private var detailedRemaining = true
+    @AppStorage(TaskDisplaySettings.hideFinishedKey) private var hideFinished = false
+    @AppStorage(FocusTimerWindow.closeEditorKey) private var closeEditorOnFocus = false
 
     private struct PendingImport: Identifiable {
         let id = UUID()
@@ -76,6 +78,12 @@ struct SettingsView: View {
     @AppStorage(NotificationSettings.taskNearbyKey) private var notifyTaskNearby = true
     @AppStorage(NotificationSettings.taskDueKey) private var notifyTaskDue = true
     @AppStorage(NotificationSettings.habitsKey) private var notifyHabits = true
+    @AppStorage(NotificationSettings.daytimeKey) private var notifyDaytime = true
+    @AppStorage(DailyBriefSettings.enabledKey) private var briefEnabled = false
+    @AppStorage(DailyBriefSettings.onFirstOpenKey) private var briefOnFirstOpen = true
+    @AppStorage(DailyBriefSettings.fixedTimeKey) private var briefFixedTime = false
+    @AppStorage(DailyBriefSettings.fixedMinutesKey) private var briefFixedMinutes = 9 * 60
+    @AppStorage(NotificationSettings.daytimeMinutesKey) private var notifyDaytimeMinutes = 9 * 60
 
     /// 可用的分类：没有通知控制器或备份时不显示对应分类。
     private var categories: [SettingsCategory] {
@@ -167,7 +175,9 @@ struct SettingsView: View {
             syncSection
             if !checks.isEmpty { probeSection }
             statusSection
-        case .notifications: notificationSection
+        case .notifications:
+            notificationSection
+            dailyBriefSection
         case .backup: backupSection
         case .menuBar: menuBarSection
         case .taskCard: taskCardSection
@@ -354,6 +364,14 @@ struct SettingsView: View {
             Toggle("剩余时间详细显示", isOn: $detailedRemaining)
             Text("开启时显示「2天 3小时」，关闭时只显示「2天」。")
                 .font(.caption).foregroundStyle(.secondary)
+            Toggle("任务页不显示已完成和已放弃的任务", isOn: $hideFinished)
+            Text("只影响这台 Mac 的任务页；按「完成时机」筛选时仍会显示。手机和同步数据不变。")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        Section("专注") {
+            Toggle("开始专注后关闭编辑窗口", isOn: $closeEditorOnFocus)
+            Text("在任务或习惯的编辑窗口中点「开始专注」后自动关闭编辑窗口，只留下计时窗。编辑窗口中未保存的修改不会保存。")
+                .font(.caption).foregroundStyle(.secondary)
         }
         Section {
             TaskStatusPreview()
@@ -403,6 +421,32 @@ struct SettingsView: View {
         }
     }
 
+    private var dailyBriefSection: some View {
+        Section {
+            Toggle("每日概览弹窗", isOn: $briefEnabled)
+            if briefEnabled {
+                Toggle("每天第一次打开电脑时弹出", isOn: $briefOnFirstOpen)
+                Toggle("每天固定时间弹出", isOn: $briefFixedTime)
+                if briefFixedTime {
+                    LabeledContent("弹出时间") {
+                        DeadlinerDatePicker(selection: Binding(
+                            get: { Calendar.current.date(bySettingHour: briefFixedMinutes / 60, minute: briefFixedMinutes % 60,
+                                                         second: 0, of: Date()) ?? Date() },
+                            set: {
+                                let c = Calendar.current.dateComponents([.hour, .minute], from: $0)
+                                briefFixedMinutes = (c.hour ?? 9) * 60 + (c.minute ?? 0)
+                            }
+                        ), components: .time)
+                    }
+                }
+            }
+        } header: {
+            Text("每日概览")
+        } footer: {
+            Text("在所有窗口最上层显示正在进行的任务和今天的习惯（分两组）。「第一次打开电脑」指每天第一次启动、唤醒或解锁这台 Mac，需要 Deadliner 正在运行或已设为开机自启。")
+        }
+    }
+
     private var notificationSection: some View {
         Section {
             Toggle("启用通知", isOn: Binding(get: { notificationsEnabled }, set: { setNotifications($0) }))
@@ -410,6 +454,19 @@ struct SettingsView: View {
                 Toggle("任务到期前一天提醒", isOn: $notifyTaskNearby)
                 Toggle("任务到期时提醒", isOn: $notifyTaskDue)
                 Toggle("习惯打卡提醒", isOn: $notifyHabits)
+                Toggle("23:59 截止的任务改在白天提醒", isOn: $notifyDaytime)
+                if notifyDaytime {
+                    LabeledContent("白天提醒时间") {
+                        DeadlinerDatePicker(selection: Binding(
+                            get: { Calendar.current.date(bySettingHour: notifyDaytimeMinutes / 60, minute: notifyDaytimeMinutes % 60,
+                                                         second: 0, of: Date()) ?? Date() },
+                            set: {
+                                let c = Calendar.current.dateComponents([.hour, .minute], from: $0)
+                                notifyDaytimeMinutes = (c.hour ?? 9) * 60 + (c.minute ?? 0)
+                            }
+                        ), components: .time)
+                    }
+                }
             }
             if notificationsDenied {
                 HStack {
@@ -423,11 +480,13 @@ struct SettingsView: View {
         } header: {
             Text("通知")
         } footer: {
-            Text("提醒时间与手机一致，由 Core 计算；习惯在设定的提醒时间通知。")
+            Text("提醒时间由 Core 计算，与手机一致；习惯在设定的提醒时间通知。23:59 截止的任务原本在午夜前后提醒（当天截止和提前一天），开启后改在截止当天和前一天的白天时间提醒。同一时刻的多条任务提醒会合并成一条。")
         }
         .onChange(of: notifyTaskNearby) { notifications?.refresh(force: true) }
         .onChange(of: notifyTaskDue) { notifications?.refresh(force: true) }
         .onChange(of: notifyHabits) { notifications?.refresh(force: true) }
+        .onChange(of: notifyDaytime) { notifications?.refresh(force: true) }
+        .onChange(of: notifyDaytimeMinutes) { notifications?.refresh(force: true) }
         .task {
             if notificationsEnabled { notificationsDenied = await NotificationController.authorizationStatus() == .denied }
         }

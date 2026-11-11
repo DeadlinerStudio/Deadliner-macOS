@@ -46,6 +46,17 @@ struct DeadlinerApp: App {
         .windowResizability(.contentSize)
         .defaultPosition(.topTrailing)
 
+        // 每日概览弹窗（设置中开启）。
+        Window("今日概览", id: DailyBriefSettings.windowId) {
+            if let model = appDelegate.model {
+                DailyBriefView(model: model)
+                    .modifier(AppearancePreferences())
+                    .deadlinerTheme()
+            }
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+
         // ⌘, 打开的系统设置窗口（与侧栏中的「设置」页内容相同）。
         Settings {
             if let model = appDelegate.model {
@@ -68,6 +79,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var openMainWindowAction: (() -> Void)?
     /// 打开专注计时窗（倒计时结束的通知点开时使用）。
     var openFocusWindowAction: (() -> Void)?
+    /// 打开每日概览弹窗。
+    var openDailyBriefAction: (() -> Void)?
+    private var dailyBrief: DailyBriefController?
 
     /// 作为单元测试的宿主运行时为 true。此时不打开正式数据库、不启动同步，
     /// 避免测试读到用户的同步设置而连接真实的 WebDAV。
@@ -106,6 +120,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         notifications.start()
         model.notifications = notifications
+        // 主窗口内容出现后才有打开窗口的入口，稍后再开始判断。
+        DispatchQueue.main.async { [weak self] in
+            let brief = DailyBriefController { [weak self] in
+                guard let open = self?.openDailyBriefAction else { return false }
+                NSApp.activate(ignoringOtherApps: true)
+                open()
+                return true
+            }
+            brief.start()
+            self?.dailyBrief = brief
+        }
     }
 
     /// 激活应用并显示主窗口；主窗口已关闭时重新打开。
@@ -130,6 +155,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        dailyBrief?.stop()
         menuBar?.tearDown()
         model?.stop()
     }
@@ -176,6 +202,7 @@ struct RootView: View {
                     model.start()
                     appDelegate.openMainWindowAction = { openWindow(id: "main") }
                     appDelegate.openFocusWindowAction = { openWindow(id: FocusTimerWindow.id) }
+                    appDelegate.openDailyBriefAction = { openWindow(id: DailyBriefSettings.windowId) }
                 }
         } else {
             Text("数据库打开失败：\(appDelegate.startupError ?? "未知错误")")

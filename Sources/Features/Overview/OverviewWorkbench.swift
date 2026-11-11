@@ -93,20 +93,20 @@ struct OverviewWorkbench: View {
         } else if let detail = store.month, !store.monthLoading {
             if columns == 3 {
                 HStack(alignment: .top, spacing: 18) {
-                    OverviewActivityCalendar(review: detail.review).frame(maxWidth: .infinity)
+                    OverviewActivityCalendar(review: detail.review, focus: monthFocus).frame(maxWidth: .infinity)
                     VStack(spacing: 18) { result(detail); preview }.frame(maxWidth: .infinity)
                     reviewPreview.frame(maxWidth: .infinity)
                 }
             } else {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .top), count: columns), alignment: .leading, spacing: 18) {
-                    OverviewActivityCalendar(review: detail.review)
+                    OverviewActivityCalendar(review: detail.review, focus: monthFocus)
                     result(detail)
                     preview
                     reviewPreview
                 }
             }
             if let focus = store.focusMonth { OverviewFocusInvestmentCard(focus: focus) }
-            OverviewCompletionTimingCard(counts: store.monthTiming, subtitle: "所选月份完成的任务")
+            OverviewCompletionTimingCard(counts: store.monthTiming, subtitle: "\(Self.monthPhrase(selectedMonth))内完成的任务")
         } else { ProgressView("加载月份…").frame(maxWidth: .infinity, minHeight: 240) }
     }
 
@@ -205,13 +205,41 @@ struct OverviewWorkbench: View {
                                     completedTiming: store.intervalTiming)
                 OverviewPeriodCard(periods: store.intervalPeriods)
             }
-            OverviewActivityChart(days: review.daily, title: "区间完成活动")
+            OverviewActivityChart(days: review.daily, title: "\(rangePhrase)完成活动")
             if let focus = store.focusInterval { OverviewFocusInvestmentCard(focus: focus) }
-            OverviewCompletionTimingCard(counts: store.intervalTiming, subtitle: "所选区间完成的任务")
+            OverviewCompletionTimingCard(counts: store.intervalTiming, subtitle: "\(rangePhrase)内完成的任务")
             Text("完成活动按实际完成日期；待办、逾期、放弃及指标按截止日期。指标中的逾期沿用 Core 未完成口径，含放弃。")
                 .font(.caption).foregroundStyle(.secondary)
-            if !review.completedTitles.isEmpty { OverviewTitlesCard(review: review) }
+            if !review.completedTitles.isEmpty { OverviewTitlesCard(review: review, title: "\(rangePhrase)内完成的任务") }
         }
+    }
+
+    /// 当前范围的具体说法：「11月」「近30天」「2026年」「5月1日–6月2日」，用在卡片标题里代替「所选区间」。
+    private var rangePhrase: String {
+        let calendar = OverviewPeriod.calendar
+        switch scope {
+        case "所选月": return Self.monthPhrase(selectedMonth)
+        case "近30天": return "近30天"
+        case "本年": return "\(calendar.component(.year, from: Date()))年"
+        case "自定义":
+            let thisYear = calendar.component(.year, from: Date())
+            let sameYear = calendar.component(.year, from: start) == thisYear && calendar.component(.year, from: end) == thisYear
+            let format = sameYear ? "M月d日" : "yyyy年M月d日"
+            return "\(OverviewDates.label(OverviewPeriod.key(start), format))–\(OverviewDates.label(OverviewPeriod.key(end), format))"
+        default: return "全部时间"
+        }
+    }
+
+    /// 「11月」；不是今年时带年份。
+    static func monthPhrase(_ month: Date) -> String {
+        let calendar = OverviewPeriod.calendar
+        let format = calendar.component(.year, from: month) == calendar.component(.year, from: Date()) ? "M月" : "yyyy年M月"
+        return OverviewDates.label(OverviewPeriod.key(month), format)
+    }
+
+    /// 所选月份每天的专注秒数。
+    private var monthFocus: [String: Int] {
+        Dictionary((store.focusMonth?.daily ?? []).map { ($0.start, $0.seconds) }, uniquingKeysWith: +)
     }
 
     private var taskOrder: [String] {
@@ -261,7 +289,8 @@ struct OverviewError: View {
 
 struct OverviewActivityCalendar: View {
     let review: OverviewStore.MonthReview
-    @State private var selected: OverviewStore.DayCount?
+    /// 当月每天的专注秒数（键为 `yyyy-MM-dd`），用于悬停提示。
+    var focus: [String: Int] = [:]
     @Environment(\.palette) private var t
     var body: some View {
         OverviewCard(title: "月度活动", subtitle: "每日完成任务") {
@@ -272,22 +301,19 @@ struct OverviewActivityCalendar: View {
                     ForEach(0..<7, id: \.self) { weekday in
                         if let day = weeks[index][weekday] {
                             let future = day.date > OverviewPeriod.key(Date())
-                            Button { selected = day } label: {
-                                Text(OverviewDates.label(day.date, "d"))
-                                    .font(.callout.monospacedDigit()).foregroundStyle(t.onSurface).frame(maxWidth: .infinity).frame(height: 34)
-                                    .background(t.primary.opacity(day.completed == 0 ? 0.04 : min(0.8, 0.18 + Double(day.completed) * 0.09)), in: RoundedRectangle(cornerRadius: 7))
-                                    .overlay(RoundedRectangle(cornerRadius: 7).stroke(day.date == OverviewPeriod.key(Date()) ? t.primary : .clear, lineWidth: 1.5))
-                            }.buttonStyle(.plain).disabled(future).opacity(future ? 0.55 : 1)
-                                .help("\(day.date)：完成 \(day.completed) 项")
-                                .accessibilityLabel("\(day.date)，完成 \(day.completed) 项")
+                            // 悬停显示当日完成任务数与专注时长（与活跃热力图相同）。
+                            Text(OverviewDates.label(day.date, "d"))
+                                .font(.callout.monospacedDigit()).foregroundStyle(t.onSurface).frame(maxWidth: .infinity).frame(height: 34)
+                                .background(t.primary.opacity(day.completed == 0 ? 0.04 : min(0.8, 0.18 + Double(day.completed) * 0.09)), in: RoundedRectangle(cornerRadius: 7))
+                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(day.date == OverviewPeriod.key(Date()) ? t.primary : .clear, lineWidth: 1.5))
+                                .opacity(future ? 0.55 : 1)
+                                .help(future ? "" : OverviewDates.dayTooltip(day, focusSeconds: focus[day.date] ?? 0))
+                                .accessibilityLabel(OverviewDates.dayTooltip(day, focusSeconds: focus[day.date] ?? 0))
                         } else { Color.clear.frame(maxWidth: .infinity).frame(height: 34) }
                     }
                 }
             }
-            if let selected {
-                Text("\(selected.date) · 完成 \(selected.completed) 项").font(.callout).foregroundStyle(t.primary)
-            } else { Text("选择日期查看当日活动").font(.caption).foregroundStyle(.secondary) }
-        }.onChange(of: review.monthStart) { selected = nil }
+        }
     }
 }
 
@@ -338,7 +364,7 @@ struct OverviewTrendWorkspace: View {
             case "年度贡献":
                 if store.annualLoading { ProgressView("加载年度贡献…") }
                 else if let error = store.annualError { OverviewError(message: error) { store.refresh() } }
-                else { OverviewHeatmapCard(days: store.annual) }
+                else { OverviewHeatmapCard(days: store.annual, focus: store.annualFocus) }
             case "每日完成": OverviewDailyCard(days: store.daily)
             case "每月趋势": OverviewMonthlyCard(months: store.monthly, timings: store.monthTimings)
             case "专注时长": OverviewFocusBarsCard(points: store.focusLast30?.daily ?? [], subtitle: "近 30 天", unit: .day)

@@ -24,7 +24,7 @@ struct ArchiveView: View {
         )
         .topAtmosphere(t.secondary)
         .navigationTitle("归档")
-        .navigationSubtitle("\(store.tasks.count) 个任务 · \(store.habits.count) 个习惯")
+        .navigationSubtitle("近 \(ArchiveStore.visibleDays) 天归档的 \(store.tasks.count) 个任务 · \(store.habits.count) 个习惯")
         .searchable(text: $store.searchText, placement: .toolbar, prompt: "搜索归档")
         .searchFocusOnRequest()
         .onAppear { store.refresh() }

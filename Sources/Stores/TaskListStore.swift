@@ -33,6 +33,8 @@ final class TaskListStore {
     static let uncategorized = "__uncategorized"
     /// 完成时机筛选（超前 / 提前 / 按时 / 逾期完成）；nil 为不筛选。
     var timingFilter: CompletionTiming?
+    /// 设置中的「任务页不显示已完成和已放弃的任务」。
+    var hideFinished = UserDefaults.standard.bool(forKey: TaskDisplaySettings.hideFinishedKey)
     /// 正在打开的编辑器（新建或编辑）。
     var editor: EditorRequest?
 
@@ -85,6 +87,9 @@ final class TaskListStore {
         }
         if let timingFilter {
             filtered = filtered.filter { CompletionTiming.of($0) == timingFilter }
+        } else if hideFinished {
+            // 按完成时机筛选时仍显示已完成的任务，否则筛选结果总是空的。
+            filtered = filtered.filter { !$0.isCompleted && !$0.isAbandoned }
         }
         return Self.sorted(filtered, by: sortOrder)
     }

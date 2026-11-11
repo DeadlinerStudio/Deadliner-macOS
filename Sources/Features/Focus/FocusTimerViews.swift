@@ -10,6 +10,8 @@ struct FocusStartSection: View {
     @Environment(\.openWindow) private var openWindow
     @AppStorage(FocusTimerWindow.countdownKey) private var countdown = true
     @AppStorage(FocusTimerWindow.minutesKey) private var minutes = 25
+    @AppStorage(FocusTimerWindow.closeEditorKey) private var closeEditor = false
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         if let timer {
@@ -43,6 +45,7 @@ struct FocusStartSection: View {
                         if isHabit { timer.startHabit(targetId, minutes: countdown ? minutes : nil) }
                         else { timer.startTask(targetId, minutes: countdown ? minutes : nil) }
                         openWindow(id: FocusTimerWindow.id)
+                        if closeEditor { dismiss() }
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(timer.isBusy)
@@ -93,6 +96,8 @@ enum FocusTimerWindow {
     static let countdownKey = "focus.countdown"
     static let minutesKey = "focus.minutes"
     static let pinnedKey = "focus.pinned"
+    /// 开始专注后关闭任务 / 习惯编辑窗口（未保存的修改不会保存）。
+    static let closeEditorKey = "focus.closeEditorOnStart"
 }
 
 struct FocusTimerWindowView: View {
@@ -305,7 +310,7 @@ struct FocusPanelTimerRow: View {
 }
 
 /// 把所在窗口设为浮动（置顶）或普通层级。
-private struct WindowLevelSetter: NSViewRepresentable {
+struct WindowLevelSetter: NSViewRepresentable {
     let floating: Bool
 
     func makeNSView(context: Context) -> NSView { NSView() }

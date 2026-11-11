@@ -165,6 +165,8 @@ final class OverviewStore {
     private(set) var previousMonth: MonthReview?
     private(set) var comparisonError: String?
     private(set) var annual: [DayCount] = []
+    /// 今年每天的专注秒数（键为 `yyyy-MM-dd`），用于热力图悬停提示。
+    private(set) var annualFocus: [String: Int] = [:]
     private(set) var annualError: String?
     private(set) var annualLoading = false
     private(set) var interval: MonthReview?
@@ -364,6 +366,8 @@ final class OverviewStore {
         let now = Date()
         let start = OverviewPeriod.calendar.date(from: OverviewPeriod.calendar.dateComponents([.year], from: now))!
         let end = OverviewPeriod.calendar.date(byAdding: .day, value: 1, to: now)!
+        annualFocus = Dictionary(focusRange(start: OverviewPeriod.key(start), endExclusive: OverviewPeriod.key(end)).daily
+            .map { ($0.start, $0.seconds) }, uniquingKeysWith: +)
         bridge?.loadRange(startDate: OverviewPeriod.key(start), endDateExclusive: OverviewPeriod.key(end), onState: { [weak self] state in
             MainActor.assumeIsolated {
                 guard let self, self.annualGeneration == request else { return }

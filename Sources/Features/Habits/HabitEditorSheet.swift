@@ -127,7 +127,7 @@ struct HabitEditorSheet: View {
                 } header: {
                     Text("提醒")
                 } footer: {
-                    Text("提醒会随同步保存到手机；Mac 端的系统通知会在后续版本支持。")
+                    Text("提醒会随同步保存到手机；开启「设置 → 通知 → 习惯打卡提醒」后，Mac 也会在提醒时间发送系统通知。")
                 }
 
                 if let id = draft.id {

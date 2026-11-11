@@ -43,10 +43,16 @@ final class ArchiveStore {
         self.didChange = didChange
     }
 
-    func refresh() {
+    /// Mac 只显示最近这么多天内归档的任务；更早的仍保存在数据里并随同步保留（手机上照常显示），不会删除。
+    static let visibleDays = 30
+
+    func refresh(now: Date = Date()) {
+        let cutoff = now.addingTimeInterval(-Double(Self.visibleDays) * 86400)
         tasks = database.tasks.list()
             .filter { !$0.isDeleted && TaskStateMachine.shared.isVisibleInArchive(state: $0.state) }
             .map(TaskItem.init(core:))
+            // 归档时间以最后修改时间为准（归档是最后一次状态变化）。
+            .filter { ($0.updatedAt ?? $0.completedAt ?? .distantPast) >= cutoff }
             .sorted { ($0.updatedAt ?? .distantPast) > ($1.updatedAt ?? .distantPast) }
         habits = database.habits.list()
             .filter { !$0.isDeleted && $0.status.name == "ARCHIVED" }

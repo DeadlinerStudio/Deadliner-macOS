@@ -9,6 +9,16 @@ enum NotificationSettings {
     static let taskNearbyKey = "notifications.taskNearby"
     static let taskDueKey = "notifications.taskDue"
     static let habitsKey = "notifications.habits"
+    /// 23:59 截止的任务改在白天提醒（默认开启），以及白天提醒的时间（分钟，默认 9:00）。
+    static let daytimeKey = "notifications.daytimeForEndOfDay"
+    static let daytimeMinutesKey = "notifications.daytimeMinutes"
+
+    static func shaping(_ defaults: UserDefaults = .standard) -> NotificationShaping.Options {
+        NotificationShaping.Options(
+            daytime: defaults.object(forKey: daytimeKey) as? Bool ?? true,
+            daytimeMinutes: defaults.object(forKey: daytimeMinutesKey) as? Int ?? 9 * 60
+        )
+    }
 
     static func policy(_ defaults: UserDefaults = .standard) -> NotificationPolicy {
         let enabled = defaults.bool(forKey: enabledKey)
@@ -34,6 +44,60 @@ struct PlannedNotification: Equatable {
     let title: String
     let body: String
     let fireAt: Date
+    /// 任务的截止时间（习惯为 nil），用于把 23:59 截止的提醒挪到白天。
+    var dueAt: Date? = nil
+}
+
+/// Mac 端对 Core 提醒的整理（不改 Core 的计算）：
+/// - 23:59 截止的任务：Core 在截止时和提前一天各提醒一次，都落在午夜前后。开启后改在截止当天 / 前一天的白天提醒；
+/// - 同一时刻、同一种类的多条任务提醒合并成一条，避免一次弹出一串。
+enum NotificationShaping {
+    struct Options: Equatable {
+        var daytime = true
+        var daytimeMinutes = 9 * 60
+    }
+
+    static func apply(_ items: [PlannedNotification], options: Options, now: Date = Date(),
+                      calendar: Calendar = .current) -> [PlannedNotification] {
+        var shaped: [PlannedNotification] = []
+        for var item in items {
+            if options.daytime, item.kind.hasPrefix("TASK_"), let due = item.dueAt, isEndOfDay(due, calendar) {
+                let dueDay = calendar.startOfDay(for: due)
+                let day = item.kind == "TASK_NEARBY" ? calendar.date(byAdding: .day, value: -1, to: dueDay)! : dueDay
+                let fire = calendar.date(byAdding: .minute, value: options.daytimeMinutes, to: day)!
+                // 白天的时间已经过了：不再补发（否则每次刷新都会立刻弹出）。
+                guard fire > now else { continue }
+                item = PlannedNotification(id: item.id, ownerUid: item.ownerUid, kind: item.kind, title: item.title,
+                                           body: item.kind == "TASK_NEARBY" ? "明天 23:59 截止" : "今天 23:59 截止",
+                                           fireAt: fire, dueAt: item.dueAt)
+            }
+            shaped.append(item)
+        }
+        // 合并：任务提醒按（种类, 分钟）分组，多于一条时合成一条。
+        var result: [PlannedNotification] = []
+        let groups = Dictionary(grouping: shaped) { item -> String in
+            item.kind.hasPrefix("TASK_") ? "\(item.kind)|\(Int(item.fireAt.timeIntervalSince1970 / 60))" : item.id
+        }
+        for (key, group) in groups {
+            guard group.count > 1, let first = group.first else { result += group; continue }
+            let titles = group.map(\.title).sorted()
+            let names = titles.prefix(5).joined(separator: "、") + (titles.count > 5 ? " 等" : "")
+            let endOfDay = group.allSatisfy { $0.body.contains("23:59") }
+            let title: String = switch first.kind {
+            case "TASK_NEARBY": endOfDay ? "明天有 \(group.count) 项任务截止" : "\(group.count) 项任务还有 1 天到期"
+            default: endOfDay ? "今天有 \(group.count) 项任务截止" : "\(group.count) 项任务已到截止时间"
+            }
+            result.append(PlannedNotification(id: "deadliner.group.\(key)", ownerUid: "", kind: first.kind, title: title,
+                                              body: names, fireAt: first.fireAt))
+        }
+        return result.sorted { $0.fireAt < $1.fireAt }
+    }
+
+    /// 截止时间是当天 23:59（全天截止）。
+    static func isEndOfDay(_ date: Date, _ calendar: Calendar) -> Bool {
+        let c = calendar.dateComponents([.hour, .minute], from: date)
+        return c.hour == 23 && c.minute == 59
+    }
 }
 
 /// 通知的去处：正式应用是系统通知中心，测试中是内存记录。
@@ -47,10 +111,13 @@ protocol NotificationSink: AnyObject {
 final class MacNotificationGateway: NSObject, NotificationGateway {
     private let sink: NotificationSink
     private let habitsEnabled: () -> Bool
+    private let shaping: () -> NotificationShaping.Options
 
-    init(sink: NotificationSink, habitsEnabled: @escaping () -> Bool = { NotificationSettings.habitsEnabled() }) {
+    init(sink: NotificationSink, habitsEnabled: @escaping () -> Bool = { NotificationSettings.habitsEnabled() },
+         shaping: @escaping () -> NotificationShaping.Options = { NotificationSettings.shaping() }) {
         self.sink = sink
         self.habitsEnabled = habitsEnabled
+        self.shaping = shaping
     }
 
     func applyNotificationMetadata(metadata: NotificationMetadata) {
@@ -60,9 +127,9 @@ final class MacNotificationGateway: NSObject, NotificationGateway {
             if !includeHabits && kind.hasPrefix("HABIT") { return nil }
             guard let fireAt = CoreDates.parseInstant(entry.triggerAt), let body = Self.body(kind: kind, dueAt: entry.dueAt) else { return nil }
             return PlannedNotification(id: "deadliner.\(entry.key)", ownerUid: entry.ownerUid, kind: kind,
-                                       title: entry.title, body: body, fireAt: fireAt)
+                                       title: entry.title, body: body, fireAt: fireAt, dueAt: CoreDates.parseInstant(entry.dueAt))
         }
-        sink.replaceAll(with: planned)
+        sink.replaceAll(with: NotificationShaping.apply(planned, options: shaping()))
     }
 
     func cancelAll() { sink.removeAll() }

@@ -94,8 +94,8 @@ struct FocusContent: View {
             Section {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 10)], spacing: 10) {
                     tile("今天", today, tint: t.primary)
-                    tile("本周", thisWeek, tint: Color(hex: 0x10B981))
-                    tile("本月", thisMonth, tint: Color(hex: 0xF59E0B))
+                    tile("本周", thisWeek, tint: Color(hex: 0x10B981), days: FocusTexts.elapsedDays(in: .weekOfYear))
+                    tile("本月", thisMonth, tint: Color(hex: 0xF59E0B), days: FocusTexts.elapsedDays(in: .month))
                     tile("累计", allTime, tint: Color(hex: 0x8B5CF6))
                 }
                 .padding(.vertical, 4)
@@ -120,7 +120,8 @@ struct FocusContent: View {
         .readableWidth(860)
     }
 
-    private func tile(_ title: String, _ summary: FocusStore.Summary, tint: Color) -> some View {
+    /// `days` 不为 nil 时显示日均（按这段时间到今天为止的天数）。
+    private func tile(_ title: String, _ summary: FocusStore.Summary, tint: Color, days: Int? = nil) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: 12.5, weight: .semibold))
@@ -128,7 +129,8 @@ struct FocusContent: View {
             Text(FocusTexts.duration(summary.totalSeconds))
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(t.onSurface)
-            Text("\(summary.sessionCount) 次专注")
+            Text([ "\(summary.sessionCount) 次专注", days.map { "日均 \(FocusTexts.duration(summary.totalSeconds / max(1, $0)))" } ]
+                    .compactMap { $0 }.joined(separator: " · "))
                 .font(.system(size: 12))
                 .foregroundStyle(t.onSurfaceVariant)
         }
@@ -193,6 +195,35 @@ struct FocusContent: View {
 }
 
 enum FocusTexts {
+    /// 本周（周一开始）或本月到今天为止的天数，含今天。
+    static func elapsedDays(in component: Calendar.Component, now: Date = Date()) -> Int {
+        var calendar = Calendar.current
+        calendar.firstWeekday = 2
+        guard let start = calendar.dateInterval(of: component, for: now)?.start else { return 1 }
+        return (calendar.dateComponents([.day], from: start, to: calendar.startOfDay(for: now)).day ?? 0) + 1
+    }
+
+    /// 每日平均专注：总时长除以范围内到今天为止的天数（未来的日子不计入）。
+    /// `byMonth` 时每个点是一个月，按该月到今天为止的天数计算。
+    static func dailyAverage(_ points: [OverviewStore.FocusPoint], byMonth: Bool = false, now: Date = Date()) -> Int {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        var days = 0
+        var total = 0
+        for point in points {
+            guard let start = OverviewDates.date(point.start), start <= today else { continue }
+            total += point.seconds
+            if byMonth {
+                let end = min(calendar.date(byAdding: .month, value: 1, to: start) ?? start,
+                              calendar.date(byAdding: .day, value: 1, to: today) ?? today)
+                days += max(1, calendar.dateComponents([.day], from: start, to: end).day ?? 1)
+            } else {
+                days += 1
+            }
+        }
+        return days > 0 ? total / days : 0
+    }
+
     /// 菜单栏用的短格式，例如「1h20」「45m」。
     static func compact(_ seconds: Int) -> String {
         let minutes = seconds / 60

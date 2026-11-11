@@ -31,6 +31,42 @@ final class NotificationTests: XCTestCase {
         if let directory { try? FileManager.default.removeItem(at: directory) }
     }
 
+    /// 23:59 截止的任务改在白天提醒；同一时刻的多条任务提醒合并成一条。
+    func testEndOfDayRemindersMoveToDaytimeAndMerge() {
+        let calendar = Calendar.current
+        let now = calendar.date(from: DateComponents(year: 2026, month: 11, day: 11, hour: 10))!
+        func at(_ day: Int, _ hour: Int, _ minute: Int) -> Date { calendar.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour, minute: minute))! }
+        func item(_ id: String, _ kind: String, fire: Date, due: Date?) -> PlannedNotification {
+            PlannedNotification(id: "deadliner.\(id)", ownerUid: id, kind: kind, title: "示例\(id)",
+                                body: MacNotificationGateway.body(kind: kind, dueAt: "") ?? "", fireAt: fire, dueAt: due)
+        }
+        let items = [
+            item("a", "TASK_DUE", fire: at(13, 23, 59), due: at(13, 23, 59)),
+            item("b", "TASK_DUE", fire: at(13, 23, 59), due: at(13, 23, 59)),
+            item("a", "TASK_NEARBY", fire: at(12, 23, 59), due: at(13, 23, 59)),
+            item("c", "TASK_DUE", fire: at(13, 15, 0), due: at(13, 15, 0)),        // 不是 23:59：不动
+            item("d", "TASK_DUE", fire: at(11, 23, 59), due: at(11, 23, 59)),      // 今天 9:00 已过：不补发
+            item("h", "HABIT_DUE", fire: at(12, 0, 0), due: nil),                  // 习惯不动
+        ]
+        let shaped = NotificationShaping.apply(items, options: .init(daytime: true, daytimeMinutes: 9 * 60), now: now)
+        XCTAssertEqual(shaped.count, 4)
+        let merged = shaped.first { $0.id.hasPrefix("deadliner.group.TASK_DUE") }
+        XCTAssertEqual(merged?.title, "今天有 2 项任务截止")
+        XCTAssertEqual(merged?.body, "示例a、示例b")
+        XCTAssertEqual(merged?.fireAt, at(13, 9, 0))
+        let nearby = shaped.first { $0.kind == "TASK_NEARBY" }
+        XCTAssertEqual(nearby?.fireAt, at(12, 9, 0))
+        XCTAssertEqual(nearby?.body, "明天 23:59 截止")
+        XCTAssertEqual(shaped.first { $0.ownerUid == "c" }?.fireAt, at(13, 15, 0))
+        XCTAssertNil(shaped.first { $0.ownerUid == "d" })
+        XCTAssertEqual(shaped.first { $0.kind == "HABIT_DUE" }?.fireAt, at(12, 0, 0))
+
+        // 关闭后保持 Core 的时间，只合并同一时刻的提醒。
+        let plain = NotificationShaping.apply(items, options: .init(daytime: false), now: now)
+        XCTAssertEqual(plain.first { $0.id.hasPrefix("deadliner.group.TASK_DUE") }?.title, "2 项任务已到截止时间")
+        XCTAssertEqual(plain.count, 5)
+    }
+
     func testCorePlansTaskReminders() throws {
         let sink = RecordingSink()
         var policy = NotificationPolicy(taskRealtime: false, taskNearby: true, taskDue: true, habitMode: HabitNotificationMode.due)

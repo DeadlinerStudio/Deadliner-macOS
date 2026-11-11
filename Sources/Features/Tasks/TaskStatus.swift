@@ -74,6 +74,8 @@ enum TaskStatus {
 enum TaskDisplaySettings {
     static let forwardProgressKey = "cards.forwardProgress"
     static let detailedRemainingKey = "cards.detailedRemaining"
+    /// 任务页不显示已完成和已放弃的任务（只影响 Mac 的任务页，不改数据）。
+    static let hideFinishedKey = "tasks.hideFinished"
 
     /// 延期选项：Core 允许 1～168 小时或 1～7 天。
     static let postponeOptions: [(title: String, amount: Int, hours: Bool)] = [

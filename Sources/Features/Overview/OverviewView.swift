@@ -327,6 +327,11 @@ enum OverviewDates {
         return iso.date(from: raw)
     }
 
+    /// 悬停提示：日期、当日完成任务数，换行后当日专注时长。
+    static func dayTooltip(_ day: OverviewStore.DayCount, focusSeconds: Int) -> String {
+        "\(label(day.date, "M月d日 EEE"))\n完成 \(day.completed) 项任务\n专注 \(focusSeconds > 0 ? FocusTexts.duration(focusSeconds) : "0 分钟")"
+    }
+
     static func label(_ raw: String, _ format: String) -> String {
         guard let date = date(raw) else { return raw }
         let f = DateFormatter()
@@ -529,6 +534,8 @@ struct OverviewHistoryCard: View {
 struct OverviewHeatmapCard: View {
     let days: [OverviewStore.DayCount]
     var title = "活跃热力图"
+    /// 每天的专注秒数（键为 `yyyy-MM-dd`），用于悬停提示。
+    var focus: [String: Int] = [:]
     @State private var width: CGFloat = 400
     @Environment(\.palette) private var t
 
@@ -573,7 +580,7 @@ struct OverviewHeatmapCard: View {
                                 RoundedRectangle(cornerRadius: cell / 4, style: .continuous)
                                     .fill(color(day?.completed, peak: peak))
                                     .frame(width: cell, height: cell)
-                                    .help(day.map { "\($0.date)：完成 \($0.completed)" } ?? "")
+                                    .help(day.map { OverviewDates.dayTooltip($0, focusSeconds: focus[$0.date] ?? 0) } ?? "")
                             }
                         }
                     }
@@ -644,7 +651,9 @@ struct OverviewDailyCard: View {
                     }
                 }
                 .chartForegroundStyleScale(["已完成": c.completed, "逾期": c.overdue])
-                .chartLegend(showOverdue ? .visible : .hidden)
+                // 坐标范围始终包含逾期，开关「显示逾期」时坐标系不缩放。
+                .chartYScale(domain: 0...Double(max(1, days.map { $0.completed + $0.overdue }.max() ?? 1)))
+                .chartLegend(.visible)
                 .frame(height: 200)
             }
         }
@@ -751,7 +760,8 @@ struct OverviewWeeklyCard: View {
                 EmptyChart()
             } else {
                 Chart(weeks.suffix(4)) { week in
-                    BarMark(x: .value("周", OverviewDates.label(week.date, "M/d")), y: .value("完成", week.completed))
+                    BarMark(x: .value("周", OverviewDates.label(week.date, "M/d")), y: .value("完成", week.completed),
+                            width: .ratio(0.38))
                         .foregroundStyle(t.primary.gradient)
                         .cornerRadius(6)
                         .annotation(position: .top) {
@@ -919,20 +929,59 @@ struct OverviewFocusBarsCard: View {
     let points: [OverviewStore.FocusPoint]
     var subtitle: String
     var unit: Unit = .day
+    @State private var hovered: OverviewStore.FocusPoint?
     @Environment(\.palette) private var t
 
     var body: some View {
         let total = points.map(\.seconds).reduce(0, +)
-        OverviewCard(title: "专注时长", subtitle: total > 0 ? "\(subtitle) · 合计 \(FocusTexts.duration(total))" : subtitle) {
+        let average = FocusTexts.dailyAverage(points, byMonth: unit == .month)
+        OverviewCard(title: "专注时长", subtitle: total > 0
+                     ? "\(subtitle) · 合计 \(FocusTexts.duration(total)) · 日均 \(FocusTexts.duration(average))" : subtitle) {
             if total == 0 {
                 EmptyChart(text: "这段时间没有专注")
             } else {
                 let stride = max(1, Int((Double(points.count) / 6).rounded(.up)))
-                Chart(points) { point in
-                    BarMark(x: .value("日期", OverviewDates.date(point.start) ?? Date(), unit: unit == .day ? .day : .month),
-                            y: .value("分钟", Double(point.seconds) / 60))
-                        .foregroundStyle(OverviewColors(t: t).focus.gradient)
-                        .cornerRadius(3)
+                Chart {
+                    ForEach(points) { point in
+                        BarMark(x: .value("日期", OverviewDates.date(point.start) ?? Date(), unit: unit == .day ? .day : .month),
+                                y: .value("分钟", Double(point.seconds) / 60))
+                            .foregroundStyle(OverviewColors(t: t).focus.gradient)
+                            .opacity(hovered == nil || hovered == point ? 1 : 0.45)
+                            .cornerRadius(3)
+                    }
+                    // 鼠标悬停的柱子：上方显示具体时长。
+                    if let hovered, let date = OverviewDates.date(hovered.start) {
+                        RuleMark(x: .value("日期", date, unit: unit == .day ? .day : .month))
+                            .foregroundStyle(.clear)
+                            .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                                VStack(spacing: 1) {
+                                    Text(OverviewDates.label(hovered.start, unit == .day ? "M月d日" : "yyyy年M月"))
+                                        .font(.caption2).foregroundStyle(t.onSurfaceVariant)
+                                    Text(FocusTexts.duration(hovered.seconds)).font(.caption.weight(.semibold))
+                                }
+                                .padding(.horizontal, 7).padding(.vertical, 4)
+                                .background(t.groupBg, in: RoundedRectangle(cornerRadius: 7))
+                                .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
+                            }
+                    }
+                }
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        Rectangle().fill(.clear).contentShape(Rectangle())
+                            .onContinuousHover { phase in
+                                guard case .active(let location) = phase, let frame = proxy.plotFrame,
+                                      let date: Date = proxy.value(atX: location.x - geometry[frame].origin.x) else {
+                                    hovered = nil
+                                    return
+                                }
+                                let calendar = Calendar.current
+                                hovered = points.first { point in
+                                    guard let start = OverviewDates.date(point.start) else { return false }
+                                    return unit == .day ? calendar.isDate(start, inSameDayAs: date)
+                                        : calendar.isDate(start, equalTo: date, toGranularity: .month)
+                                }
+                            }
+                    }
                 }
                 .chartYAxis {
                     AxisMarks { value in
@@ -974,6 +1023,7 @@ struct OverviewFocusInvestmentCard: View {
                     BigNumber(title: "专注时长", value: FocusTexts.compact(focus.totalSeconds), tint: c.focus)
                     BigNumber(title: "专注次数", value: "\(focus.sessions)", tint: c.focus)
                     BigNumber(title: "有专注的天数", value: "\(focus.activeDays)", tint: c.focus)
+                    BigNumber(title: "日均专注", value: FocusTexts.compact(FocusTexts.dailyAverage(focus.daily)), tint: c.focus)
                 }
                 let peak = max(1, focus.categories.first?.seconds ?? 1)
                 VStack(spacing: 10) {

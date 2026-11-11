@@ -27,6 +27,8 @@ struct TaskListView: View {
         return palette.primary
     }
 
+    @AppStorage(TaskDisplaySettings.hideFinishedKey) private var hideFinished = false
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
             TaskListContent(
@@ -108,6 +110,7 @@ struct TaskListView: View {
             if let selection { batchBar(selection) }
         }
         .onExitCommand { if selection != nil { selection = nil } }
+        .onChange(of: hideFinished, initial: true) { store.hideFinished = hideFinished }
         .onChange(of: store.visibleTasks.map(\.id)) { _, ids in
             // 同步或筛选后，去掉已经不在列表中的选中项。
             if let current = selection { selection = current.intersection(ids) }
