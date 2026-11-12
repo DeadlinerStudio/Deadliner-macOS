@@ -83,6 +83,41 @@ enum MonthlyInsightSettings {
               !model.trimmingCharacters(in: .whitespaces).isEmpty,
               let key = keychain.password(url: url, username: "api"), !key.isEmpty else { return nil }
         return AIConfig(apiKey: key, baseUrl: url, model: model, platform: "macos", timezone: TimeZone.current.identifier,
-                        temperature: nil, nativeToolCalling: false, preferredLanguage: "zh-CN")
+                        temperature: temperature(for: model).map { KotlinDouble(double: $0) }, nativeToolCalling: false,
+                        preferredLanguage: "zh-CN")
+    }
+
+    /// Lifi 没有设置温度时固定发送 0.1；OpenAI 的推理模型（o1 / o3 / o4、gpt-5 及之后）只接受默认值 1，
+    /// 其他取值会被拒绝（HTTP 400）。这些模型改为发送 1，其他模型保持 Lifi 的默认。
+    nonisolated static func temperature(for model: String) -> Double? {
+        let name = model.trimmingCharacters(in: .whitespaces).lowercased()
+        return name.range(of: #"^(o[1-9]|gpt-([5-9]|[1-9][0-9]))"#, options: .regularExpression) != nil ? 1 : nil
+    }
+
+    /// 用与月度洞察相同的地址、模型和温度发一条最短的请求，返回服务的实际回应（成功或具体错误）。
+    /// 只发给用户填写的服务地址。
+    nonisolated static func probe(url: String, model: String, key: String) async -> String {
+        var address = url.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if !address.hasSuffix("/chat/completions") { address += "/chat/completions" }
+        guard let endpoint = URL(string: address), endpoint.scheme == "https" else { return "服务地址无效（需要 https）" }
+        var body: [String: Any] = ["model": model.trimmingCharacters(in: .whitespaces),
+                                   "messages": [["role": "user", "content": "请只回复 OK"]]]
+        if let temperature = temperature(for: model) { body["temperature"] = temperature } else { body["temperature"] = 0.1 }
+        var request = URLRequest(url: endpoint, timeoutInterval: 60)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if (200..<300).contains(status) { return "连接正常（HTTP \(status)）" }
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            let message = (json?["error"] as? [String: Any])?["message"] as? String
+                ?? String(data: data.prefix(300), encoding: .utf8) ?? ""
+            return "HTTP \(status)：\(message)"
+        } catch {
+            return "请求失败：\(error.localizedDescription)"
+        }
     }
 }

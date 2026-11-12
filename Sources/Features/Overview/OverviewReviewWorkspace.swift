@@ -38,6 +38,8 @@ struct MonthlyInsightSettingsView: View {
     @State private var enabled = UserDefaults.standard.bool(forKey: "overview.ai.enabled")
     @State private var key = ""
     @State private var error: String?
+    @State private var probeResult: String?
+    @State private var probing = false
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("月度洞察配置").font(.title2.bold())
@@ -50,7 +52,26 @@ struct MonthlyInsightSettingsView: View {
             Text("使用兼容 Chat Completions 的服务。启用后会向该服务发送月度指标和最多 50 个已完成任务标题，生成结果按月保存在本机；密钥保存在钥匙串。")
                 .font(.caption).foregroundStyle(.secondary)
             if let error { Text(error).foregroundStyle(.red) }
-            HStack { Button("取消") { dismiss() }; Spacer(); Button("保存", action: save).buttonStyle(.borderedProminent) }
+            if let probeResult {
+                Text(probeResult).font(.caption).textSelection(.enabled)
+                    .foregroundStyle(probeResult.hasPrefix("连接正常") ? Color.green : Color.red)
+            }
+            HStack {
+                Button("取消") { dismiss() }
+                Spacer()
+                Button(probing ? "测试中…" : "测试连接") {
+                    probing = true
+                    probeResult = nil
+                    let (url, model, key) = (url, model, key)
+                    _Concurrency.Task {
+                        let result = await MonthlyInsightSettings.probe(url: url, model: model, key: key)
+                        probeResult = result
+                        probing = false
+                    }
+                }
+                .disabled(probing || url.isEmpty || model.isEmpty || key.isEmpty)
+                Button("保存", action: save).buttonStyle(.borderedProminent)
+            }
         }.padding(24).frame(width: 480)
             .onAppear { key = MonthlyInsightSettings.keychain.password(url: url, username: "api") ?? "" }
     }

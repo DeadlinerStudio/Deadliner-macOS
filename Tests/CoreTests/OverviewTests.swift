@@ -304,6 +304,16 @@ final class OverviewTests: XCTestCase {
         XCTAssertEqual(overview.month?.distribution.completed, 2)
     }
 
+    /// OpenAI 推理模型只接受默认温度 1；其他模型保持 Lifi 的默认（nil → 0.1）。
+    func testReasoningModelsUseDefaultTemperature() {
+        for model in ["gpt-6.1-sol", "GPT-5", "gpt-5-mini", "o3", "o4-mini", "o1-preview", "gpt-10"] {
+            XCTAssertEqual(MonthlyInsightSettings.temperature(for: model), 1, model)
+        }
+        for model in ["gpt-4o", "gpt-4.1-mini", "deepseek-chat", "qwen-plus", "gpt-3.5-turbo", ""] {
+            XCTAssertNil(MonthlyInsightSettings.temperature(for: model), model)
+        }
+    }
+
     func testHeatmapWeeksStartOnMonday() {
         // 2026-10-28 是周三：前面空出周一、周二。
         let days = (28...31).map { OverviewStore.DayCount(date: "2026-10-\($0)", completed: 1) }
