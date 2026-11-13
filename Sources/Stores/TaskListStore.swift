@@ -35,6 +35,8 @@ final class TaskListStore {
     var timingFilter: CompletionTiming?
     /// 设置中的「任务页不显示已完成和已放弃的任务」。
     var hideFinished = UserDefaults.standard.bool(forKey: TaskDisplaySettings.hideFinishedKey)
+    /// 卡片进度动画的轮次（见 `CardSweep`）。
+    var sweep = CardSweep()
     /// 正在打开的编辑器（新建或编辑）。
     var editor: EditorRequest?
 

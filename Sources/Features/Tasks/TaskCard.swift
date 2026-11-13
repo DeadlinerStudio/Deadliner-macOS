@@ -73,7 +73,7 @@ struct TaskCard: View {
         .padding(.horizontal, MiuixCard.padX)
         .padding(.vertical, MiuixCard.padY)
         .frame(height: MiuixCard.height)
-        .background { CardBackground(colors: colors, sweepFrom: IndicatorStatus.undergo.colors(t), progress: progress, forward: forwardProgress) }
+        .background { CardBackground(taskId: task.id, colors: colors, sweepFrom: IndicatorStatus.undergo.colors(t), progress: progress, forward: forwardProgress) }
         .overlay(alignment: .bottomTrailing) {
             if let actions, hovering, selected == nil { hoverActions(actions) }
         }
@@ -170,25 +170,27 @@ struct TaskCard: View {
 
 /// 卡片背景：底色、状态色浅层、从左到右的剩余时间渐变。
 ///
-/// 进度条不跟随数值做隐式动画：列表刷新（完成、编辑、同步）时卡片可能换位置，隐式动画会把位置变化
-/// 一起动画化，色块就会从旧位置飘过来。改为：列表内容或排列方式一变（`cardSweepKey`），
-/// 就在卡片当前位置重新创建色块，从满格缩回当前值（正向进度条时从零向右增长到当前值）；
-/// 每分钟的时间流逝只静默更新进度。
+/// 进度条不跟随数值做隐式动画（否则卡片换位置时色块会从旧位置飘过来）。
+/// 只在三种情况下在卡片当前位置重新播放进度动画（`CardSweep`）：第一次打开、从其他页面切到任务页
+/// （所有卡片），以及编辑并保存了某个任务（只有这一张）。其余刷新（取消编辑、专注结束、同步、切换排列、
+/// 滚动出现）都只静默更新进度。
 private struct CardBackground: View {
+    let taskId: String
     let colors: IndicatorStatus.Colors
     let sweepFrom: IndicatorStatus.Colors
     let progress: Double
     var forward = false
-    @Environment(\.cardSweepKey) private var sweepKey
+    @Environment(\.cardSweep) private var sweep
 
     var body: some View {
         ZStack(alignment: .leading) {
             colors.base
             colors.overlay
             if progress > 0 {
-                SweepBar(colors: colors, sweepFrom: sweepFrom, progress: progress, forward: forward)
+                let key = sweep.key(for: taskId)
+                SweepBar(token: "\(taskId)#\(key)", colors: colors, sweepFrom: sweepFrom, progress: progress, forward: forward)
                     // 新的 key 就是新的色块：不在新旧位置之间插值，也不做淡入淡出。
-                    .id(sweepKey)
+                    .id(key)
                     .transition(.identity)
             }
         }
@@ -198,6 +200,8 @@ private struct CardBackground: View {
 /// 一次性的进度色块：出现时为满格（「进行中」的颜色），排好位置后缩回当前进度并过渡到当前状态色。
 /// 正向进度条（随时间增长）时反过来：从零开始向右增长到当前进度。
 private struct SweepBar: View {
+    /// 任务与动画轮次；同一轮已经播放过的（例如滚动后重新出现、切换排列）不再播放。
+    let token: String
     let colors: IndicatorStatus.Colors
     let sweepFrom: IndicatorStatus.Colors
     let progress: Double
@@ -211,6 +215,10 @@ private struct SweepBar: View {
         }
         .scaleEffect(x: sweeping ? (forward ? 0.001 : 1) : progress, y: 1, anchor: .leading)
         .onAppear {
+            guard CardSweep.played.insert(token).inserted else {
+                sweeping = false
+                return
+            }
             // 等卡片在当前位置排好之后再开始动画，否则位置变化会被一起动画化。
             DispatchQueue.main.async {
                 withAnimation(.easeInOut(duration: 0.8)) { sweeping = false }
@@ -223,7 +231,18 @@ private struct SweepBar: View {
     }
 }
 
+/// 进度动画的轮次：`generation` 在第一次打开和切到任务页时加一（所有卡片），
+/// `edited` 记录每个任务被编辑保存的次数（只有那一张）。
+struct CardSweep: Equatable {
+    var generation = 0
+    var edited: [String: Int] = [:]
+
+    func key(for taskId: String) -> String { "\(generation)-\(edited[taskId] ?? 0)" }
+
+    /// 已经播放过的「任务#轮次」。
+    @MainActor static var played: Set<String> = []
+}
+
 extension EnvironmentValues {
-    /// 列表内容与排列方式的签名；变化时每张卡片在当前位置重新播放进度回落动画。
-    @Entry var cardSweepKey: String = ""
+    @Entry var cardSweep = CardSweep()
 }

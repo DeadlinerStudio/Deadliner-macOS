@@ -25,6 +25,17 @@ final class TaskStatusTests: XCTestCase {
         XCTAssertEqual(TaskStatus.indicator(task(state: .completed, start: 3600, due: 7200), now: now), .completed)
     }
 
+    /// 进度动画只在新的一轮（打开 / 切回任务页）时全部重播，编辑保存时只换被编辑的那张。
+    func testCardSweepKeys() {
+        var sweep = CardSweep()
+        XCTAssertEqual(sweep.key(for: "a"), "0-0")
+        sweep.edited["a", default: 0] += 1
+        XCTAssertEqual(sweep.key(for: "a"), "0-1")
+        XCTAssertEqual(sweep.key(for: "b"), "0-0")  // 其他卡片不变
+        sweep.generation += 1
+        XCTAssertEqual(sweep.key(for: "b"), "1-0")  // 切回任务页：全部换新
+    }
+
     func testCustomStatusColorsRoundTripAndReset() {
         var raw = StatusColorSettings.updating("", .passed, to: Color(hex: 0x12AB34))
         raw = StatusColorSettings.updating(raw, .notStarted, to: Color(hex: 0xFFFFFF))

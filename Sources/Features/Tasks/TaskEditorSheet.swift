@@ -8,6 +8,8 @@ struct TaskEditorSheet: View {
     var onClose: () -> Void
     /// 保存成功后调用（例如把灵感标记为已整理）。
     var onSaved: (() -> Void)?
+    /// 保存成功后传入任务 ID（任务页据此只让这张卡片播放进度动画）。
+    var onSavedTask: ((String) -> Void)?
 
     @State private var draft: TaskDraft
     @State private var categories: [CategoryItem] = []
@@ -15,10 +17,12 @@ struct TaskEditorSheet: View {
     @State private var errorMessage: String?
     @State private var confirmDelete = false
     @State private var managingCategories = false
+    @Environment(\.focusTimer) private var focusTimer
 
     init(commands: TaskCommands, categoryCommands: CategoryCommands, draft: TaskDraft, onSaved: (() -> Void)? = nil,
-         onClose: @escaping () -> Void) {
+         onSavedTask: ((String) -> Void)? = nil, onClose: @escaping () -> Void) {
         self.onSaved = onSaved
+        self.onSavedTask = onSavedTask
         self.commands = commands
         self.categoryCommands = categoryCommands
         self.onClose = onClose
@@ -27,9 +31,21 @@ struct TaskEditorSheet: View {
 
     private var isEditing: Bool { draft.id != nil }
 
+    /// 这个任务正在专注计时：已经开始做了，结束专注之前不能编辑（只保留「专注」区）。
+    private var isLocked: Bool {
+        guard let id = draft.id, let running = focusTimer?.running else { return false }
+        return !running.isHabit && running.targetId == id
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                if isLocked {
+                    Section {
+                        Label("正在专注这个任务，结束专注后才能编辑", systemImage: "lock.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Section {
                     TextField("任务名称", text: $draft.title, prompt: Text("任务名称"))
                         .labelsHidden()
@@ -40,12 +56,14 @@ struct TaskEditorSheet: View {
                         .multilineTextAlignment(.leading)
                         .lineLimit(3...6)
                 }
+                .disabled(isLocked)
 
                 Section("时间") {
                     OptionalDateRow(title: "开始时间", date: $draft.startAt, defaultValue: Self.defaultStart)
                     OptionalDateRow(title: "截止时间", date: $draft.dueAt, defaultValue: Self.defaultDue)
                     Toggle("标星", isOn: $draft.isStarred)
                 }
+                .disabled(isLocked)
 
                 if let id = draft.id, draft.isActive {
                     FocusStartSection(targetId: id, isHabit: false)
@@ -71,6 +89,7 @@ struct TaskEditorSheet: View {
                             .font(.caption)
                     }
                 }
+                .disabled(isLocked)
 
                 Section("子任务") {
                     ForEach(Array(draft.subtasks.enumerated()), id: \.element.id) { index, _ in
@@ -88,10 +107,12 @@ struct TaskEditorSheet: View {
                         .multilineTextAlignment(.leading)
                         .onSubmit(addSubtask)
                 }
+                .disabled(isLocked)
 
                 if isEditing {
                     Section {
                         Button("删除任务", role: .destructive) { confirmDelete = true }
+                            .disabled(isLocked)
                     }
                 }
 
@@ -108,9 +129,9 @@ struct TaskEditorSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") {
                         addSubtask()
-                        perform { try commands.save(draft); onSaved?() }
+                        perform { onSavedTask?(try commands.save(draft)); onSaved?() }
                     }
-                    .disabled(!draft.isValid)
+                    .disabled(!draft.isValid || isLocked)
                 }
             }
         }

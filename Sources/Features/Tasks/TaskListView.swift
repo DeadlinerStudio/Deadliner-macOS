@@ -45,7 +45,8 @@ struct TaskListView: View {
                 selection: selection,
                 isFiltered: store.categoryFilter != nil || store.timingFilter != nil,
                 archiveMatches: archiveMatches(store.searchText),
-                onShowArchive: onShowArchive.map { show in { show(store.searchText) } }
+                onShowArchive: onShowArchive.map { show in { show(store.searchText) } },
+                sweep: store.sweep
             )
             .topAtmosphere(Self.tone(for: store.visibleTasks, now: context.date, palette: t))
         }
@@ -111,6 +112,9 @@ struct TaskListView: View {
         }
         .onExitCommand { if selection != nil { selection = nil } }
         .onChange(of: hideFinished, initial: true) { store.hideFinished = hideFinished }
+        // 离开任务页时进入新的一轮：再切回来（或重新打开窗口）时所有卡片播放一次进度动画。
+        // 第一次打开时本来就是新的一轮。放在离开时而不是出现时，避免切回来的第一帧先按旧一轮画出进度。
+        .onDisappear { store.sweep.generation += 1 }
         .onChange(of: store.visibleTasks.map(\.id)) { _, ids in
             // 同步或筛选后，去掉已经不在列表中的选中项。
             if let current = selection { selection = current.intersection(ids) }
@@ -123,7 +127,8 @@ struct TaskListView: View {
             Text("启用同步后，删除也会同步到手机。")
         }
         .sheet(item: $store.editor) { request in
-            TaskEditorSheet(commands: commands, categoryCommands: categoryCommands, draft: request.draft) {
+            TaskEditorSheet(commands: commands, categoryCommands: categoryCommands, draft: request.draft,
+                            onSavedTask: { store.sweep.edited[$0, default: 0] += 1 }) {
                 store.editor = nil
             }
             .deadlinerTheme()
@@ -239,6 +244,8 @@ struct TaskListContent: View {
     var isFiltered = false
     var archiveMatches = 0
     var onShowArchive: (() -> Void)?
+    /// 进度动画的轮次（见 `CardSweep`）。
+    var sweep = CardSweep()
     @Environment(\.palette) private var t
 
     var body: some View {
@@ -268,7 +275,7 @@ struct TaskListContent: View {
                     }
                     .readableWidth(layout.maxContentWidth)
                     .safeAreaInset(edge: .bottom) { archiveHint.padding(.top, 14) }
-                    .environment(\.cardSweepKey, Self.sweepKey(tasks, layout: layout))
+                    .environment(\.cardSweep, sweep)
                     .transaction(value: layout) { $0.animation = nil }
                     .padding(.horizontal, 24)
                     .padding(.top, 16)
@@ -277,19 +284,6 @@ struct TaskListContent: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    /// 列表的签名：排列方式、顺序，以及每个任务影响进度的字段。只随数据变化，不随时间流逝变化。
-    static func sweepKey(_ tasks: [TaskItem], layout: CardLayout) -> String {
-        var hasher = Hasher()
-        for task in tasks {
-            hasher.combine(task.id)
-            hasher.combine(task.state)
-            hasher.combine(task.startAt)
-            hasher.combine(task.dueAt)
-            hasher.combine(task.updatedAt)
-        }
-        return "\(layout.rawValue)-\(hasher.finalize())"
     }
 
     @ViewBuilder
