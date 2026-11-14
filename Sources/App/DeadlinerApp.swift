@@ -20,6 +20,13 @@ struct DeadlinerApp: App {
                 Button("搜索") { appDelegate.model?.searchFocusRequest += 1 }
                     .keyboardShortcut("f", modifiers: [.command])
             }
+            CommandGroup(after: .pasteboard) {
+                Button("从剪贴板导入分享链接") {
+                    appDelegate.showMainWindow()
+                    appDelegate.model?.importShareLinkFromPasteboard()
+                }
+                .keyboardShortcut("v", modifiers: [.command, .shift])
+            }
             CommandMenu("前往") {
                 ForEach(Array(AppModel.Page.allCases.enumerated()), id: \.element) { index, page in
                     Button(page.title) { appDelegate.model?.page = page }
@@ -115,7 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.openFocusWindowAction?()
                 return
             }
-            model?.page = kind.hasPrefix("HABIT") ? .habits : .tasks
+            model?.page = kind.hasPrefix("HABIT") ? .habits : kind == DailySummary.kind ? .overview : .tasks
             self?.showMainWindow()
         }
         notifications.start()
@@ -148,6 +155,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model?.focusTimer.reconcile()
         model?.sync.setForeground(true)
         model?.notifications?.refresh()
+        model?.checkPasteboardForShareLink()
     }
 
     func applicationDidResignActive(_ notification: Notification) {
@@ -225,6 +233,7 @@ struct MainView: View {
             Sidebar(page: $model.page, syncStatus: model.sync.status, syncNow: { model.sync.syncNow() },
                     profile: model.profile, editProfile: { editingProfile = true },
                     taskList: model.taskList, habitList: model.habitList)
+                .displayScaled()
                 .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
         } detail: {
             Group {
@@ -252,6 +261,7 @@ struct MainView: View {
                     SettingsView(sync: model.sync, backup: LocalBackup(database: model.container.database), notifications: model.notifications, onBackupImported: { model.refreshAll() })
                 }
             }
+            .displayScaled()
             .environment(\.searchFocusRequest, model.searchFocusRequest)
             .environment(\.focusTimer, model.focusTimer)
         }
@@ -277,10 +287,40 @@ struct MainView: View {
         } message: { _ in
             Text("会先结束并保存这次专注，再执行刚才的操作。")
         }
+        .overlay { CelebrationOverlay(trigger: model.celebration) }
+        .alert(shareAlertTitle, isPresented: Binding(get: { model.pendingShare != nil }, set: { if !$0 { model.pendingShare = nil } }),
+               presenting: model.pendingShare) { share in
+            switch share.result {
+            case .success(let draft):
+                Button("添加") { model.acceptShare(draft) }
+                Button("取消", role: .cancel) {}
+            case .failure:
+                Button("好", role: .cancel) {}
+            }
+        } message: { share in
+            switch share.result {
+            case .success(let draft): Text(Self.shareSummary(draft))
+            case .failure(let error): Text(error.localizedDescription)
+            }
+        }
         .alert("无法完成操作", isPresented: Binding(get: { timerConflictError != nil }, set: { if !$0 { timerConflictError = nil } })) {
             Button("好") {}
         } message: {
             Text(timerConflictError ?? "")
         }
+    }
+
+    private var shareAlertTitle: String {
+        if case .failure = model.pendingShare?.result { return "无法导入分享链接" }
+        return "检测到分享链接"
+    }
+
+    /// 导入前的确认文字：任务名、截止时间和子任务数。
+    static func shareSummary(_ draft: TaskDraft) -> String {
+        var lines = ["「\(draft.title)」"]
+        if let due = draft.dueAt { lines.append("截止：\(due.formatted(.dateTime.year().month().day().hour().minute()))") }
+        if !draft.subtasks.isEmpty { lines.append("\(draft.subtasks.count) 个子任务") }
+        lines.append("添加后会打开编辑窗口，保存后才会写入。")
+        return lines.joined(separator: "\n")
     }
 }

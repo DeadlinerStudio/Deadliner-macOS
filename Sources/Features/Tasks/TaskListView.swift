@@ -16,6 +16,9 @@ struct TaskListView: View {
     @State private var selection: Set<String>?
     @State private var pendingBatchDelete = false
     @State private var errorMessage: String?
+    /// 底部的简短提示（例如「已复制分享链接」），几秒后消失。
+    @State private var notice: String?
+    @State private var showingCategories = false
     @AppStorage(CardLayout.storageKey) private var layoutRaw = CardLayout.single.rawValue
     @Environment(\.palette) private var t
 
@@ -73,6 +76,7 @@ struct TaskListView: View {
                         Text("未分类").tag(Optional(TaskListStore.uncategorized))
                     }
                     .pickerStyle(.inline)
+                    Button("分类详情…") { showingCategories = true }
                     Picker("完成时机", selection: $store.timingFilter) {
                         Text("全部任务").tag(CompletionTiming?.none)
                         Divider()
@@ -108,7 +112,17 @@ struct TaskListView: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if let selection { batchBar(selection) }
+            if let selection {
+                batchBar(selection)
+            } else if let notice {
+                Label(notice, systemImage: "checkmark.circle.fill")
+                    .font(.callout)
+                    .padding(.horizontal, 16)
+                    .frame(height: 36)
+                    .deadlinerGlass(in: Capsule())
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .onExitCommand { if selection != nil { selection = nil } }
         .onChange(of: hideFinished, initial: true) { store.hideFinished = hideFinished }
@@ -131,6 +145,18 @@ struct TaskListView: View {
                             onSavedTask: { store.sweep.edited[$0, default: 0] += 1 }) {
                 store.editor = nil
             }
+            .deadlinerTheme()
+        }
+        .sheet(isPresented: $showingCategories) {
+            CategoryBrowserSheet(commands: categoryCommands, onClose: { showingCategories = false },
+                                 openTask: { id in
+                                     showingCategories = false
+                                     if let draft = commands.draft(for: id) { store.editor = .init(draft: draft) }
+                                 },
+                                 filterTasks: { id in
+                                     showingCategories = false
+                                     store.categoryFilter = id
+                                 })
             .deadlinerTheme()
         }
         .confirmationDialog("确定要删除「\(pendingDelete?.title ?? "")」吗？", isPresented: Binding(
@@ -165,8 +191,21 @@ struct TaskListView: View {
                 var current = selection ?? []
                 if current.contains(task.id) { current.remove(task.id) } else { current.insert(task.id) }
                 selection = current
+            },
+            share: {
+                run {
+                    try commands.copyShareLink(task.id)
+                    show(notice: "已复制「\(task.title)」的分享链接")
+                }
             }
         )
+    }
+
+    private func show(notice text: String) {
+        withAnimation { notice = text }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            if notice == text { withAnimation { notice = nil } }
+        }
     }
 
     private var subtitle: String {

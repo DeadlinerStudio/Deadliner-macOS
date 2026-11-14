@@ -12,6 +12,20 @@ enum NotificationSettings {
     /// 23:59 截止的任务改在白天提醒（默认开启），以及白天提醒的时间（分钟，默认 9:00）。
     static let daytimeKey = "notifications.daytimeForEndOfDay"
     static let daytimeMinutesKey = "notifications.daytimeMinutes"
+    /// 临近提醒提前多少小时（默认 24，即 Core 的「提前一天」）。
+    static let nearbyHoursKey = "notifications.nearbyHours"
+    static let nearbyHourOptions = [1, 2, 3, 6, 12, 24, 48, 72]
+
+    /// Mac 端排任务提醒用的设置。临近提醒由 Mac 按截止时间自己推算（Core 固定为提前一天），
+    /// 所以向 Core 只要「到期」这一种，再由它派生临近提醒。
+    static func taskReminders(_ defaults: UserDefaults = .standard) -> TaskReminderOptions {
+        let enabled = defaults.bool(forKey: enabledKey)
+        return TaskReminderOptions(
+            nearby: enabled && (defaults.object(forKey: taskNearbyKey) as? Bool ?? true),
+            due: enabled && (defaults.object(forKey: taskDueKey) as? Bool ?? true),
+            nearbyHours: max(1, defaults.object(forKey: nearbyHoursKey) as? Int ?? 24)
+        )
+    }
 
     static func shaping(_ defaults: UserDefaults = .standard) -> NotificationShaping.Options {
         NotificationShaping.Options(
@@ -21,11 +35,11 @@ enum NotificationSettings {
     }
 
     static func policy(_ defaults: UserDefaults = .standard) -> NotificationPolicy {
-        let enabled = defaults.bool(forKey: enabledKey)
+        let reminders = taskReminders(defaults)
         return NotificationPolicy(
             taskRealtime: false, // 手机的实时通知（Live Update）在 Mac 上没有对应形式
-            taskNearby: enabled && (defaults.object(forKey: taskNearbyKey) as? Bool ?? true),
-            taskDue: enabled && (defaults.object(forKey: taskDueKey) as? Bool ?? true),
+            taskNearby: false,   // 由 Mac 从「到期」提醒派生，可以自定义提前的小时数
+            taskDue: reminders.nearby || reminders.due,
             habitMode: HabitNotificationMode.due
         )
     }
@@ -33,6 +47,17 @@ enum NotificationSettings {
     /// Core 的策略没有「关闭习惯提醒」，由 Mac 端在排程时过滤。
     static func habitsEnabled(_ defaults: UserDefaults = .standard) -> Bool {
         defaults.bool(forKey: enabledKey) && (defaults.object(forKey: habitsKey) as? Bool ?? true)
+    }
+}
+
+struct TaskReminderOptions: Equatable {
+    var nearby = true
+    var due = true
+    var nearbyHours = 24
+
+    /// 「1 天」「3 小时」。
+    static func phrase(hours: Int) -> String {
+        hours % 24 == 0 ? "\(hours / 24) 天" : "\(hours) 小时"
     }
 }
 
@@ -63,13 +88,19 @@ enum NotificationShaping {
         for var item in items {
             if options.daytime, item.kind.hasPrefix("TASK_"), let due = item.dueAt, isEndOfDay(due, calendar) {
                 let dueDay = calendar.startOfDay(for: due)
-                let day = item.kind == "TASK_NEARBY" ? calendar.date(byAdding: .day, value: -1, to: dueDay)! : dueDay
+                // 临近提醒移到它原本那一天的白天；原本就在截止当天（提前不到一天）的保持原时间。
+                let day = item.kind == "TASK_NEARBY" ? calendar.startOfDay(for: item.fireAt) : dueDay
+                let daysBefore = calendar.dateComponents([.day], from: day, to: dueDay).day ?? 0
+                if item.kind == "TASK_NEARBY" && daysBefore < 1 {
+                    shaped.append(item)
+                    continue
+                }
                 let fire = calendar.date(byAdding: .minute, value: options.daytimeMinutes, to: day)!
                 // 白天的时间已经过了：不再补发（否则每次刷新都会立刻弹出）。
                 guard fire > now else { continue }
+                let body = item.kind != "TASK_NEARBY" ? "今天 23:59 截止" : daysBefore == 1 ? "明天 23:59 截止" : "\(daysBefore) 天后 23:59 截止"
                 item = PlannedNotification(id: item.id, ownerUid: item.ownerUid, kind: item.kind, title: item.title,
-                                           body: item.kind == "TASK_NEARBY" ? "明天 23:59 截止" : "今天 23:59 截止",
-                                           fireAt: fire, dueAt: item.dueAt)
+                                           body: body, fireAt: fire, dueAt: item.dueAt)
             }
             shaped.append(item)
         }
@@ -84,7 +115,7 @@ enum NotificationShaping {
             let names = titles.prefix(5).joined(separator: "、") + (titles.count > 5 ? " 等" : "")
             let endOfDay = group.allSatisfy { $0.body.contains("23:59") }
             let title: String = switch first.kind {
-            case "TASK_NEARBY": endOfDay ? "明天有 \(group.count) 项任务截止" : "\(group.count) 项任务还有 1 天到期"
+            case "TASK_NEARBY": group.allSatisfy { $0.body == "明天 23:59 截止" } ? "明天有 \(group.count) 项任务截止" : "\(group.count) 项任务即将到期"
             default: endOfDay ? "今天有 \(group.count) 项任务截止" : "\(group.count) 项任务已到截止时间"
             }
             result.append(PlannedNotification(id: "deadliner.group.\(key)", ownerUid: "", kind: first.kind, title: title,
@@ -112,24 +143,55 @@ final class MacNotificationGateway: NSObject, NotificationGateway {
     private let sink: NotificationSink
     private let habitsEnabled: () -> Bool
     private let shaping: () -> NotificationShaping.Options
+    /// 为 nil 时原样使用 Core 的任务提醒；提供时由 Mac 从「到期」提醒派生临近提醒（可自定义提前小时数）。
+    private let taskReminders: (() -> TaskReminderOptions)?
 
     init(sink: NotificationSink, habitsEnabled: @escaping () -> Bool = { NotificationSettings.habitsEnabled() },
-         shaping: @escaping () -> NotificationShaping.Options = { NotificationSettings.shaping() }) {
+         shaping: @escaping () -> NotificationShaping.Options = { NotificationSettings.shaping() },
+         taskReminders: (() -> TaskReminderOptions)? = nil) {
         self.sink = sink
         self.habitsEnabled = habitsEnabled
         self.shaping = shaping
+        self.taskReminders = taskReminders
     }
 
     func applyNotificationMetadata(metadata: NotificationMetadata) {
         let includeHabits = habitsEnabled()
-        let planned = metadata.alarms.compactMap { entry -> PlannedNotification? in
+        var planned = metadata.alarms.compactMap { entry -> PlannedNotification? in
             let kind = entry.kind.name
             if !includeHabits && kind.hasPrefix("HABIT") { return nil }
             guard let fireAt = CoreDates.parseInstant(entry.triggerAt), let body = Self.body(kind: kind, dueAt: entry.dueAt) else { return nil }
             return PlannedNotification(id: "deadliner.\(entry.key)", ownerUid: entry.ownerUid, kind: kind,
                                        title: entry.title, body: body, fireAt: fireAt, dueAt: CoreDates.parseInstant(entry.dueAt))
         }
+        if let options = taskReminders?() { planned = Self.derivingNearby(planned, options: options) }
         sink.replaceAll(with: NotificationShaping.apply(planned, options: shaping()))
+    }
+
+    /// 从「到期」提醒派生临近提醒：截止前 `nearbyHours` 小时（已经过了的不排）；不需要「到期」提醒时去掉它。
+    static func derivingNearby(_ items: [PlannedNotification], options: TaskReminderOptions, now: Date = Date()) -> [PlannedNotification] {
+        var result: [PlannedNotification] = []
+        for item in items {
+            switch item.kind {
+            case "TASK_NEARBY":
+                continue // 由下面重新派生
+            case "TASK_DUE":
+                if options.nearby, let due = item.dueAt {
+                    let fire = due.addingTimeInterval(-Double(options.nearbyHours) * 3600)
+                    if fire > now {
+                        result.append(PlannedNotification(
+                            id: item.id.replacingOccurrences(of: "deadliner.", with: "deadliner.nearby."), ownerUid: item.ownerUid,
+                            kind: "TASK_NEARBY", title: item.title,
+                            body: "还有 \(TaskReminderOptions.phrase(hours: options.nearbyHours))到期（\(due.formatted(.dateTime.month().day().hour().minute()))）",
+                            fireAt: fire, dueAt: due))
+                    }
+                }
+                if options.due { result.append(item) }
+            default:
+                result.append(item)
+            }
+        }
+        return result
     }
 
     func cancelAll() { sink.removeAll() }

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import Shared
@@ -48,6 +49,11 @@ final class AppModel {
     @ObservationIgnored private(set) var focusTimer: FocusTimerStore!
     /// 任务 / 习惯正在专注计时、又要改变状态时，等待用户确认。
     var timerConflict: TimerConflict?
+    /// 每次加 1 播放一次完成动画。
+    var celebration = 0
+    /// 打开或在剪贴板中识别到的分享链接，等待用户确认导入。
+    var pendingShare: PendingShare?
+    @ObservationIgnored private var pasteboardChangeCount = NSPasteboard.general.changeCount
     @ObservationIgnored private(set) var overview: OverviewStore!
     @ObservationIgnored private(set) var capture: CaptureStore!
     @ObservationIgnored private(set) var profile: ProfileStore!
@@ -77,6 +83,64 @@ final class AppModel {
         taskCommands.onTimerConflict = { [unowned self] in timerConflict = $0 }
         habitCommands.onTimerConflict = { [unowned self] in timerConflict = $0 }
         habitCommands.isTiming = { [unowned self] in focusTimer.isTiming(habit: $0) }
+        taskCommands.onCompleted = { [unowned self] _ in celebration += 1 }
+    }
+
+    // MARK: - 分享链接
+
+    struct PendingShare: Identifiable {
+        let id = UUID()
+        let result: Result<TaskDraft, TaskShareLink.LinkError>
+    }
+
+    /// 解析分享链接，交给界面确认（成功时显示任务名，失败时显示原因）。
+    func receiveShareLink(_ text: String) {
+        do {
+            pendingShare = PendingShare(result: .success(try TaskShareLink.decode(text)))
+        } catch {
+            pendingShare = PendingShare(result: .failure(error as? TaskShareLink.LinkError ?? .corrupted))
+        }
+    }
+
+    /// 菜单「从剪贴板导入分享链接」：用户主动粘贴。
+    func importShareLinkFromPasteboard() {
+        pasteboardChangeCount = NSPasteboard.general.changeCount
+        if let link = TaskShareLink.fromPasteboard() {
+            receiveShareLink(link)
+        } else {
+            pendingShare = PendingShare(result: .failure(.notALink))
+        }
+    }
+
+    /// 应用激活时：开启了自动识别、且剪贴板内容变了，才读取剪贴板（与安卓相同）。
+    /// macOS 15.4 起先用不读取内容的模式检测，只有剪贴板里是网址时才读取（系统可能询问是否允许）。
+    func checkPasteboardForShareLink() {
+        let pasteboard = NSPasteboard.general
+        guard UserDefaults.standard.bool(forKey: ShareLinkSettings.detectClipboardKey),
+              pasteboard.changeCount != pasteboardChangeCount, pendingShare == nil else { return }
+        pasteboardChangeCount = pasteboard.changeCount
+        let read = { [weak self] in
+            guard let self, let link = TaskShareLink.fromPasteboard(pasteboard), link != TaskShareLink.lastCopied else { return }
+            receiveShareLink(link)
+        }
+        if #available(macOS 15.4, *) {
+            // 系统剪贴板对象可以在任意线程使用。
+            nonisolated(unsafe) let board = pasteboard
+            _Concurrency.Task {
+                let key: PartialKeyPath<NSPasteboard.DetectedValues> = \.probableWebURL
+                guard let found = try? await board.detectedPatterns(for: [key]), found.contains(key) else { return }
+                read()
+            }
+        } else {
+            read()
+        }
+    }
+
+    /// 确认导入：在任务页打开编辑器（新任务，保存后才写入）。
+    func acceptShare(_ draft: TaskDraft) {
+        pendingShare = nil
+        page = .tasks
+        taskList.editor = .init(draft: draft)
     }
 
     /// 确认冲突：先结束并保存这次专注，再执行原来的操作（Core 在同一事务中完成）。
@@ -105,6 +169,7 @@ final class AppModel {
         capture.refresh()
         profile.refresh()
         if page == .overview { overview.refresh() }
+        notifications?.scheduleDailySummary()
     }
 
     /// 菜单栏与面板的汇总。习惯取今天的状态（习惯页正在看其他日期时，只统计今天的完成度）。

@@ -60,6 +60,8 @@ final class TaskCommands {
     private let didChange: () -> Void
     /// 任务正在专注计时时由界面接手（确认后先结束计时再执行）；没有设置时报错。
     var onTimerConflict: ((TimerConflict) -> Void)?
+    /// 进行中的任务被勾选完成后调用（完成动画）。取消完成、放弃等不调用。
+    var onCompleted: ((String) -> Void)?
 
     init(database: DeadlinerDatabase, didChange: @escaping () -> Void) {
         self.database = database
@@ -121,7 +123,11 @@ final class TaskCommands {
     }
 
     /// 勾选完成 / 取消完成（Core 中 MARK_COMPLETE 在两者之间切换）。
-    func toggleComplete(_ uid: String) throws { try apply(TaskAction.markComplete, to: uid) }
+    func toggleComplete(_ uid: String) throws {
+        let wasActive = database.tasks.find(uid: uid)?.state == TaskState.active
+        guard try apply(TaskAction.markComplete, to: uid) else { return }
+        if wasActive, database.tasks.find(uid: uid)?.state == TaskState.completed { onCompleted?(uid) }
+    }
 
     /// 放弃 / 取消放弃（Core 中 MARK_GIVE_UP 在两者之间切换）。
     func toggleGiveUp(_ uid: String) throws { try apply(TaskAction.markGiveUp, to: uid) }
@@ -149,6 +155,16 @@ final class TaskCommands {
         try save(draft)
     }
 
+    /// 生成任务的分享链接（与安卓相同的格式），复制到剪贴板。
+    @discardableResult
+    func copyShareLink(_ uid: String) throws -> String {
+        guard let draft = draft(for: uid) else { throw TaskCommandError.notFound }
+        let link = try TaskShareLink.encode(draft)
+        TaskShareLink.copy(link)
+        TaskShareLink.lastCopied = link
+        return link
+    }
+
     func delete(_ uid: String) throws {
         let outcome = database.tasks.delete(uid: uid, updatedAt: CoreClock.now()).outcome
         if handledTimerConflict(outcome, uid: uid, action: nil, delete: true) { return }
@@ -163,11 +179,14 @@ final class TaskCommands {
             && !TaskStateMachine.shared.isNoOp(state: coreState, action: action)
     }
 
-    private func apply(_ action: TaskAction, to uid: String) throws {
+    /// 返回是否已经执行（正在计时、交给界面确认时为 false）。
+    @discardableResult
+    private func apply(_ action: TaskAction, to uid: String) throws -> Bool {
         let outcome = database.tasks.applyAction(uid: uid, action: action, occurredAt: CoreClock.now()).outcome
-        if handledTimerConflict(outcome, uid: uid, action: action, delete: false) { return }
+        if handledTimerConflict(outcome, uid: uid, action: action, delete: false) { return false }
         try check(outcome)
         didChange()
+        return true
     }
 
     private func handledTimerConflict(_ outcome: TaskActionOutcome, uid: String, action: TaskAction?, delete: Bool) -> Bool {

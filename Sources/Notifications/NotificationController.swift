@@ -19,7 +19,7 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
     func start() {
         UNUserNotificationCenter.current().delegate = self
         _ = database.configureNotificationUpdates(
-            gateway: MacNotificationGateway(sink: UserNotificationSink()),
+            gateway: MacNotificationGateway(sink: UserNotificationSink(), taskReminders: { NotificationSettings.taskReminders() }),
             policyProvider: Self.policyProvider,
             interactionsProvider: Self.interactionsProvider
         )
@@ -43,6 +43,12 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
     /// 设置变化后传 `force: true`。
     func refresh(force: Bool = false) {
         database.triggerNotificationInfoUpdate(force: force)
+        scheduleDailySummary()
+    }
+
+    /// 按当前任务重新排下一条每日摘要（数据变化后由 AppModel 调用）。
+    func scheduleDailySummary() {
+        DailySummary.schedule(tasks: database.tasks.list().filter { !$0.isDeleted }.map(TaskItem.init(core:)))
     }
 
     /// 打开通知开关时请求系统授权；返回是否已获授权。

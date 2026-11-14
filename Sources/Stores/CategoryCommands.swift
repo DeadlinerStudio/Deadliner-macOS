@@ -68,6 +68,38 @@ final class CategoryCommands {
         didChange()
     }
 
+    /// 一个分类里的内容（与 iOS 的分类详情相同）：任务（包括已完成和归档的）与习惯。`id` 为 nil 表示未分类。
+    struct Contents: Equatable {
+        struct Habit: Identifiable, Equatable {
+            let id: String
+            let name: String
+            let colorHex: String?
+            let isArchived: Bool
+        }
+        var tasks: [TaskItem] = []
+        var habits: [Habit] = []
+        var isEmpty: Bool { tasks.isEmpty && habits.isEmpty }
+    }
+
+    func contents(of id: String?) -> Contents {
+        let known = Set(list().map(\.id))
+        // 分类已删除的任务和习惯按「未分类」显示（与任务页的筛选一致）。
+        func matches(_ uid: String?) -> Bool {
+            guard let id else { return uid == nil || !known.contains(uid!) }
+            return uid == id
+        }
+        let tasks = database.tasks.list()
+            .filter { !$0.isDeleted && matches($0.categoryUid) }
+            .map(TaskItem.init(core:))
+            .sorted { ($0.dueAt ?? .distantFuture) < ($1.dueAt ?? .distantFuture) }
+        let habits = database.habits.list()
+            .filter { !$0.isDeleted && matches($0.categoryUid) }
+            .map { Contents.Habit(id: $0.uid, name: $0.name, colorHex: $0.color.map { HabitItem.hex(fromArgb: $0.intValue) },
+                                  isArchived: $0.status.name == "ARCHIVED") }
+            .sorted { !$0.isArchived && $1.isArchived }
+        return Contents(tasks: tasks, habits: habits)
+    }
+
     /// 已删除的预设分类重新加回来（Core `restorePresets`）。
     func restorePresets() {
         _ = database.categories.restorePresets()

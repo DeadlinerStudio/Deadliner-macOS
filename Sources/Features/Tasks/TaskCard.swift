@@ -17,6 +17,8 @@ struct TaskCard: View {
         var postpone: (Int, Bool) -> Void = { _, _ in }
         /// 选中 / 取消选中（多选）。
         var select: () -> Void = {}
+        /// 复制与安卓相同格式的分享链接。
+        var share: () -> Void = {}
     }
 
     let task: TaskItem
@@ -162,6 +164,7 @@ struct TaskCard: View {
         }
         Button(TaskCommands.canApply(.markArchive, to: task.state) ? "归档" : "归档（需先完成或放弃）", systemImage: "archivebox", action: actions.archive)
             .disabled(!TaskCommands.canApply(.markArchive, to: task.state))
+        Button("复制分享链接", systemImage: "link", action: actions.share)
         Divider()
         Button("选择", systemImage: "checkmark.circle", action: actions.select)
         Button("删除", systemImage: "trash", role: .destructive, action: actions.delete)

@@ -84,6 +84,12 @@ struct SettingsView: View {
     @AppStorage(DailyBriefSettings.fixedTimeKey) private var briefFixedTime = false
     @AppStorage(DailyBriefSettings.fixedMinutesKey) private var briefFixedMinutes = 9 * 60
     @AppStorage(NotificationSettings.daytimeMinutesKey) private var notifyDaytimeMinutes = 9 * 60
+    @AppStorage(NotificationSettings.nearbyHoursKey) private var notifyNearbyHours = 24
+    @AppStorage(DailySummary.enabledKey) private var dailySummaryEnabled = false
+    @AppStorage(DailySummary.minutesKey) private var dailySummaryMinutes = 9 * 60
+    @AppStorage(CelebrationSettings.enabledKey) private var celebrate = true
+    @AppStorage(ShareLinkSettings.detectClipboardKey) private var detectShareLinks = false
+    @AppStorage(DisplayScale.storageKey) private var displayScaleRaw = DisplayScale.standard.rawValue
 
     /// 可用的分类：没有通知控制器或备份时不显示对应分类。
     private var categories: [SettingsCategory] {
@@ -177,6 +183,7 @@ struct SettingsView: View {
             statusSection
         case .notifications:
             notificationSection
+            dailySummarySection
             dailyBriefSection
         case .backup: backupSection
         case .menuBar: menuBarSection
@@ -367,6 +374,14 @@ struct SettingsView: View {
             Toggle("任务页不显示已完成和已放弃的任务", isOn: $hideFinished)
             Text("只影响这台 Mac 的任务页；按「完成时机」筛选时仍会显示。手机和同步数据不变。")
                 .font(.caption).foregroundStyle(.secondary)
+            Toggle("完成时显示动画效果", isOn: $celebrate)
+            Text("把进行中的任务标记为完成时，窗口上方会撒出彩带。开启系统的「减少动态效果」时不播放。")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        Section("分享链接") {
+            Toggle("自动识别剪贴板中的分享链接", isOn: $detectShareLinks)
+            Text("与安卓相同：复制了别人分享的任务链接后切回 Deadliner，会询问是否添加。macOS 可能会先询问是否允许 Deadliner 读取剪贴板；只在剪贴板里是网址时才读取。不开启时，可以用菜单「编辑 → 从剪贴板导入分享链接」（⇧⌘V）。在任务的右键菜单中选「复制分享链接」，可以分享给手机或其他人。")
+                .font(.caption).foregroundStyle(.secondary)
         }
         Section("专注") {
             Toggle("开始专注后关闭编辑窗口", isOn: $closeEditorOnFocus)
@@ -407,6 +422,11 @@ struct SettingsView: View {
             }
             .pickerStyle(.segmented)
             Toggle("衬线字体", isOn: $serif)
+            Picker("显示大小", selection: $displayScaleRaw) {
+                ForEach(DisplayScale.allCases) { Text($0.title).tag($0.rawValue) }
+            }
+            Text("整体缩放主窗口的侧栏和页面内容；设置窗口与弹窗保持系统大小。")
+                .font(.caption).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 8) {
                 Text("主题色")
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 60), spacing: 8)], spacing: 10) {
@@ -419,6 +439,32 @@ struct SettingsView: View {
             .padding(.vertical, 4)
             TaskStatusPreview(statuses: [.undergo, .notStarted])
         }
+    }
+
+    private var dailySummarySection: some View {
+        Section {
+            Toggle("每日摘要通知", isOn: $dailySummaryEnabled)
+                .disabled(!notificationsEnabled)
+            if dailySummaryEnabled {
+                LabeledContent("推送时间") {
+                    DeadlinerDatePicker(selection: Binding(
+                        get: { Calendar.current.date(bySettingHour: dailySummaryMinutes / 60, minute: dailySummaryMinutes % 60,
+                                                     second: 0, of: Date()) ?? Date() },
+                        set: {
+                            let c = Calendar.current.dateComponents([.hour, .minute], from: $0)
+                            dailySummaryMinutes = (c.hour ?? 9) * 60 + (c.minute ?? 0)
+                        }
+                    ), components: .time)
+                }
+            }
+        } header: {
+            Text("每日摘要")
+        } footer: {
+            Text("与安卓相同：每天固定时间推送一条通知，显示今天到期、已逾期和进行中的任务数，点开进入概览。需要先启用通知。")
+        }
+        .onChange(of: dailySummaryEnabled) { notifications?.refresh() }
+        .onChange(of: dailySummaryMinutes) { notifications?.refresh() }
+        .onChange(of: notificationsEnabled) { notifications?.refresh() }
     }
 
     private var dailyBriefSection: some View {
@@ -451,7 +497,14 @@ struct SettingsView: View {
         Section {
             Toggle("启用通知", isOn: Binding(get: { notificationsEnabled }, set: { setNotifications($0) }))
             if notificationsEnabled {
-                Toggle("任务到期前一天提醒", isOn: $notifyTaskNearby)
+                Toggle("任务临近到期提醒", isOn: $notifyTaskNearby)
+                if notifyTaskNearby {
+                    Picker("提前", selection: $notifyNearbyHours) {
+                        ForEach(NotificationSettings.nearbyHourOptions, id: \.self) { hours in
+                            Text(TaskReminderOptions.phrase(hours: hours)).tag(hours)
+                        }
+                    }
+                }
                 Toggle("任务到期时提醒", isOn: $notifyTaskDue)
                 Toggle("习惯打卡提醒", isOn: $notifyHabits)
                 Toggle("23:59 截止的任务改在白天提醒", isOn: $notifyDaytime)
@@ -480,8 +533,9 @@ struct SettingsView: View {
         } header: {
             Text("通知")
         } footer: {
-            Text("提醒时间由 Core 计算，与手机一致；习惯在设定的提醒时间通知。23:59 截止的任务原本在午夜前后提醒（当天截止和提前一天），开启后改在截止当天和前一天的白天时间提醒。同一时刻的多条任务提醒会合并成一条。")
+            Text("到期和习惯提醒由 Core 计算，与手机一致；临近提醒默认提前 1 天，可以改成提前几小时或几天（只在这台 Mac 上）。23:59 截止的任务原本在午夜前后提醒，开启后改在白天时间提醒（临近提醒移到它所在那天的白天）。同一时刻的多条任务提醒会合并成一条。")
         }
+        .onChange(of: notifyNearbyHours) { notifications?.refresh(force: true) }
         .onChange(of: notifyTaskNearby) { notifications?.refresh(force: true) }
         .onChange(of: notifyTaskDue) { notifications?.refresh(force: true) }
         .onChange(of: notifyHabits) { notifications?.refresh(force: true) }
