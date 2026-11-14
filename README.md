@@ -86,7 +86,7 @@ scripts/package.sh ../Deadliner-for-macOS-package   # 打包 DMG 与 ZIP（临�
   - [#2](https://github.com/DeadlinerStudio/DeadlinerCore/pull/2)：`BackupService.restore` 声明 `@Throws`，导入无效备份时报错而不退出
   - [#3](https://github.com/DeadlinerStudio/DeadlinerCore/pull/3)：防止同步时分类被「未命名分类」覆盖
   - [#4](https://github.com/DeadlinerStudio/DeadlinerCore/pull/4)：按日期范围读取概览统计（`loadRange`），用于自定义时间段
-  - 待提交：`IosLifiCore`、`IosQuickAddBridge` 从 `iosMain` 移到 `appleMain`，并允许传入完整的 `AIConfig`，供 macOS 使用 Lifi AI（分支 `mac/apple-lifi`）
+  - [#6](https://github.com/DeadlinerStudio/DeadlinerCore/pull/6)：`IosLifiCore`、`IosQuickAddBridge` 从 `iosMain` 移到 `appleMain`，并允许传入完整的 `AIConfig`，供 macOS 使用 Lifi AI
 - Lifi 模式统一由 `DEADLINER_LIFI_MODE` 管理：默认 `private`（与 iOS / Android / HarmonyOS 相同），需要先运行 Core 的 `runscript/setupLifi.sh`；公开构建使用 `stub`（AI 不可用），`auto` 根据本地安装情况选择。
 - 构建前可统一设置：
 
