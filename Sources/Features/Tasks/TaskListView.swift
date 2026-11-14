@@ -5,6 +5,9 @@ struct TaskListView: View {
     @Bindable var store: TaskListStore
     let commands: TaskCommands
     let categoryCommands: CategoryCommands
+    /// 快速添加与 Lifi AI 的入口（没有时不显示按钮）。
+    var onQuickAdd: (() -> Void)?
+    var onLifi: (() -> Void)?
     /// 同步未启用时，空列表上显示「配置同步」入口。
     var onSetupSync: (() -> Void)?
     /// 搜索时归档中匹配的任务数，以及跳到归档页的动作。
@@ -109,6 +112,18 @@ struct TaskListView: View {
                     Label("排序", systemImage: "arrow.up.arrow.down")
                 }
                 .help("排序")
+            }
+            if let onLifi {
+                ToolbarItem {
+                    Button("Lifi AI", systemImage: "sparkles", action: onLifi)
+                        .help("和 Lifi AI 对话（⌘L）")
+                }
+            }
+            if let onQuickAdd {
+                ToolbarItem {
+                    Button("快速添加", systemImage: "bolt", action: onQuickAdd)
+                        .help("一句话快速添加任务或习惯（⌥⌘N）")
+                }
             }
             ToolbarItem {
                 Button("从日历导入", systemImage: "calendar.badge.plus") { importingCalendar = true }

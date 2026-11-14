@@ -2,7 +2,7 @@ import SwiftUI
 
 /// 设置左侧的分类（参照「系统设置」）。选中的分类记在 `storageKey`。
 enum SettingsCategory: String, CaseIterable, Identifiable {
-    case sync, notifications, backup, menuBar, taskCard, appearance, about
+    case sync, notifications, lifi, backup, menuBar, taskCard, appearance, about
 
     static let storageKey = "settings.category"
     var id: String { rawValue }
@@ -11,6 +11,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .sync: "同步"
         case .notifications: "通知"
+        case .lifi: "Lifi AI"
         case .backup: "备份"
         case .menuBar: "菜单栏"
         case .taskCard: "任务卡片"
@@ -24,6 +25,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .sync: "通过 WebDAV 与手机同步任务、习惯和专注记录。"
         case .notifications: "任务到期与习惯打卡的系统通知。"
+        case .lifi: "AI 助手、快速添加的 AI 识别与记忆。"
         case .backup: "导出或导入与手机端格式一致的完整备份。"
         case .menuBar: "菜单栏图标与下拉面板的内容。"
         case .taskCard: "任务卡片的进度条、剩余时间与状态颜色。"
@@ -36,6 +38,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .sync: "arrow.triangle.2.circlepath"
         case .notifications: "bell.badge.fill"
+        case .lifi: "sparkles"
         case .backup: "externaldrive.fill"
         case .menuBar: "menubar.rectangle"
         case .taskCard: "rectangle.stack.fill"
@@ -48,6 +51,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .sync: .blue
         case .notifications: .red
+        case .lifi: .purple
         case .backup: .teal
         case .menuBar: .indigo
         case .taskCard: .orange

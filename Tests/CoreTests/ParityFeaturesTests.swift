@@ -245,6 +245,71 @@ final class ParityFeaturesTests: XCTestCase {
         XCTAssertEqual(fromAllDay.startAt, date(18, 0))
     }
 
+    // MARK: - Lifi AI
+
+    func testLifiToolExecutor() throws {
+        let commands = TaskCommands(database: container.database) {}
+        var changed = 0
+        let executor = LifiToolExecutor(database: container.database) { changed += 1 }
+        let now = Date()
+        var draft = TaskDraft()
+        draft.title = "示例报告"
+        draft.note = "第三章"
+        draft.dueAt = now.addingTimeInterval(3600 * 5)
+        let id = try commands.save(draft)
+        draft.title = "示例很久以后"
+        draft.dueAt = now.addingTimeInterval(86400 * 30)
+        _ = try commands.save(draft)
+
+        let read = executor.execute(ToolCall.ReadTasks(timeRangeDays: nil, status: nil, keywords: [], limit: 20, sort: nil,
+                                                       agent: nil, reason: nil, executionMode: nil), now: now)
+        XCTAssertEqual(read.tool, "read_tasks")
+        XCTAssertTrue(read.json.contains("示例报告"))
+        XCTAssertFalse(read.json.contains("示例很久以后"), "默认只看前后 7 天")
+        XCTAssertTrue(read.json.contains("\"dueSoon24h\":1"))
+        XCTAssertTrue(LifiToolExecutor.isRead(ToolCall.ReadHabits(keywords: [], agent: nil, reason: nil, executionMode: nil)))
+
+        let create = executor.execute(ToolCall.CreateTask(name: "示例新任务", dueTime: "2026-12-01 09:30", note: nil,
+                                                          agent: nil, reason: nil, executionMode: nil))
+        XCTAssertTrue(create.json.contains("\"pendingUserConfirmation\":true"))
+        XCTAssertEqual(container.database.tasks.list().filter { !$0.isDeleted }.count, 2, "创建工具只生成草案")
+        let invalid = executor.execute(ToolCall.CreateTask(name: "示例", dueTime: "下周", note: nil, agent: nil, reason: nil, executionMode: nil))
+        XCTAssertTrue(invalid.json.contains("\"ok\":false"))
+
+        let update = ToolCall.UpdateDeadline(taskId: id, newDueTime: "2026-12-24 18:00", agent: nil, reason: "示例", executionMode: nil)
+        XCTAssertTrue(LifiToolExecutor.isWrite(update))
+        let updated = executor.execute(update)
+        XCTAssertTrue(updated.json.contains("\"ok\":true"))
+        XCTAssertEqual(commands.item(id)?.dueAt, Calendar.current.date(from: DateComponents(year: 2026, month: 12, day: 24, hour: 18)))
+        XCTAssertEqual(changed, 1)
+        XCTAssertTrue(LifiToolExecutor.denied(update).json.contains("USER_DENIED"))
+        XCTAssertTrue(executor.execute(ToolCall.UpdateDeadline(taskId: "missing", newDueTime: "2026-12-24 18:00", agent: nil, reason: nil, executionMode: nil))
+            .json.contains("TASK_NOT_FOUND"))
+    }
+
+    func testLifiDraftsAndQuickAddParser() {
+        XCTAssertEqual(LifiDrafts.parseDue("2026-11-20 15:00"), date(20, 15))
+        XCTAssertEqual(LifiDrafts.parseDue("2026-11-20T15:00:00"), date(20, 15))
+        XCTAssertEqual(LifiDrafts.parseDue("2026-11-20"), date(20, 23, 59))
+        XCTAssertNil(LifiDrafts.parseDue("明天"))
+        XCTAssertNil(LifiDrafts.parseDue(nil))
+
+        let json = QuickAddParser().parseJson(text: "每天读书", preferredKind: "TASK", timezone: TimeZone.current.identifier)
+        let habit = LifiDrafts.QuickProposal.decode(json)
+        XCTAssertEqual(habit?.isHabit, true)
+        XCTAssertFalse(habit?.title.isEmpty ?? true)
+        XCTAssertNil(habit?.habitDraft.validationError)
+
+        let task = LifiDrafts.QuickProposal.decode(#"{"kind":"TASK","title":"交报告","dueAt":"2026-11-20T15:00","note":"","ready":true,"source":"AI"}"#)
+        XCTAssertEqual(task?.taskDraft.title, "交报告")
+        XCTAssertEqual(task?.taskDraft.dueAt, date(20, 15))
+        let weekly = LifiDrafts.QuickProposal.decode(#"{"kind":"HABIT","title":"力量训练","period":"WEEKLY","targetCount":3,"reminderTime":"07:30"}"#)
+        XCTAssertEqual(weekly?.habitDraft.goalWindow, .week)
+        XCTAssertEqual(weekly?.habitDraft.targetCount, 3)
+        XCTAssertEqual(weekly?.habitDraft.reminderEnabled, true)
+        XCTAssertEqual(LifiAssistantStore.phaseText(agent: "Lifi", phase: "deciding"), "Lifi 正在思考…")
+    }
+
     // MARK: - 显示大小
 
     func testDisplayScaleOptions() {

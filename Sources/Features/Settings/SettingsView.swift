@@ -1,4 +1,5 @@
 import SwiftUI
+import Shared
 import UniformTypeIdentifiers
 
 /// 外观设置（存 UserDefaults）。
@@ -36,6 +37,8 @@ struct SettingsView: View {
     var notifications: NotificationController?
     /// 导入备份后刷新各页面。
     var onBackupImported: (() -> Void)?
+    /// Lifi 的记忆管理使用的数据库；为 nil 时不显示记忆管理（截图测试）。
+    var lifiDatabase: DeadlinerDatabase?
     /// 固定显示的分类（截图测试）；为 nil 时使用记住的分类。
     var pinnedCategory: SettingsCategory?
     @AppStorage(SettingsCategory.storageKey) private var categoryRaw = SettingsCategory.sync.rawValue
@@ -186,6 +189,7 @@ struct SettingsView: View {
             notificationSection
             dailySummarySection
             dailyBriefSection
+        case .lifi: LifiSettingsSection(database: lifiDatabase)
         case .backup: backupSection
         case .menuBar: menuBarSection
         case .taskCard: taskCardSection

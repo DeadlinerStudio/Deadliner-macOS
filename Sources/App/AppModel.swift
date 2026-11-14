@@ -65,6 +65,9 @@ final class AppModel {
     @ObservationIgnored private(set) var taskCommands: TaskCommands!
     @ObservationIgnored private(set) var categoryCommands: CategoryCommands!
     @ObservationIgnored private(set) var habitCommands: HabitCommands!
+    @ObservationIgnored private(set) var lifi: LifiAssistantStore!
+    /// 显示快速添加。
+    var showingQuickAdd = false
 
     init(container: MacCoreContainer) {
         self.container = container
@@ -85,6 +88,7 @@ final class AppModel {
         taskCommands.onTimerConflict = { [unowned self] in timerConflict = $0 }
         habitCommands.onTimerConflict = { [unowned self] in timerConflict = $0 }
         habitCommands.isTiming = { [unowned self] in focusTimer.isTiming(habit: $0) }
+        lifi = LifiAssistantStore(database: database, taskCommands: taskCommands, habitCommands: habitCommands) { [unowned self] in refreshAll() }
         taskCommands.onCompleted = { [unowned self] id in
             celebration += 1
             registerCompletion(id)
@@ -241,6 +245,7 @@ final class AppModel {
     }
 
     func stop() {
+        lifi.close()
         sync.stop()
         taskList.stop()
         habitList.stop()

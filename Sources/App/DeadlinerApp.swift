@@ -15,6 +15,13 @@ struct DeadlinerApp: App {
             CommandGroup(replacing: .newItem) {
                 Button("新建任务") { appDelegate.model?.newTask() }
                     .keyboardShortcut("n", modifiers: [.command])
+                Button("快速添加") {
+                    appDelegate.showMainWindow()
+                    appDelegate.model?.showingQuickAdd = true
+                }
+                .keyboardShortcut("n", modifiers: [.command, .option])
+                Button("Lifi AI") { appDelegate.openLifiAction?() }
+                    .keyboardShortcut("l", modifiers: [.command])
             }
             CommandGroup(after: .textEditing) {
                 Button("搜索") { appDelegate.model?.searchFocusRequest += 1 }
@@ -53,6 +60,20 @@ struct DeadlinerApp: App {
         .windowResizability(.contentSize)
         .defaultPosition(.topTrailing)
 
+        // Lifi AI 对话窗口。
+        Window("Lifi AI", id: LifiWindow.id) {
+            if let model = appDelegate.model {
+                LifiAssistantView(store: model.lifi, openSettings: {
+                    UserDefaults.standard.set(SettingsCategory.lifi.rawValue, forKey: SettingsCategory.storageKey)
+                    appDelegate.showMainWindow()
+                    model.page = .settings
+                })
+                .modifier(AppearancePreferences())
+                .deadlinerTheme()
+            }
+        }
+        .defaultSize(width: 480, height: 640)
+
         // 每日概览弹窗（设置中开启）。
         Window("今日概览", id: DailyBriefSettings.windowId) {
             if let model = appDelegate.model {
@@ -67,7 +88,7 @@ struct DeadlinerApp: App {
         // ⌘, 打开的系统设置窗口（与侧栏中的「设置」页内容相同）。
         Settings {
             if let model = appDelegate.model {
-                SettingsView(sync: model.sync, backup: LocalBackup(database: model.container.database), notifications: model.notifications, onBackupImported: { model.refreshAll() })
+                SettingsView(sync: model.sync, backup: LocalBackup(database: model.container.database), notifications: model.notifications, onBackupImported: { model.refreshAll() }, lifiDatabase: model.container.database)
                     .modifier(AppearancePreferences())
                     .deadlinerTheme()
                     .frame(width: 800, height: 620)
@@ -90,6 +111,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var openFocusWindowAction: (() -> Void)?
     /// 打开每日概览弹窗。
     var openDailyBriefAction: (() -> Void)?
+    /// 打开 Lifi AI 对话窗口。
+    var openLifiAction: (() -> Void)?
     private var dailyBrief: DailyBriefController?
 
     /// 作为单元测试的宿主运行时为 true。此时不打开正式数据库、不启动同步，
@@ -214,6 +237,10 @@ struct RootView: View {
                     appDelegate.openMainWindowAction = { openWindow(id: "main") }
                     appDelegate.openFocusWindowAction = { openWindow(id: FocusTimerWindow.id) }
                     appDelegate.openDailyBriefAction = { openWindow(id: DailyBriefSettings.windowId) }
+                    appDelegate.openLifiAction = {
+                        NSApp.activate(ignoringOtherApps: true)
+                        openWindow(id: LifiWindow.id)
+                    }
                 }
         } else {
             Text("数据库打开失败：\(appDelegate.startupError ?? "未知错误")")
@@ -243,6 +270,8 @@ struct MainView: View {
                 switch model.page {
                 case .tasks:
                     TaskListView(store: model.taskList, commands: model.taskCommands, categoryCommands: model.categoryCommands,
+                                 onQuickAdd: { model.showingQuickAdd = true },
+                                 onLifi: LifiSettings.isAvailable ? { AppDelegate.current?.openLifiAction?() } : nil,
                                  onSetupSync: model.sync.status == .disabled ? { model.page = .settings } : nil,
                                  archiveMatches: { model.archive.taskMatchCount($0) },
                                  onShowArchive: { query in
@@ -261,12 +290,32 @@ struct MainView: View {
                 case .archive:
                     ArchiveView(store: model.archive, commands: model.taskCommands)
                 case .settings:
-                    SettingsView(sync: model.sync, backup: LocalBackup(database: model.container.database), notifications: model.notifications, onBackupImported: { model.refreshAll() })
+                    SettingsView(sync: model.sync, backup: LocalBackup(database: model.container.database), notifications: model.notifications, onBackupImported: { model.refreshAll() }, lifiDatabase: model.container.database)
                 }
             }
             .displayScaled()
             .environment(\.searchFocusRequest, model.searchFocusRequest)
             .environment(\.focusTimer, model.focusTimer)
+        }
+        .sheet(isPresented: $model.showingQuickAdd) {
+            QuickAddSheet(lifi: model.lifi, taskCommands: model.taskCommands, habitCommands: model.habitCommands,
+                          openTaskEditor: { draft in
+                              model.showingQuickAdd = false
+                              DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                  model.page = .tasks
+                                  model.taskList.editor = .init(draft: draft)
+                              }
+                          },
+                          openHabitEditor: { draft in
+                              model.showingQuickAdd = false
+                              DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                  model.page = .habits
+                                  model.habitList.editor = .init(draft: draft)
+                              }
+                          },
+                          onAdded: { _ in model.showingQuickAdd = false },
+                          onClose: { model.showingQuickAdd = false })
+            .deadlinerTheme()
         }
         .sheet(isPresented: $editingProfile) {
             ProfileSheet(store: model.profile) { editingProfile = false }.deadlinerTheme()
@@ -344,4 +393,8 @@ struct MainView: View {
         lines.append("添加后会打开编辑窗口，保存后才会写入。")
         return lines.joined(separator: "\n")
     }
+}
+
+enum LifiWindow {
+    static let id = "lifi"
 }

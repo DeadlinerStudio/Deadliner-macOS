@@ -26,6 +26,7 @@ Liquid Glass 与侧栏下的顶部浮光需要 macOS 26；更早的系统使用�
 - **任务详情**：点按卡片查看时间进度、备注与子任务（子任务可直接勾选、添加），完成后可以撤销
 - **系统日历**：把任务添加到日历，或从日历事件导入任务（可排除不需要的日历）
 - **快捷指令**：新建任务、创建灵感、打开新建任务、导入分享链接
+- **Lifi AI**（包含 Lifi 的构建）：对话助手（⌘L）安排任务、建立习惯、回答关于任务的问题；快速添加（⌥⌘N）一句话识别任务或习惯；记忆管理
 - **习惯**：今日完成度、一周日期条、打卡（勾选型 / 计量型）、艾宾浩斯复习
 - **灵感**：先记下想法，之后合并、整理成任务或习惯
 - **概览**：总览与趋势，可选全部时间、任意月份（‹ › 翻月）或任意起止日期；专注时长、时间投入、较上月同期、日历当天明细
@@ -61,7 +62,7 @@ Liquid Glass 与侧栏下的顶部浮光需要 macOS 26；更早的系统使用�
 3. 点工具栏的 **+** 或按 ⌘N 新建任务；悬停在卡片上可以完成，右键菜单里有更多操作。
 4. 在 **设置 → 通知** 中开启提醒，在 **设置 → 菜单栏** 中自定义菜单栏图标与面板。
 
-快捷键：⌘N 新建任务、⌘F 搜索、⌘R 立即同步、⇧⌘V 从剪贴板导入分享链接、⌘1～⌘7 切换页面、⌘, 设置；概览中 ⌘← / ⌘→ 切换月份。
+快捷键：⌘N 新建任务、⌥⌘N 快速添加、⌘L Lifi AI、⌘F 搜索、⌘R 立即同步、⇧⌘V 从剪贴板导入分享链接、⌘1～⌘7 切换页面、⌘, 设置；概览中 ⌘← / ⌘→ 切换月份。
 
 ## 从源码构建
 
@@ -85,6 +86,7 @@ scripts/package.sh ../Deadliner-for-macOS-package   # 打包 DMG 与 ZIP（临�
   - [#2](https://github.com/DeadlinerStudio/DeadlinerCore/pull/2)：`BackupService.restore` 声明 `@Throws`，导入无效备份时报错而不退出
   - [#3](https://github.com/DeadlinerStudio/DeadlinerCore/pull/3)：防止同步时分类被「未命名分类」覆盖
   - [#4](https://github.com/DeadlinerStudio/DeadlinerCore/pull/4)：按日期范围读取概览统计（`loadRange`），用于自定义时间段
+  - 待提交：`IosLifiCore`、`IosQuickAddBridge` 从 `iosMain` 移到 `appleMain`，并允许传入完整的 `AIConfig`，供 macOS 使用 Lifi AI（分支 `mac/apple-lifi`）
 - Lifi 模式统一由 `DEADLINER_LIFI_MODE` 管理：默认 `private`（与 iOS / Android / HarmonyOS 相同），需要先运行 Core 的 `runscript/setupLifi.sh`；公开构建使用 `stub`（AI 不可用），`auto` 根据本地安装情况选择。
 - 构建前可统一设置：
 
