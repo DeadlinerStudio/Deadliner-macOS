@@ -87,6 +87,11 @@ final class TaskCommands {
         )
     }
 
+    /// 读取一条任务（任务页列表中没有时使用，例如已归档）。
+    func item(_ uid: String) -> TaskItem? {
+        database.tasks.find(uid: uid).flatMap { $0.isDeleted ? nil : TaskItem(core: $0) }
+    }
+
     /// 新建或保存任务，返回任务 uid。
     @discardableResult
     func save(_ draft: TaskDraft) throws -> String {

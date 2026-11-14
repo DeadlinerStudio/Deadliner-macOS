@@ -195,6 +195,56 @@ final class ParityFeaturesTests: XCTestCase {
         XCTAssertEqual(Set(categories.contents(of: nil).tasks.map(\.title)), ["示例任务 A", "示例任务 B"])
     }
 
+    // MARK: - 撤销完成、详情、日历
+
+    func testUndoCompletionRestoresTasks() throws {
+        let model = AppModel(container: container)
+        var draft = TaskDraft()
+        draft.title = "示例撤销"
+        draft.dueAt = date(20, 12)
+        let a = try model.taskCommands.save(draft)
+        draft.title = "示例撤销二"
+        let b = try model.taskCommands.save(draft)
+        try model.taskCommands.toggleComplete(a)
+        try model.taskCommands.toggleComplete(b)   // 1 秒内连续完成：合并成一条
+        XCTAssertEqual(model.undoCompletion?.ids, [a, b])
+        XCTAssertEqual(model.undoCompletion?.title, "2 个任务")
+        XCTAssertEqual(model.celebration, 2)
+        model.undoLastCompletion()
+        XCTAssertNil(model.undoCompletion)
+        XCTAssertEqual(model.taskCommands.item(a)?.state, .active)
+        XCTAssertEqual(model.taskCommands.item(b)?.state, .active)
+        XCTAssertEqual(model.celebration, 2, "撤销不播放动画")
+        XCTAssertNil(model.taskCommands.item("missing"))
+    }
+
+    func testCalendarEventMapping() {
+        // 没有开始时间或开始晚于截止：截止前 1 小时开始。
+        XCTAssertEqual(CalendarBridge.eventTimes(start: nil, due: date(20, 12))?.start, date(20, 11))
+        XCTAssertEqual(CalendarBridge.eventTimes(start: date(21, 9), due: date(20, 12))?.start, date(20, 11))
+        XCTAssertEqual(CalendarBridge.eventTimes(start: date(19, 9), due: date(20, 12))?.start, date(19, 9))
+        XCTAssertNil(CalendarBridge.eventTimes(start: date(19, 9), due: nil))
+        var draft = TaskDraft()
+        draft.note = "备注"
+        draft.subtasks = [.init(id: "a", content: "第一步", isCompleted: true), .init(id: "b", content: "第二步", isCompleted: false)]
+        XCTAssertEqual(CalendarBridge.eventNotes(draft), "备注\n\n☑︎ 第一步\n☐ 第二步")
+
+        let timed = CalendarBridge.Event(id: "1", title: "示例会议", start: date(18, 14), end: date(18, 15), isAllDay: false,
+                                         notes: "会议室 A", calendarId: "c", calendarTitle: "工作")
+        let fromTimed = CalendarBridge.draft(from: timed)
+        XCTAssertEqual(fromTimed.title, "示例会议")
+        XCTAssertEqual(fromTimed.startAt, date(18, 14))
+        XCTAssertEqual(fromTimed.dueAt, date(18, 15))
+        XCTAssertEqual(fromTimed.note, "会议室 A")
+        // 全天事件：EventKit 的结束时间是第二天 0 点，截止取最后一天的 23:59。
+        let allDay = CalendarBridge.Event(id: "2", title: "", start: date(18, 0), end: date(20, 0), isAllDay: true,
+                                          notes: "", calendarId: "c", calendarTitle: "工作")
+        let fromAllDay = CalendarBridge.draft(from: allDay)
+        XCTAssertEqual(fromAllDay.title, "日历事件")
+        XCTAssertEqual(fromAllDay.dueAt, date(19, 23, 59))
+        XCTAssertEqual(fromAllDay.startAt, date(18, 0))
+    }
+
     // MARK: - 显示大小
 
     func testDisplayScaleOptions() {

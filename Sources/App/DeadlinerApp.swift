@@ -79,6 +79,8 @@ struct DeadlinerApp: App {
 /// 持有应用模型，保证数据库在整个应用生命周期内只创建一次，退出时关闭。
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// 当前应用的委托（快捷指令在应用进程内执行时用来取得数据）。
+    private(set) static weak var current: AppDelegate?
     private(set) var model: AppModel?
     private(set) var startupError: String?
     private var menuBar: MenuBarController?
@@ -96,6 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     override init() {
         super.init()
+        Self.current = self
         guard !Self.isRunningTests else {
             startupError = "测试运行中"
             return
@@ -288,6 +291,24 @@ struct MainView: View {
             Text("会先结束并保存这次专注，再执行刚才的操作。")
         }
         .overlay { CelebrationOverlay(trigger: model.celebration) }
+        .overlay(alignment: .bottom) {
+            if let undo = model.undoCompletion {
+                HStack(spacing: 12) {
+                    Label("已完成\(undo.title)", systemImage: "checkmark.circle.fill")
+                        .lineLimit(1)
+                    Button("撤销") { model.undoLastCompletion() }
+                        .buttonStyle(.borderless)
+                        .keyboardShortcut("z", modifiers: [.command])
+                }
+                .font(.callout)
+                .padding(.horizontal, 16)
+                .frame(height: 38)
+                .deadlinerGlass(in: Capsule())
+                .padding(.bottom, 76)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: model.undoCompletion)
         .alert(shareAlertTitle, isPresented: Binding(get: { model.pendingShare != nil }, set: { if !$0 { model.pendingShare = nil } }),
                presenting: model.pendingShare) { share in
             switch share.result {

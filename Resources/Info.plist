@@ -24,6 +24,10 @@
 	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>用于把任务添加到日历，以及从日历事件导入任务。只在你点按相关按钮时访问。</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>用于把任务添加到日历，以及从日历事件导入任务。只在你点按相关按钮时访问。</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

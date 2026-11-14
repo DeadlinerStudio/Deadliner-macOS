@@ -51,6 +51,8 @@ final class AppModel {
     var timerConflict: TimerConflict?
     /// 每次加 1 播放一次完成动画。
     var celebration = 0
+    /// 刚完成的任务，可以撤销（与安卓的「撤销完成」相同）。几秒后消失。
+    var undoCompletion: UndoCompletion?
     /// 打开或在剪贴板中识别到的分享链接，等待用户确认导入。
     var pendingShare: PendingShare?
     @ObservationIgnored private var pasteboardChangeCount = NSPasteboard.general.changeCount
@@ -83,7 +85,46 @@ final class AppModel {
         taskCommands.onTimerConflict = { [unowned self] in timerConflict = $0 }
         habitCommands.onTimerConflict = { [unowned self] in timerConflict = $0 }
         habitCommands.isTiming = { [unowned self] in focusTimer.isTiming(habit: $0) }
-        taskCommands.onCompleted = { [unowned self] _ in celebration += 1 }
+        taskCommands.onCompleted = { [unowned self] id in
+            celebration += 1
+            registerCompletion(id)
+        }
+    }
+
+    // MARK: - 撤销完成
+
+    struct UndoCompletion: Equatable {
+        let token = UUID()
+        var ids: [String]
+        var title: String
+        let startedAt: Date
+    }
+
+    static let undoSeconds: TimeInterval = 5
+
+    /// 一次批量完成（1 秒内连续完成）合并成一条提示。
+    func registerCompletion(_ id: String, now: Date = Date()) {
+        let title = container.database.tasks.find(uid: id)?.title ?? ""
+        if var current = undoCompletion, now.timeIntervalSince(current.startedAt) < 1 {
+            current.ids.append(id)
+            current.title = "\(current.ids.count) 个任务"
+            undoCompletion = current
+            return
+        }
+        let next = UndoCompletion(ids: [id], title: "「\(title)」", startedAt: now)
+        undoCompletion = next
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.undoSeconds) { [weak self] in
+            if self?.undoCompletion?.token == next.token { self?.undoCompletion = nil }
+        }
+    }
+
+    /// 撤销：把刚完成的任务改回进行中（Core 的 MARK_COMPLETE 在两者之间切换）。已经被改成其他状态的跳过。
+    func undoLastCompletion() {
+        guard let undo = undoCompletion else { return }
+        undoCompletion = nil
+        for id in undo.ids where container.database.tasks.find(uid: id)?.state == TaskState.completed {
+            try? taskCommands.toggleComplete(id)
+        }
     }
 
     // MARK: - 分享链接

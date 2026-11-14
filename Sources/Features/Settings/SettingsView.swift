@@ -88,6 +88,7 @@ struct SettingsView: View {
     @AppStorage(DailySummary.enabledKey) private var dailySummaryEnabled = false
     @AppStorage(DailySummary.minutesKey) private var dailySummaryMinutes = 9 * 60
     @AppStorage(CelebrationSettings.enabledKey) private var celebrate = true
+    @AppStorage(TaskDisplaySettings.tapOpensDetailKey) private var tapOpensDetail = true
     @AppStorage(ShareLinkSettings.detectClipboardKey) private var detectShareLinks = false
     @AppStorage(DisplayScale.storageKey) private var displayScaleRaw = DisplayScale.standard.rawValue
 
@@ -373,6 +374,9 @@ struct SettingsView: View {
                 .font(.caption).foregroundStyle(.secondary)
             Toggle("任务页不显示已完成和已放弃的任务", isOn: $hideFinished)
             Text("只影响这台 Mac 的任务页；按「完成时机」筛选时仍会显示。手机和同步数据不变。")
+                .font(.caption).foregroundStyle(.secondary)
+            Toggle("点按卡片打开任务详情", isOn: $tapOpensDetail)
+            Text("与手机相同：点按卡片先查看详情（时间进度、备注、子任务），在详情中再编辑。关闭后点按卡片直接打开编辑窗口。右键菜单中两者都有。")
                 .font(.caption).foregroundStyle(.secondary)
             Toggle("完成时显示动画效果", isOn: $celebrate)
             Text("把进行中的任务标记为完成时，窗口上方会撒出彩带。开启系统的「减少动态效果」时不播放。")

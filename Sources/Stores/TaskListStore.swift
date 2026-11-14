@@ -40,6 +40,13 @@ final class TaskListStore {
     /// 正在打开的编辑器（新建或编辑）。
     var editor: EditorRequest?
 
+    /// 正在查看详情的任务。
+    var detail: DetailRequest?
+
+    struct DetailRequest: Identifiable {
+        let id: String
+    }
+
     struct EditorRequest: Identifiable {
         let id = UUID()
         let draft: TaskDraft

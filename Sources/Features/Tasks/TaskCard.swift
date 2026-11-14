@@ -19,6 +19,11 @@ struct TaskCard: View {
         var select: () -> Void = {}
         /// 复制与安卓相同格式的分享链接。
         var share: () -> Void = {}
+        /// 查看详情；点按卡片时打开详情还是编辑窗口由任务页决定（`tap`）。
+        var detail: (() -> Void)? = nil
+        var tap: (() -> Void)? = nil
+        /// 保存到系统日历（只有有截止时间的任务）。
+        var addToCalendar: (() -> Void)? = nil
     }
 
     let task: TaskItem
@@ -102,7 +107,7 @@ struct TaskCard: View {
         .contentShape(RoundedRectangle(cornerRadius: MiuixRadius.card, style: .continuous))
         .onTapGesture {
             // 多选中点按切换选中；⌘ 点按进入多选。
-            if selected != nil || NSEvent.modifierFlags.contains(.command) { actions?.select() } else { actions?.open() }
+            if selected != nil || NSEvent.modifierFlags.contains(.command) { actions?.select() } else { (actions?.tap ?? actions?.open)?() }
         }
         .contextMenu {
             if let actions {
@@ -150,6 +155,7 @@ struct TaskCard: View {
 
     @ViewBuilder
     private func menu(_ actions: Actions) -> some View {
+        if let detail = actions.detail { Button("查看详情", systemImage: "doc.text.magnifyingglass", action: detail) }
         Button("编辑", systemImage: "pencil", action: actions.open)
         Button(task.isStarred ? "取消标星" : "标星", systemImage: task.isStarred ? "star.slash" : "star", action: actions.toggleStar)
         if task.state == .active, task.dueAt != nil {
@@ -165,6 +171,9 @@ struct TaskCard: View {
         Button(TaskCommands.canApply(.markArchive, to: task.state) ? "归档" : "归档（需先完成或放弃）", systemImage: "archivebox", action: actions.archive)
             .disabled(!TaskCommands.canApply(.markArchive, to: task.state))
         Button("复制分享链接", systemImage: "link", action: actions.share)
+        if let addToCalendar = actions.addToCalendar, task.dueAt != nil {
+            Button("添加到日历", systemImage: "calendar.badge.plus", action: addToCalendar)
+        }
         Divider()
         Button("选择", systemImage: "checkmark.circle", action: actions.select)
         Button("删除", systemImage: "trash", role: .destructive, action: actions.delete)

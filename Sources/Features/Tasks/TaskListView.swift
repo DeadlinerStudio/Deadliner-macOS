@@ -19,6 +19,10 @@ struct TaskListView: View {
     /// 底部的简短提示（例如「已复制分享链接」），几秒后消失。
     @State private var notice: String?
     @State private var showingCategories = false
+    @State private var importingCalendar = false
+    /// 从详情点「编辑」：详情关闭后再打开编辑窗口（两个弹窗不能同时出现）。
+    @State private var editAfterDetail: String?
+    @AppStorage(TaskDisplaySettings.tapOpensDetailKey) private var tapOpensDetail = true
     @AppStorage(CardLayout.storageKey) private var layoutRaw = CardLayout.single.rawValue
     @Environment(\.palette) private var t
 
@@ -107,6 +111,10 @@ struct TaskListView: View {
                 .help("排序")
             }
             ToolbarItem {
+                Button("从日历导入", systemImage: "calendar.badge.plus") { importingCalendar = true }
+                    .help("从系统日历导入任务")
+            }
+            ToolbarItem {
                 Button("新建任务", systemImage: "plus") { store.editor = .init(draft: TaskDraft()) }
                     .help("新建任务（⌘N）")
             }
@@ -144,6 +152,35 @@ struct TaskListView: View {
             TaskEditorSheet(commands: commands, categoryCommands: categoryCommands, draft: request.draft,
                             onSavedTask: { store.sweep.edited[$0, default: 0] += 1 }) {
                 store.editor = nil
+            }
+            .deadlinerTheme()
+        }
+        .sheet(item: $store.detail, onDismiss: {
+            if let id = editAfterDetail, let draft = commands.draft(for: id) { store.editor = .init(draft: draft) }
+            editAfterDetail = nil
+        }) { request in
+            TaskDetailSheet(taskId: request.id,
+                            task: { id in store.tasks.first { $0.id == id } ?? commands.item(id) },
+                            category: { $0.flatMap { store.categories[$0] } },
+                            commands: commands,
+                            onEdit: {
+                                editAfterDetail = request.id
+                                store.detail = nil
+                            },
+                            onAddToCalendar: { addToCalendar(request.id) },
+                            onShare: {
+                                run {
+                                    try commands.copyShareLink(request.id)
+                                    show(notice: "已复制分享链接")
+                                }
+                            },
+                            onClose: { store.detail = nil })
+            .deadlinerTheme()
+        }
+        .sheet(isPresented: $importingCalendar) {
+            CalendarImportSheet(commands: commands, onClose: { importingCalendar = false }) { count in
+                importingCalendar = false
+                show(notice: "已从日历导入 \(count) 个任务")
             }
             .deadlinerTheme()
         }
@@ -197,8 +234,26 @@ struct TaskListView: View {
                     try commands.copyShareLink(task.id)
                     show(notice: "已复制「\(task.title)」的分享链接")
                 }
-            }
+            },
+            detail: { store.detail = .init(id: task.id) },
+            tap: tapOpensDetail ? { store.detail = .init(id: task.id) } : nil,
+            addToCalendar: { addToCalendar(task.id) }
         )
+    }
+
+    /// 保存到系统日历，结果用底部提示告知。
+    private func addToCalendar(_ id: String) {
+        guard let draft = commands.draft(for: id) else { return }
+        _Concurrency.Task {
+            do {
+                switch try await CalendarBridge.shared.save(draft) {
+                case .saved(let calendar): show(notice: "已添加到日历「\(calendar)」")
+                case .duplicate(let calendar): show(notice: "日历「\(calendar)」中已有这个事件")
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     private func show(notice text: String) {
