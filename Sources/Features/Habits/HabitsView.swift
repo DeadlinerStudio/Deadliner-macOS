@@ -39,7 +39,17 @@ struct HabitsView: View {
         .navigationSubtitle(subtitle)
         .searchable(text: $store.searchText, placement: .toolbar, prompt: "搜索习惯")
         .searchFocusOnRequest()
+        .onAppear { store.rollOverIfNeeded() }
         .toolbar {
+            ToolbarItemGroup {
+                Button("上一周", systemImage: "chevron.left") { store.shiftWeek(by: -1) }
+                    .help("上一周")
+                Button("今天") { store.goToToday() }
+                    .disabled(HabitDates.isToday(store.selectedDate))
+                    .help("回到今天")
+                Button("下一周", systemImage: "chevron.right") { store.shiftWeek(by: 1) }
+                    .help("下一周")
+            }
             ToolbarItem {
                 Button("新建习惯", systemImage: "plus") { store.editor = .init(draft: HabitDraft()) }
                     .help("新建习惯")

@@ -79,6 +79,30 @@ final class HabitAndArchiveTests: XCTestCase {
         XCTAssertFalse(habit.canApplyPrimaryAction, "Core 不允许为未来日期打卡")
     }
 
+    /// 应用一直开着跨过了几天：停在旧的「今天」时跟到新的今天，日期条换成新的一周；也可以前后翻周、回到今天。
+    func testFollowsTodayAcrossDaysAndShiftsWeeks() async throws {
+        _ = insertHabit(name: "阅读", mode: .checkOff, target: 1)
+        habits = HabitListStore(database: container.database)
+        habits.start()
+        let today = HabitDates.string(Date())
+        try await waitUntil { self.habits.selectedDate == today }
+        let later = Calendar.current.date(byAdding: .day, value: 3, to: Date())!
+        let laterString = HabitDates.string(later)
+        habits.rollOverIfNeeded(now: later)
+        try await waitUntil { self.habits.selectedDate == laterString }
+        XCTAssertTrue(habits.week.contains { $0.date == laterString }, "日期条换成新的一周")
+
+        habits.shiftWeek(by: -1)
+        let weekBefore = HabitDates.string(Calendar.current.date(byAdding: .day, value: -7, to: later)!)
+        try await waitUntil { self.habits.selectedDate == weekBefore }
+        // 用户特意查看的其他日期：再跨天时不动。
+        habits.rollOverIfNeeded(now: Calendar.current.date(byAdding: .day, value: 4, to: Date())!)
+        try await _Concurrency.Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertEqual(habits.selectedDate, weekBefore)
+        habits.goToToday()
+        try await waitUntil { self.habits.selectedDate == today }
+    }
+
     func testArchiveListsArchivedTasksAndRestoresHabits() throws {
         let commands = TaskCommands(database: container.database) {}
         let done = try commands.save(TaskDraft(title: "已完成并归档"))

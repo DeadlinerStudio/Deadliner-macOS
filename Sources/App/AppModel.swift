@@ -198,6 +198,13 @@ final class AppModel {
     }
 
     func start() {
+        // 午夜跨天时（应用一直开着）让习惯页跟到新的一天。
+        NotificationCenter.default.addObserver(forName: .NSCalendarDayChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.habitList.rollOverIfNeeded()
+                self?.habitList.refresh()
+            }
+        }
         taskList.start()
         habitList.start()
         archive.refresh()
@@ -207,6 +214,7 @@ final class AppModel {
     }
 
     func refreshAll(except skipped: Page? = nil) {
+        habitList.rollOverIfNeeded()
         if skipped != .tasks { taskList.refresh() }
         if skipped != .habits { habitList.refresh() }
         archive.refresh()
