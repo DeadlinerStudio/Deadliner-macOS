@@ -33,6 +33,10 @@ final class TaskListStore {
     static let uncategorized = "__uncategorized"
     /// 完成时机筛选（超前 / 提前 / 按时 / 逾期完成）；nil 为不筛选。
     var timingFilter: CompletionTiming?
+    /// 只看标星（置顶）的任务（与 iOS 搜索页「星标」相同）。
+    var starredOnly = false
+    /// 是否有任何筛选条件（分类、完成时机、星标）。
+    var isFiltered: Bool { categoryFilter != nil || timingFilter != nil || starredOnly }
     /// 设置中的「任务页不显示已完成和已放弃的任务」。
     var hideFinished = UserDefaults.standard.bool(forKey: TaskDisplaySettings.hideFinishedKey)
     /// 卡片进度动画的轮次（见 `CardSweep`）。
@@ -93,6 +97,9 @@ final class TaskListStore {
             filtered = filtered.filter {
                 categoryFilter == Self.uncategorized ? ($0.categoryId.flatMap { categories[$0] } == nil) : $0.categoryId == categoryFilter
             }
+        }
+        if starredOnly {
+            filtered = filtered.filter(\.isStarred)
         }
         if let timingFilter {
             filtered = filtered.filter { CompletionTiming.of($0) == timingFilter }

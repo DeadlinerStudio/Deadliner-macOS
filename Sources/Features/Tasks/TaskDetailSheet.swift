@@ -42,6 +42,13 @@ struct TaskDetailSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("关闭", action: onClose) }
                 if let item = task(taskId) {
                     ToolbarItem(placement: .primaryAction) {
+                        Button(item.isStarred ? "取消标星" : "标星", systemImage: item.isStarred ? "star.fill" : "star") {
+                            run { try commands.setStarred(taskId, !item.isStarred) }
+                        }
+                        .help(item.isStarred ? "取消标星" : "标星（置顶到列表前面）")
+                        .disabled(isLocked)
+                    }
+                    ToolbarItem(placement: .primaryAction) {
                         Menu {
                             Button("复制分享链接", systemImage: "link", action: onShare)
                             Button("添加到日历", systemImage: "calendar.badge.plus", action: onAddToCalendar)

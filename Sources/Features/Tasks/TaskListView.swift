@@ -53,7 +53,7 @@ struct TaskListView: View {
                 onSetupSync: onSetupSync,
                 layout: CardLayout(rawValue: layoutRaw) ?? .single,
                 selection: selection,
-                isFiltered: store.categoryFilter != nil || store.timingFilter != nil,
+                isFiltered: store.isFiltered,
                 archiveMatches: archiveMatches(store.searchText),
                 onShowArchive: onShowArchive.map { show in { show(store.searchText) } },
                 sweep: store.sweep
@@ -74,6 +74,8 @@ struct TaskListView: View {
             }
             ToolbarItem {
                 Menu {
+                    Toggle("只看星标", systemImage: "star", isOn: $store.starredOnly)
+                    Divider()
                     Picker("分类", selection: $store.categoryFilter) {
                         Text("全部分类").tag(String?.none)
                         Divider()
@@ -91,10 +93,10 @@ struct TaskListView: View {
                     }
                     .pickerStyle(.inline)
                 } label: {
-                    Label("筛选", systemImage: store.categoryFilter == nil && store.timingFilter == nil
-                          ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                    Label("筛选", systemImage: store.isFiltered
+                          ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                 }
-                .help("按分类或完成时机筛选")
+                .help("只看星标，或按分类、完成时机筛选")
             }
             ToolbarItem {
                 Button(selection == nil ? "选择" : "完成选择", systemImage: selection == nil ? "checkmark.circle" : "checkmark.circle.fill") {
@@ -280,7 +282,7 @@ struct TaskListView: View {
 
     private var subtitle: String {
         if let selection { return "已选 \(selection.count) 个" }
-        let filtered = !store.searchText.isEmpty || store.categoryFilter != nil
+        let filtered = !store.searchText.isEmpty || store.isFiltered
         return filtered ? "\(store.visibleTasks.count) / \(store.tasks.count) 个任务" : "\(store.tasks.count) 个任务"
     }
 

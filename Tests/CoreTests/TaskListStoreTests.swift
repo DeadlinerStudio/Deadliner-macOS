@@ -44,6 +44,12 @@ final class TaskListStoreTests: XCTestCase {
 
         store.searchText = "早"
         XCTAssertEqual(store.visibleTasks.map(\.title), ["更早截止"])
+
+        store.searchText = ""
+        XCTAssertFalse(store.isFiltered)
+        store.starredOnly = true
+        XCTAssertTrue(store.isFiltered)
+        XCTAssertEqual(store.visibleTasks.map(\.title), ["标星"])
     }
 
     func testRefreshPicksUpWritesFromElsewhere() async throws {
