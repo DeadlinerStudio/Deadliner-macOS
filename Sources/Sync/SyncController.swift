@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Network
 import Observation
@@ -56,6 +57,18 @@ final class SyncController {
     @ObservationIgnored private var backgroundTimer: Timer?
     @ObservationIgnored private let backupSession: URLSession
     @ObservationIgnored private let backupDirectory: () throws -> URL
+    @ObservationIgnored private var sleepObservers: [NSObjectProtocol] = []
+    /// 唤醒后的等待期：此时网络常常还没准备好（例如 VPN 的域名解析），先不同步。
+    @ObservationIgnored private var wakeGraceUntil: Date?
+    @ObservationIgnored private var wakeTask: DispatchWorkItem?
+    @ObservationIgnored private var retryTask: DispatchWorkItem?
+    /// 连续的临时网络错误次数。第一次只记录、不显示为失败。
+    @ObservationIgnored private var transientFailures = 0
+
+    /// 唤醒后等多久再同步。
+    static let wakeGraceSeconds: TimeInterval = 30
+    /// 后台遇到临时错误后多久重试一次（前台由 Core 负责重试）。
+    static let transientRetrySeconds: TimeInterval = 60
 
     init(database: DeadlinerDatabase, keychain: KeychainPasswordStore = .init(), defaults: UserDefaults = .standard,
          backupSession: URLSession = .shared, backupDirectory: @escaping () throws -> URL = RemoteBackup.defaultDirectory,
@@ -76,6 +89,7 @@ final class SyncController {
     /// 启动时调用：已启用同步时按保存的设置开始自动同步。
     func start() {
         startNetworkMonitor()
+        observeSleep()
         restartBackgroundTimer()
         if settings.enabled { applyConfiguration() }
     }
@@ -165,13 +179,17 @@ final class SyncController {
         guard minutes > 0 else { return }
         backgroundTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(minutes * 60), repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, self.configured, !self.appActive else { return }
-                _ = self.database.startSync(trigger: SyncTrigger.periodic, onComplete: self.completionHandler())
+                guard let self, self.configured, !self.appActive, !self.inWakeGrace else { return }
+                self.startBackgroundSync()
             }
         }
     }
 
     func stop() {
+        sleepObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        sleepObservers = []
+        wakeTask?.cancel()
+        retryTask?.cancel()
         backgroundTimer?.invalidate()
         backgroundTimer = nil
         monitor?.cancel()
@@ -229,12 +247,87 @@ final class SyncController {
     }
 
     private func record(_ outcome: Outcome) {
-        let entry = LogEntry(date: Date(), succeeded: outcome.succeeded, applied: outcome.applied,
-                             message: outcome.failure.map(Self.friendly))
+        let transient = !outcome.succeeded && Self.isTransient(outcome.failure ?? "")
+        transientFailures = transient ? transientFailures + 1 : 0
+        // 第一次临时错误（刚唤醒、网络切换）不当作失败显示，稍后自动重试。
+        let quiet = transient && transientFailures == 1
+        let message = quiet ? Self.transientMessage : outcome.failure.map(Self.friendly)
+        let entry = LogEntry(date: Date(), succeeded: outcome.succeeded, applied: outcome.applied, message: message)
         log.insert(entry, at: 0)
         if log.count > 50 { log.removeLast(log.count - 50) }
-        status = outcome.succeeded ? .succeeded(entry.date) : .failed(entry.message ?? "同步失败")
+        if outcome.succeeded {
+            status = .succeeded(entry.date)
+            Diagnostics.sync.info("sync succeeded applied=\(outcome.applied, privacy: .public)")
+        } else if quiet {
+            if case .syncing = status { status = .idle }
+            Diagnostics.sync.notice("sync transient failure, retrying: \(outcome.failure ?? "", privacy: .private)")
+            if !appActive { scheduleTransientRetry() }
+        } else {
+            status = .failed(entry.message ?? "同步失败")
+            Diagnostics.sync.error("sync failed transient=\(transient, privacy: .public): \(outcome.failure ?? "", privacy: .private)")
+        }
         if outcome.applied > 0 { didApplyRemoteChanges() }
+    }
+
+    private var inWakeGrace: Bool { wakeGraceUntil.map { Date() < $0 } ?? false }
+
+    private func startBackgroundSync() {
+        _ = database.startSync(trigger: SyncTrigger.periodic, onComplete: completionHandler())
+    }
+
+    private func scheduleTransientRetry() {
+        retryTask?.cancel()
+        let task = DispatchWorkItem { [weak self] in
+            guard let self, self.configured, !self.appActive, !self.inWakeGrace else { return }
+            self.startBackgroundSync()
+        }
+        retryTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.transientRetrySeconds, execute: task)
+    }
+
+    /// 睡眠前把网络标为不可用；唤醒后等一会儿再恢复，避免在网络就绪前同步失败。
+    private func observeSleep() {
+        guard sleepObservers.isEmpty else { return }
+        let center = NSWorkspace.shared.notificationCenter
+        sleepObservers.append(center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.willSleep() }
+        })
+        sleepObservers.append(center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.didWake() }
+        })
+    }
+
+    func willSleep() {
+        wakeTask?.cancel()
+        retryTask?.cancel()
+        if configured { database.setSyncNetworkAvailable(available: false) }
+    }
+
+    func didWake(grace: TimeInterval = SyncController.wakeGraceSeconds) {
+        wakeGraceUntil = Date().addingTimeInterval(grace)
+        wakeTask?.cancel()
+        let task = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.wakeGraceUntil = nil
+            guard self.configured else { return }
+            // 恢复网络状态：前台时 Core 会立即同步一次；后台时补上等待期内跳过的那次。
+            self.database.setSyncNetworkAvailable(available: self.monitor?.currentPath.status != .unsatisfied)
+            if !self.appActive { self.startBackgroundSync() }
+        }
+        wakeTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + grace, execute: task)
+    }
+
+    static let transientMessage = "暂时连不上服务器（可能刚唤醒或网络切换），稍后自动重试"
+
+    /// 找不到服务器、超时、断网、连接中断等临时错误（NSURLError -1001/-1003/-1004/-1005/-1009 等）。
+    static func isTransient(_ message: String) -> Bool {
+        let codes = ["-1001", "-1003", "-1004", "-1005", "-1009", "-1020"]
+        if codes.contains(where: { message.contains("Code=\($0)") || message.contains("code: \($0)") || message.contains("(\($0))") }) { return true }
+        let phrases = ["timed out", "timeout", "could not be found", "unresolvedaddress", "nodename nor servname",
+                       "network connection was lost", "appears to be offline", "network is unavailable", "no such record"]
+        let lower = message.lowercased()
+        return phrases.contains { lower.contains($0) }
     }
 
     private func startNetworkMonitor() {
@@ -244,7 +337,7 @@ final class SyncController {
             let available = path.status == .satisfied
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    guard let self, self.configured else { return }
+                    guard let self, self.configured, !self.inWakeGrace else { return }
                     self.database.setSyncNetworkAvailable(available: available)
                 }
             }
@@ -259,6 +352,7 @@ final class SyncController {
         if message.contains("HTTP 404") { return "服务器上找不到同步目录（\(message)）" }
         if message.contains("conditional write") { return "云端数据刚被其他设备更新，稍后会自动重试" }
         if message.localizedCaseInsensitiveContains("timeout") || message.localizedCaseInsensitiveContains("timed out") { return "连接超时，请检查网络" }
+        if isTransient(message) { return "连不上服务器，请检查网络或 VPN（\(message)）" }
         return message
     }
 }

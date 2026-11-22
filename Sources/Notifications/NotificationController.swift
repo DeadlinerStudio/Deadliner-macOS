@@ -9,6 +9,7 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
     private let database: DeadlinerDatabase
     private let open: (_ ownerUid: String, _ kind: String) -> Void
     private var timer: Timer?
+    private var summaryWork: DispatchWorkItem?
 
     init(database: DeadlinerDatabase, open: @escaping (_ ownerUid: String, _ kind: String) -> Void) {
         self.database = database
@@ -38,6 +39,7 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
     func stop() {
         timer?.invalidate()
         timer = nil
+        summaryWork?.cancel()
     }
 
     /// 设置变化后传 `force: true`。
@@ -47,8 +49,15 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
     }
 
     /// 按当前任务重新排下一条每日摘要（数据变化后由 AppModel 调用）。
+    /// 写入、激活、刷新常在同一瞬间先后触发，0.5 秒内的多次只执行最后一次。
     func scheduleDailySummary() {
-        DailySummary.schedule(tasks: database.tasks.list().filter { !$0.isDeleted }.map(TaskItem.init(core:)))
+        summaryWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            DailySummary.schedule(tasks: self.database.tasks.list().filter { !$0.isDeleted }.map(TaskItem.init(core:)))
+        }
+        summaryWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
     }
 
     /// 打开通知开关时请求系统授权；返回是否已获授权。

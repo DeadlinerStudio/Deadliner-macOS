@@ -126,6 +126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             startupError = "测试运行中"
             return
         }
+        if let root = try? AppPaths.applicationSupportDirectory() { Diagnostics.configureCoreLog(root: root) }
         do {
             let model = AppModel(container: try MacCoreContainer.makeDefault())
             // 已经设置过同步的用户（更新前就在使用）不再显示新手引导。

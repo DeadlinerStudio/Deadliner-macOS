@@ -254,7 +254,7 @@ struct SettingsView: View {
             ForEach(sync.log.prefix(8)) { entry in
                 LabeledContent(entry.date.formatted(date: .abbreviated, time: .standard)) {
                     Text(entry.succeeded ? (entry.applied > 0 ? "成功，合并了 \(entry.applied) 项云端修改" : "成功") : (entry.message ?? "失败"))
-                        .foregroundStyle(entry.succeeded ? Color.secondary : Color.red)
+                        .foregroundStyle(entry.succeeded || entry.message == SyncController.transientMessage ? Color.secondary : Color.red)
                         .lineLimit(2)
                 }
                 .font(.callout)
@@ -264,6 +264,17 @@ struct SettingsView: View {
                     Text(backup.lastPathComponent).textSelection(.enabled).foregroundStyle(.secondary)
                 }
                 .font(.callout)
+            }
+            if let directory = Diagnostics.directory() {
+                HStack {
+                    Text("诊断日志").font(.callout).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("在访达中显示") {
+                        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                        NSWorkspace.shared.activateFileViewerSelecting([directory])
+                    }
+                }
+                .help("同步与数据层的运行记录，排查问题时可以发给开发者；不含任务内容和密码")
             }
         }
     }

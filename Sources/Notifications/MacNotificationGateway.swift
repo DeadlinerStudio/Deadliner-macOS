@@ -220,36 +220,3 @@ final class MacNotificationGateway: NSObject, NotificationGateway {
         }
     }
 }
-
-/// 系统通知中心。只管理带 `deadliner.` 前缀的请求。
-final class UserNotificationSink: NotificationSink {
-    /// 系统对每个应用待发送的通知数量有上限，只保留最近的这些。
-    private static let limit = 60
-
-    func replaceAll(with notifications: [PlannedNotification]) {
-        let upcoming = notifications.filter { $0.fireAt > Date() }.sorted { $0.fireAt < $1.fireAt }.prefix(Self.limit)
-        UNUserNotificationCenter.current().getPendingNotificationRequests { pending in
-            let center = UNUserNotificationCenter.current()
-            let keep = Set(upcoming.map(\.id))
-            let stale = pending.map(\.identifier).filter { $0.hasPrefix("deadliner.") && !keep.contains($0) }
-            center.removePendingNotificationRequests(withIdentifiers: stale)
-            for item in upcoming {
-                let content = UNMutableNotificationContent()
-                content.title = item.title
-                content.body = item.body
-                content.sound = .default
-                content.userInfo = ["ownerUid": item.ownerUid, "kind": item.kind]
-                let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: item.fireAt)
-                let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-                // 同一标识的请求会被替换，时间或标题变化后无需先删除。
-                center.add(UNNotificationRequest(identifier: item.id, content: content, trigger: trigger))
-            }
-        }
-    }
-
-    func removeAll() {
-        UNUserNotificationCenter.current().getPendingNotificationRequests { pending in
-            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: pending.map(\.identifier).filter { $0.hasPrefix("deadliner.") })
-        }
-    }
-}

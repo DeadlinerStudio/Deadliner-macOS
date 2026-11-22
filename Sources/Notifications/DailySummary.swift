@@ -48,14 +48,26 @@ enum DailySummary {
          defaults.object(forKey: minutesKey) as? Int ?? 9 * 60)
     }
 
-    /// 按当前任务重新排下一条摘要；关闭时移除。
+    /// 按当前任务重新排下一条摘要；关闭时移除。和已排的那条相同（时间与内容都没变）时不再重新添加，
+    /// 关闭且本来就没有排时也不发出删除请求。
     static func schedule(tasks: [TaskItem], now: Date = Date(), defaults: UserDefaults = .standard,
-                         center: UNUserNotificationCenter = .current()) {
-        let setting = settings(defaults)
-        guard setting.enabled else {
-            center.removePendingNotificationRequests(withIdentifiers: [identifier])
-            return
+                         center: PendingNotificationCenter = SystemNotificationCenter.shared) {
+        nonisolated(unsafe) let request = self.request(tasks: tasks, now: now, defaults: defaults)
+        center.pendingRequests { pending in
+            let current = pending.first { $0.identifier == identifier }
+            guard let request else {
+                if current != nil { center.remove([identifier]) }
+                return
+            }
+            if let current, UserNotificationSink.signature(current) == UserNotificationSink.signature(request) { return }
+            center.add(request)
         }
+    }
+
+    /// 要排的摘要请求；关闭时为 nil。
+    static func request(tasks: [TaskItem], now: Date = Date(), defaults: UserDefaults = .standard) -> UNNotificationRequest? {
+        let setting = settings(defaults)
+        guard setting.enabled else { return nil }
         let fire = nextFire(minutes: setting.minutes, now: now)
         let counts = counts(tasks, at: fire)
         let content = UNMutableNotificationContent()
@@ -64,7 +76,7 @@ enum DailySummary {
         content.sound = .default
         content.userInfo = ["ownerUid": "", "kind": kind]
         let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fire)
-        center.add(UNNotificationRequest(identifier: identifier, content: content,
-                                         trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false)))
+        return UNNotificationRequest(identifier: identifier, content: content,
+                                     trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false))
     }
 }
