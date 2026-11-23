@@ -128,12 +128,3 @@ scripts/package.sh ../Deadliner-for-macOS-package   # 打包 DMG 与 ZIP（临�
 本项目基于 GNU 宽通用公共许可证（LGPL）2.1 版发布，或（由你选择）任何更高版本（`LGPL-2.1-or-later`），详情请参见 [LICENSE](LICENSE)。
 
 依赖的 [DeadlinerCore](https://github.com/DeadlinerStudio/DeadlinerCore) 使用 MIT 许可证。
-
-### 在任务页使用本机 CLI
-
-在终端运行支持只读服务的 `deadliner serve`，从 Mac 的「前往 → CLI 任务（只读）」打开窗口并粘贴连接码。窗口每两秒检查同一 CLI profile 的任务更新，支持按标题或备注搜索。在另一个终端修改任务即可看到变化。关闭窗口或点「断开」结束读取，Ctrl+C 结束服务。独立预览窗口始终只读。
-
-自动启动可通过 CLI 包的 `scripts/enable-macos-autostart.sh` 一次性配置。此后打开只读窗口会启动当前用户授权的 CLI 并连接，在断开或关闭时结束该服务。未配置启动器时可照常使用连接码。
-
-
-主窗口的「任务」页可将数据源从「Mac」切换到「CLI」，下次打开会记住选择。配置启动器后，任务页会自动启动可编辑会话；手动连接时运行 `deadliner serve --allow-writes`。终端和这张列表操作同一份 CLI 任务。编辑期间若终端修改了任务，保存会提示冲突并保留草稿，可选择载入最新版本。切回「Mac」即可查看原有 Mac 任务。习惯、概览、菜单栏、提醒及同步设置仍使用 Mac 数据库。

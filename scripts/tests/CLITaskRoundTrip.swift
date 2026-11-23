@@ -13,16 +13,14 @@ struct CLITaskRoundTrip {
         let initial = try await snapshot()
         guard initial.writable == true, let task = initial.items.first, task.title == "上线质量复核",
               let revision = task.updatedAt else { throw URLError(.cannotParseResponse) }
-        var draft = CLITaskDraft(task)
-        draft.note = "Mac 已复核"
-        draft.dueAt = ""
-        try await session.write(op: "update", uid: draft.id, revision: revision, fields: draft.fields)
+        let note = "Mac 已复核"
+        try await session.write(op: "update", uid: task.uid, revision: revision, fields: ["note": note, "dueAt": nil])
         do {
-            try await session.write(op: "update", uid: draft.id, revision: revision, fields: ["note":"stale"])
+            try await session.write(op: "update", uid: task.uid, revision: revision, fields: ["note":"stale"])
             throw URLError(.badServerResponse)
         } catch let error as NSError where error.domain == "DeadlinerCLI" && error.code == 409 {}
         let updated = try await snapshot()
-        guard updated.items.first?.note == draft.note, updated.items.first?.dueAt == nil else {
+        guard updated.items.first?.note == note, updated.items.first?.dueAt == nil else {
             throw URLError(.cannotParseResponse)
         }
     }
