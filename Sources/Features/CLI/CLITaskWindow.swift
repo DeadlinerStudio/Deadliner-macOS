@@ -50,6 +50,7 @@ struct CLITaskSnapshot: Decodable {
 }
 
 struct CLITaskWindow: View {
+    @State private var launcher = CLIAutoLauncher()
     @State private var code = ""
     @State private var connection: CLISession?
     @State private var rows: [CLITaskSnapshot.Row] = []
@@ -62,7 +63,10 @@ struct CLITaskWindow: View {
                 Text("在终端运行 deadliner serve，粘贴连接码以查看 CLI 任务。")
                 SecureField("连接码", text: $code)
                     .onSubmit { connect() }
-                Button("连接", action: connect).keyboardShortcut(.defaultAction)
+                HStack {
+                    Button("连接", action: connect).keyboardShortcut(.defaultAction)
+                    Button("尝试自动启动", action: autoConnect)
+                }
             } else {
                 HStack {
                     TextField("搜索标题或备注", text: $search)
@@ -87,7 +91,20 @@ struct CLITaskWindow: View {
         .task(id: connection) {
             if let connection { await observe(connection) }
         }
+        .onAppear { autoConnect() }
         .onDisappear { disconnect() }
+    }
+
+    private func autoConnect() {
+        status = "正在尝试启动本机 CLI…"
+        launcher.start { selected in
+            code = ""
+            status = "正在连接…"
+            connection = selected
+        } failed: { message in
+            connection = nil
+            status = message
+        }
     }
 
     private func connect() {
@@ -95,12 +112,14 @@ struct CLITaskWindow: View {
             status = "连接码格式有误，请完整复制终端显示的连接码。"
             return
         }
+        launcher.stop()
         code = ""
         status = "正在连接…"
         connection = selected
     }
 
     private func disconnect() {
+        launcher.stop()
         connection = nil
         rows = []
         search = ""
