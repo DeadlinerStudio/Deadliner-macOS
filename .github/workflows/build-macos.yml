@@ -32,6 +32,9 @@ jobs:
         run: |
           xcodebuild -version
           brew list --versions xcodegen || brew install xcodegen
+      - name: Install Kotlin/Native distribution
+        working-directory: core
+        run: ./gradlew -PlifiMode=stub :shared:downloadKotlinNativeDistribution --console=plain
       - name: Build and verify Release packages
         working-directory: client
         run: scripts/package.sh "$RUNNER_TEMP/package"
