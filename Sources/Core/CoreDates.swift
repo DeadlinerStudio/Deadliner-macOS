@@ -1,12 +1,12 @@
 import Foundation
 
 /// Core 与手机共用的时间格式（见规范 v6 第 5.3 节）：
-/// - 任务的 `startAt` / `dueAt`：本地时间、不带时区，`yyyy-MM-ddTHH:mm:ss`（兼容不带秒）。
+/// - 任务的 `startAt` / `dueAt`：无时区时按本地时间读取（兼容不带秒），带时区时按 ISO-8601 读取。
 /// - `createdAt` / `updatedAt` / `completedAt`：UTC ISO-8601，以 `Z` 结尾，可能带毫秒。
 enum CoreDates {
     static func parseLocal(_ value: String?) -> Date? {
         guard let value, !value.isEmpty else { return nil }
-        return localWithSeconds.date(from: value) ?? localWithoutSeconds.date(from: value)
+        return localWithSeconds.date(from: value) ?? localWithoutSeconds.date(from: value) ?? parseInstant(value)
     }
 
     static func parseInstant(_ value: String?) -> Date? {
