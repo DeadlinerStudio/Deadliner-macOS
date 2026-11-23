@@ -38,6 +38,7 @@ struct TaskListView: View {
     }
 
     @AppStorage(TaskDisplaySettings.hideFinishedKey) private var hideFinished = false
+    @AppStorage(MotivationalQuotes.enabledKey) private var showQuotes = true
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
@@ -56,7 +57,8 @@ struct TaskListView: View {
                 isFiltered: store.isFiltered,
                 archiveMatches: archiveMatches(store.searchText),
                 onShowArchive: onShowArchive.map { show in { show(store.searchText) } },
-                sweep: store.sweep
+                sweep: store.sweep,
+                motto: showQuotes && selection == nil ? MotivationalQuotes.quote(at: context.date) : nil
             )
             .topAtmosphere(Self.tone(for: store.visibleTasks, now: context.date, palette: t))
         }
@@ -357,10 +359,23 @@ struct TaskListContent: View {
     var onShowArchive: (() -> Void)?
     /// 进度动画的轮次（见 `CardSweep`）。
     var sweep = CardSweep()
+    /// 标题下方的鼓励语句；nil 时不显示。
+    var motto: String?
     @Environment(\.palette) private var t
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if let motto, !motto.isEmpty {
+                Text(verbatim: motto)
+                    .font(.callout)
+                    .foregroundStyle(t.onSurfaceVariant)
+                    .lineLimit(1)
+                    .padding(.horizontal, 32)
+                    .padding(.top, 8)
+                    .contentTransition(.opacity)
+                    .animation(.easeInOut(duration: 0.4), value: motto)
+                    .accessibilityLabel(motto)
+            }
             if let errorMessage {
                 Text("读取任务失败：\(errorMessage)")
                     .font(.callout)

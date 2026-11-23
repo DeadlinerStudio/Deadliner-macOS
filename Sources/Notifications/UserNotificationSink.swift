@@ -116,6 +116,7 @@ final class UserNotificationSink: NotificationSink, @unchecked Sendable {
                 content.body = item.body
                 content.sound = .default
                 content.userInfo = ["ownerUid": item.ownerUid, "kind": item.kind]
+                content.categoryIdentifier = TaskNotificationActions.category(forKind: item.kind)
                 let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: item.fireAt)
                 return UNNotificationRequest(identifier: item.id, content: content,
                                              trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false))
@@ -135,12 +136,12 @@ final class UserNotificationSink: NotificationSink, @unchecked Sendable {
         return changes
     }
 
-    /// 判断两个请求是否相同：触发时间（到秒）、标题、正文、类型与所属任务。
+    /// 判断两个请求是否相同：触发时间（到秒）、标题、正文、按钮类别、类型与所属任务。
     static func signature(_ request: UNNotificationRequest) -> String {
         let c = (request.trigger as? UNCalendarNotificationTrigger)?.dateComponents
         let time = [c?.year, c?.month, c?.day, c?.hour, c?.minute, c?.second].map { $0.map(String.init) ?? "-" }.joined(separator: ".")
         let info = request.content.userInfo
-        return [time, request.content.title, request.content.body,
+        return [time, request.content.title, request.content.body, request.content.categoryIdentifier,
                 info["kind"] as? String ?? "", info["ownerUid"] as? String ?? ""].joined(separator: "\u{1F}")
     }
 }

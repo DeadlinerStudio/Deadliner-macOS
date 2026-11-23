@@ -8,6 +8,8 @@ import UserNotifications
 final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
     private let database: DeadlinerDatabase
     private let open: (_ ownerUid: String, _ kind: String) -> Void
+    /// 通知按钮「完成」「删除」交给任务命令执行（由 AppDelegate 提供）。
+    var perform: ((_ action: TaskNotificationActions.Action, _ ownerUid: String) -> Void)?
     private var timer: Timer?
     private var summaryWork: DispatchWorkItem?
 
@@ -19,6 +21,7 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
 
     func start() {
         UNUserNotificationCenter.current().delegate = self
+        TaskNotificationActions.register()
         _ = database.configureNotificationUpdates(
             gateway: MacNotificationGateway(sink: UserNotificationSink(), taskReminders: { NotificationSettings.taskReminders() }),
             policyProvider: Self.policyProvider,
@@ -55,6 +58,7 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             DailySummary.schedule(tasks: self.database.tasks.list().filter { !$0.isDeleted }.map(TaskItem.init(core:)))
+            self.pruneSnoozes()
         }
         summaryWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
@@ -78,12 +82,53 @@ final class NotificationController: NSObject, UNUserNotificationCenterDelegate {
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        let info = response.notification.request.content.userInfo
-        let owner = info["ownerUid"] as? String ?? ""
-        let kind = info["kind"] as? String ?? ""
+        let content = response.notification.request.content
+        let owner = content.userInfo["ownerUid"] as? String ?? ""
+        let kind = content.userInfo["kind"] as? String ?? ""
+        let action = TaskNotificationActions.action(for: response.actionIdentifier)
+        nonisolated(unsafe) let original = content
         await MainActor.run {
-            refresh()
-            open(owner, kind)
+            switch action {
+            case .complete?, .delete?:
+                if let action, !owner.isEmpty { perform?(action, owner) }
+                refresh()
+            case .later?:
+                snooze(owner, content: original)
+            case nil:
+                refresh()
+                open(owner, kind)
+            }
+        }
+    }
+
+    // MARK: - 稍后提醒
+
+    /// 按剩余时间的一半（至少 1 小时）再提醒一次；任务完成、放弃或删除后自动取消。
+    func snooze(_ uid: String, content original: UNNotificationContent, now: Date = Date(),
+                center: PendingNotificationCenter = SystemNotificationCenter.shared) {
+        guard !uid.isEmpty, let task = database.tasks.find(uid: uid), !task.isDeleted, task.state == .active else { return }
+        let hours = TaskNotificationActions.laterDelayHours(dueAt: CoreDates.parseLocal(task.dueAt), now: now)
+        guard let content = original.mutableCopy() as? UNMutableNotificationContent else { return }
+        content.categoryIdentifier = TaskNotificationActions.categoryId
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(hours * 3600), repeats: false)
+        center.add(UNNotificationRequest(identifier: TaskNotificationActions.snoozeId(uid), content: content, trigger: trigger))
+        Diagnostics.notifications.info("snoozed task reminder hours=\(hours, privacy: .public)")
+    }
+
+    /// 去掉已经不需要的「稍后提醒」（任务已不在进行中或已删除）。
+    func pruneSnoozes(center: PendingNotificationCenter = SystemNotificationCenter.shared) {
+        center.pendingRequests { [weak self] pending in
+            let ids = pending.map(\.identifier).filter { $0.hasPrefix(TaskNotificationActions.snoozePrefix) }
+            guard !ids.isEmpty else { return }
+            DispatchQueue.main.async {
+                guard let database = self?.database else { return }
+                let stale = ids.filter { id in
+                    let uid = String(id.dropFirst(TaskNotificationActions.snoozePrefix.count))
+                    guard let task = database.tasks.find(uid: uid), !task.isDeleted else { return true }
+                    return task.state != .active
+                }
+                center.remove(stale)
+            }
         }
     }
 }

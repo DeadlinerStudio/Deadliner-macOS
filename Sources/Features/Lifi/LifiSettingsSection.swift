@@ -17,6 +17,8 @@ struct LifiSettingsSection: View {
     @State private var message: String?
     @State private var probing = false
     @State private var managingMemory = false
+    @State private var customPrompt = UserDefaults.standard.string(forKey: LifiSettings.customPromptKey) ?? ""
+    @State private var promptSaved = false
 
     var body: some View {
         Group { content }
@@ -64,6 +66,30 @@ struct LifiSettingsSection: View {
                 Text("AI 提出的任务和习惯直接添加（可以在对话中撤回），不再逐条确认。").font(.caption).foregroundStyle(.secondary)
                 Toggle("隐藏思考过程", isOn: $hideThinking)
                 Text("不显示「正在思考」「等待工具结果」等过程信息。").font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                TextEditor(text: $customPrompt)
+                    .font(.body)
+                    .frame(minHeight: 80)
+                    .onChange(of: customPrompt) {
+                        promptSaved = false
+                        if customPrompt.count > LifiSettings.customPromptLimit {
+                            customPrompt = String(customPrompt.prefix(LifiSettings.customPromptLimit))
+                        }
+                    }
+                HStack {
+                    if promptSaved { Text("提示词已保存").font(.caption).foregroundStyle(.green) }
+                    Spacer()
+                    Button("保存提示词") {
+                        UserDefaults.standard.set(customPrompt.trimmingCharacters(in: .whitespacesAndNewlines), forKey: LifiSettings.customPromptKey)
+                        promptSaved = true
+                    }
+                    .disabled(customPrompt.trimmingCharacters(in: .whitespacesAndNewlines) == LifiSettings.customPrompt)
+                }
+            } header: {
+                Text("自定义提示词")
+            } footer: {
+                Text("与安卓相同：从一段文字中识别任务（快速添加的「AI 识别」）时，这段话会附在原文之前，例如「默认截止时间为当天 23:59」「课程名放在标题开头」。留空则不附加。")
             }
             if database != nil {
                 Section {

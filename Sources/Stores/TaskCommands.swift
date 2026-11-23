@@ -141,6 +141,19 @@ final class TaskCommands {
 
     func unarchive(_ uid: String) throws { try apply(TaskAction.unarchive, to: uid) }
 
+    /// 自动归档：把完成超过 `days` 天的任务一次归档，最后只通知一次刷新。返回归档的数量。
+    @discardableResult
+    func archiveExpired(days: Int, now: Date = Date()) -> Int {
+        let tasks = database.tasks.list().filter { !$0.isDeleted }.map(TaskItem.init(core:))
+        var archived = 0
+        for uid in AutoArchive.due(tasks, days: days, now: now) {
+            let outcome = database.tasks.applyAction(uid: uid, action: TaskAction.markArchive, occurredAt: CoreClock.now()).outcome
+            if outcome.name == "APPLIED" { archived += 1 }
+        }
+        if archived > 0 { didChange() }
+        return archived
+    }
+
     /// 延期：Core 规定 1～168 小时或 1～7 天。
     func postpone(_ uid: String, amount: Int, inHours: Bool) throws {
         let delay = TaskDeadlineDelay(amount: Int32(amount), unit: inHours ? TaskDeadlineUnit.hours : TaskDeadlineUnit.days)

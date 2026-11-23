@@ -203,14 +203,26 @@ final class AppModel {
             MainActor.assumeIsolated {
                 self?.habitList.rollOverIfNeeded()
                 self?.habitList.refresh()
+                self?.runAutoArchive()
             }
         }
+        NotificationCenter.default.addObserver(forName: AutoArchive.settingsChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.runAutoArchive() }
+        }
+        runAutoArchive()
         taskList.start()
         habitList.start()
         archive.refresh()
         focus.refresh()
         focusTimer.start()
         sync.start()
+    }
+
+    /// 自动归档：启动、跨天、回到前台和设置变化时检查一次（关闭时不处理）。
+    func runAutoArchive(now: Date = Date()) {
+        let setting = AutoArchive.settings()
+        guard setting.enabled else { return }
+        taskCommands.archiveExpired(days: setting.days, now: now)
     }
 
     func refreshAll(except skipped: Page? = nil) {

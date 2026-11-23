@@ -88,7 +88,7 @@ final class LifiAssistantStore {
     func extractQuickAdd(_ text: String, kind: String) async throws -> String {
         if let problem = ensureCore() { throw LifiError(message: problem) }
         guard let core else { throw LifiError(message: "Lifi 尚未初始化") }
-        return try await IosQuickAddBridge().extractJson(core: core, text: text, kind: kind)
+        return try await IosQuickAddBridge().extractJson(core: core, text: LifiSettings.extractionInput(text), kind: kind)
     }
 
     func send(_ raw: String) {

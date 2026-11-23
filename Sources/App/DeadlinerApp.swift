@@ -152,6 +152,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             model?.page = kind.hasPrefix("HABIT") ? .habits : kind == DailySummary.kind ? .overview : .tasks
             self?.showMainWindow()
         }
+        notifications.perform = { [weak model] action, uid in
+            guard let model else { return }
+            switch action {
+            case .complete:
+                if model.taskCommands.item(uid)?.state == .active { try? model.taskCommands.toggleComplete(uid) }
+            case .delete:
+                try? model.taskCommands.delete(uid)
+            case .later:
+                break
+            }
+        }
         notifications.start()
         model.notifications = notifications
         // 主窗口内容出现后才有打开窗口的入口，稍后再开始判断。
@@ -178,6 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
+        model?.runAutoArchive()
         model?.refreshAll()
         model?.focusTimer.reconcile()
         model?.sync.setForeground(true)

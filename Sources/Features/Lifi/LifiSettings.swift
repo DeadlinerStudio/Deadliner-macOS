@@ -9,6 +9,18 @@ enum LifiSettings {
     static let autoApproveReadKey = "lifi.autoApproveRead"
     static let silentAddKey = "lifi.silentAdd"
     static let hideThinkingKey = "lifi.hideThinking"
+    /// 自定义提示词（与安卓相同）：从一段文字中识别任务时，附在用户原文之前，用来说明自己的习惯和要求。
+    static let customPromptKey = "lifi.customPrompt"
+    static let customPromptLimit = 2000
+
+    static var customPrompt: String {
+        (UserDefaults.standard.string(forKey: customPromptKey) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// 交给 AI 识别的内容：有自定义提示词时放在原文之前。
+    static func extractionInput(_ text: String, prompt: String = customPrompt) -> String {
+        prompt.isEmpty ? text : prompt + "\n\n" + text
+    }
     static let urlKey = "overview.ai.url"
     static let modelKey = "overview.ai.model"
 

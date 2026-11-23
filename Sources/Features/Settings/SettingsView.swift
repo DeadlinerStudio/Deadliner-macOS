@@ -92,6 +92,10 @@ struct SettingsView: View {
     @AppStorage(DailySummary.minutesKey) private var dailySummaryMinutes = 9 * 60
     @AppStorage(CelebrationSettings.enabledKey) private var celebrate = true
     @AppStorage(TaskDisplaySettings.tapOpensDetailKey) private var tapOpensDetail = true
+    @AppStorage(MotivationalQuotes.enabledKey) private var showQuotes = true
+    @State private var updateState = UpdateState.idle
+    @AppStorage(AutoArchive.enabledKey) private var autoArchive = false
+    @AppStorage(AutoArchive.daysKey) private var autoArchiveDays = AutoArchive.defaultDays
     @AppStorage(ShareLinkSettings.detectClipboardKey) private var detectShareLinks = false
     @AppStorage(DisplayScale.storageKey) private var displayScaleRaw = DisplayScale.standard.rawValue
 
@@ -396,7 +400,26 @@ struct SettingsView: View {
             Toggle("完成时显示动画效果", isOn: $celebrate)
             Text("把进行中的任务标记为完成时，窗口上方会撒出彩带。开启系统的「减少动态效果」时不播放。")
                 .font(.caption).foregroundStyle(.secondary)
+            Toggle("任务页显示鼓励语句", isOn: $showQuotes)
+            Text("在任务页顶部显示一句鼓励的话，每分钟换一句。")
+                .font(.caption).foregroundStyle(.secondary)
         }
+        Section {
+            Toggle("自动归档已完成的任务", isOn: $autoArchive)
+            if autoArchive {
+                Picker("完成后多久归档", selection: $autoArchiveDays) {
+                    ForEach(AutoArchive.dayOptions, id: \.self) { Text("\($0) 天").tag($0) }
+                }
+            }
+        } header: {
+            Text("自动归档")
+        } footer: {
+            Text(autoArchive
+                 ? "任务完成 \(autoArchiveDays) 天后自动移入归档（打开应用、回到前台和每天零点时检查）。归档会同步到其他设备，可以在归档页恢复。放弃的任务不会自动归档。"
+                 : "开启后，完成超过设定天数的任务会自动移入归档，与手机端相同。")
+        }
+        .onChange(of: autoArchive) { NotificationCenter.default.post(name: AutoArchive.settingsChanged, object: nil) }
+        .onChange(of: autoArchiveDays) { NotificationCenter.default.post(name: AutoArchive.settingsChanged, object: nil) }
         Section("分享链接") {
             Toggle("自动识别剪贴板中的分享链接", isOn: $detectShareLinks)
             Text("与安卓相同：复制了别人分享的任务链接后切回 Deadliner，会询问是否添加。macOS 可能会先询问是否允许 Deadliner 读取剪贴板；只在剪贴板里是网址时才读取。不开启时，可以用菜单「编辑 → 从剪贴板导入分享链接」（⇧⌘V）。在任务的右键菜单中选「复制分享链接」，可以分享给手机或其他人。")
@@ -647,6 +670,25 @@ struct SettingsView: View {
     private var aboutSection: some View {
         Section("关于") {
             LabeledContent("版本", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
+            LabeledContent("检查更新") {
+                HStack(spacing: 8) {
+                    switch updateState {
+                    case .idle: EmptyView()
+                    case .checking: ProgressView().controlSize(.small)
+                    case .result(.upToDate(let current)): Text("已是最新版本（\(current)）").foregroundStyle(.secondary)
+                    case .result(.available(let version, let page)):
+                        Text("发现新版本 \(version)")
+                        Link("前往下载", destination: page)
+                    case .failed(let message): Text("检查失败：\(message)").foregroundStyle(.red).lineLimit(2)
+                    }
+                    Button("检查") { checkForUpdates() }
+                        .disabled(updateState == .checking)
+                }
+            }
+            if case .result(.available) = updateState, LifiSettings.isAvailable {
+                Text("下载页提供的是公开版，不含 Lifi AI；当前使用的 AI 版需要在本机重新打包。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             LabeledContent("新手引导") {
                 Button("重新显示") { UserDefaults.standard.set(false, forKey: Onboarding.doneKey) }
             }
@@ -657,6 +699,19 @@ struct SettingsView: View {
                     .truncationMode(.middle)
                     .textSelection(.enabled)
             }
+        }
+    }
+
+    enum UpdateState: Equatable {
+        case idle, checking
+        case result(UpdateChecker.Outcome)
+        case failed(String)
+    }
+
+    private func checkForUpdates() {
+        updateState = .checking
+        _Concurrency.Task {
+            do { updateState = .result(try await UpdateChecker.check()) } catch { updateState = .failed(error.localizedDescription) }
         }
     }
 
