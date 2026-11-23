@@ -72,6 +72,28 @@ final class TaskStatusTests: XCTestCase {
         XCTAssertEqual(TaskStatus.remainingText(task(due: nil), now: now), "")
     }
 
+    func testSyncedTaskProgressWithOffsetDates() throws {
+        var item = task(due: nil)
+        item.startAt = CoreDates.parseLocal("2026-11-23T09:30:00+08:00")
+        item.dueAt = CoreDates.parseLocal("2026-11-23T18:30:00+08:00")
+        let sample = try XCTUnwrap(CoreDates.parseInstant("2026-11-23T03:58:00Z"))
+
+        XCTAssertEqual(TaskStatus.displayedProgress(item, now: sample, forward: false), 392.0 / 540, accuracy: 0.000001)
+        XCTAssertEqual(TaskStatus.displayedProgress(item, now: sample, forward: true), 148.0 / 540, accuracy: 0.000001)
+    }
+
+    func testTaskDateTimeZones() throws {
+        let utc = try XCTUnwrap(CoreDates.parseInstant("2026-11-23T01:30:00.125Z"))
+        XCTAssertEqual(CoreDates.parseLocal("2026-11-23T01:30:00.125Z"), utc)
+        XCTAssertEqual(CoreDates.parseLocal("2026-11-22T17:30:00.125-08:00"), utc)
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let local = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 11, day: 23, hour: 9, minute: 30)))
+        XCTAssertEqual(CoreDates.parseLocal("2026-11-23T09:30:00"), local)
+        XCTAssertEqual(CoreDates.parseLocal("2026-11-23T09:30"), local)
+    }
+
     func testCoreDateFormats() {
         XCTAssertNotNil(CoreDates.parseLocal("2026-11-20T09:00:00"))
         XCTAssertNotNil(CoreDates.parseLocal("2026-11-20T09:00"))
