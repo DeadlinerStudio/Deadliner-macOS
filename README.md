@@ -131,4 +131,4 @@ scripts/package.sh ../Deadliner-for-macOS-package   # 打包 DMG 与 ZIP（临�
 
 ### 本机任务整合
 
-任务卡片、编辑器、归档和菜单栏都通过原有 Core 仓库读写。安装支持任务快照的 CLI 后，在终端运行一次 `sh "$(npm root -g)/@deadlinerstudio/cli/scripts/enable-macos-autostart.sh"` 授权沙盒启动器。客户端此后在后台自动连接，两端各自已有的任务保留，同一 UID 按 Core 版本合并，包括子任务、分类和删除标记。服务不可用时仍可本地编辑，恢复后自动合并。
+任务卡片、编辑器、归档和菜单栏都通过原有 Core 仓库读写。为当前用户全局安装支持任务快照的 CLI 时，npm 会自动登记启动器。手动安装或跳过安装脚本时，可在终端运行一次 `sh "$(npm root -g)/@deadlinerstudio/cli/scripts/enable-macos-autostart.sh"` 授权沙盒启动器。客户端此后在后台自动连接，两端各自已有的任务保留，同一 UID 按 Core 版本合并，包括子任务、分类和删除标记。服务不可用时仍可本地编辑，恢复后自动合并。
