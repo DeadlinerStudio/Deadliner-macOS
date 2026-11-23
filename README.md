@@ -128,3 +128,7 @@ scripts/package.sh ../Deadliner-for-macOS-package   # 打包 DMG 与 ZIP（临�
 本项目基于 GNU 宽通用公共许可证（LGPL）2.1 版发布，或（由你选择）任何更高版本（`LGPL-2.1-or-later`），详情请参见 [LICENSE](LICENSE)。
 
 依赖的 [DeadlinerCore](https://github.com/DeadlinerStudio/DeadlinerCore) 使用 MIT 许可证。
+
+### 本机任务整合
+
+任务卡片、编辑器、归档和菜单栏都通过原有 Core 仓库读写。安装支持任务快照的 CLI 后，在终端运行一次 `sh "$(npm root -g)/@deadlinerstudio/cli/scripts/enable-macos-autostart.sh"` 授权沙盒启动器。客户端此后在后台自动连接，两端各自已有的任务保留，同一 UID 按 Core 版本合并，包括子任务、分类和删除标记。服务不可用时仍可本地编辑，恢复后自动合并。

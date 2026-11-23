@@ -1,27 +1,40 @@
 import Foundation
+import Shared
 
 @main
 struct CLITaskRoundTrip {
+    @MainActor
     static func main() async throws {
         guard let line = readLine(), let session = CLISession(code: line) else { throw URLError(.badURL) }
-        let client = session.makeClient()
-        defer { client.invalidateAndCancel() }
-        func snapshot() async throws -> CLITaskSnapshot {
-            let (data, _) = try await client.data(for: session.request(revision: nil))
-            return try JSONDecoder().decode(CLITaskSnapshot.self, from: data)
+        let path = URL(fileURLWithPath: CommandLine.arguments[1]).appendingPathComponent("mac.sqlite")
+        let factory = MacosDatabaseDriverFactory(databasePath: path.path, deviceId: "mac-test")
+        let database = DeadlinerDatabase.companion.create(factory: factory)
+        defer { database.close() }
+        let peer = LocalTaskPeer(database: database) {}
+        defer { peer.stop() }
+        let commands = TaskCommands(database: database) { peer.localDidChange() }
+        try commands.save(TaskDraft(title: "Mac only"))
+        peer.attach(session)
+
+        func waitFor(_ predicate: () -> Bool) async throws {
+            for _ in 0..<150 {
+                if predicate() { return }
+                try await Task.sleep(for: .milliseconds(150))
+            }
+            throw URLError(.timedOut)
         }
-        let initial = try await snapshot()
-        guard initial.writable == true, let task = initial.items.first, task.title == "上线质量复核",
-              let revision = task.updatedAt else { throw URLError(.cannotParseResponse) }
-        let note = "Mac 已复核"
-        try await session.write(op: "update", uid: task.uid, revision: revision, fields: ["note": note, "dueAt": nil])
+
+        try await waitFor { commands.item("quality-check")?.title == "上线质量复核" }
+        guard var draft = commands.draft(for: "quality-check") else { throw URLError(.cannotParseResponse) }
+        draft.note = "Mac 已复核"
+        draft.dueAt = nil
+        draft.subtasks.append(.init(id: "subtask", content: "复核证据", isCompleted: true))
+        try commands.save(draft)
+        try await waitFor { commands.draft(for: "quality-check")?.note == "终端已确认" }
+        guard commands.item("quality-check")?.subtaskDone == 1 else { throw URLError(.cannotParseResponse) }
         do {
-            try await session.write(op: "update", uid: task.uid, revision: revision, fields: ["note":"stale"])
+            try commands.save(draft)
             throw URLError(.badServerResponse)
-        } catch let error as NSError where error.domain == "DeadlinerCLI" && error.code == 409 {}
-        let updated = try await snapshot()
-        guard updated.items.first?.note == note, updated.items.first?.dueAt == nil else {
-            throw URLError(.cannotParseResponse)
-        }
+        } catch TaskCommandError.changedWhileEditing {}
     }
 }

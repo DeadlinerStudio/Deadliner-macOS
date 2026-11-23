@@ -65,5 +65,8 @@ jobs:
         run: |
           gh run download "$CLI_RUN_ID" -R DeadlinerStudio/DeadlinerCli -n deadliner-cli-arm64 -D "$RUNNER_TEMP/cli-package"
           tar -xzf "$RUNNER_TEMP"/cli-package/*.tgz -C "$RUNNER_TEMP/cli-package"
-          swiftc -swift-version 6 Sources/Features/CLI/*.swift scripts/tests/CLITaskRoundTrip.swift -o "$RUNNER_TEMP/probe"
+          swiftc -swift-version 6 -F Frameworks -framework Shared -Xlinker -rpath -Xlinker "$PWD/Frameworks" \
+            Sources/Features/CLI/*.swift Sources/Core/{LocalTaskPeer,CoreClock,CoreDates}.swift \
+            Sources/Models/TaskItem.swift Sources/Stores/TaskCommands.swift Sources/Features/Tasks/TaskShareLink.swift \
+            scripts/tests/CLITaskRoundTrip.swift -o "$RUNNER_TEMP/probe"
           python3 scripts/tests/cli-round-trip.py "$RUNNER_TEMP/cli-package/package/bin/deadliner" "$RUNNER_TEMP/probe"
