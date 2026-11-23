@@ -22,11 +22,11 @@ struct RemoteBackup {
     }
 
     func run() async throws -> Result {
-        guard let url = URL(string: settings.normalizedURL + Self.remotePath) else { throw SyncError.invalid("服务器地址格式不正确") }
+        guard let url = URL(string: settings.normalizedURL + Self.remotePath) else { throw SyncError.invalid(String(localized: "服务器地址格式不正确")) }
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.setValue("Basic \(Data("\(settings.username):\(password)".utf8).base64EncodedString())", forHTTPHeaderField: "Authorization")
         let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw SyncError.invalid("备份云端数据失败：服务器没有响应") }
+        guard let http = response as? HTTPURLResponse else { throw SyncError.invalid(String(localized: "备份云端数据失败：服务器没有响应")) }
         switch http.statusCode {
         case 200:
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -37,9 +37,9 @@ struct RemoteBackup {
         case 404:
             return .nothingToBackUp
         case 401, 403:
-            throw SyncError.invalid("备份云端数据失败：用户名或应用密码不正确")
+            throw SyncError.invalid(String(localized: "备份云端数据失败：用户名或应用密码不正确"))
         default:
-            throw SyncError.invalid("备份云端数据失败：HTTP \(http.statusCode)")
+            throw SyncError.invalid(String(localized: "备份云端数据失败：HTTP \(http.statusCode)"))
         }
     }
 }

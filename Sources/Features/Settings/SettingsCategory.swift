@@ -9,28 +9,28 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .sync: "同步"
-        case .notifications: "通知"
+        case .sync: String(localized: "同步")
+        case .notifications: String(localized: "通知")
         case .lifi: "Lifi AI"
-        case .backup: "备份"
-        case .menuBar: "菜单栏"
-        case .taskCard: "任务卡片"
-        case .appearance: "外观"
-        case .about: "关于"
+        case .backup: String(localized: "备份")
+        case .menuBar: String(localized: "菜单栏")
+        case .taskCard: String(localized: "任务卡片")
+        case .appearance: String(localized: "外观")
+        case .about: String(localized: "关于")
         }
     }
 
     /// 分类标题下的一句说明。
     var subtitle: String {
         switch self {
-        case .sync: "通过 WebDAV 与手机同步任务、习惯和专注记录。"
-        case .notifications: "任务到期与习惯打卡的系统通知。"
-        case .lifi: "AI 助手、快速添加的 AI 识别与记忆。"
-        case .backup: "导出或导入与手机端格式一致的完整备份。"
-        case .menuBar: "菜单栏图标与下拉面板的内容。"
-        case .taskCard: "任务卡片的进度条、剩余时间与状态颜色。"
-        case .appearance: "深浅色、顶部浮光、字体与主题色。"
-        case .about: "版本信息与新手引导。"
+        case .sync: String(localized: "通过 WebDAV 与手机同步任务、习惯和专注记录。")
+        case .notifications: String(localized: "任务到期与习惯打卡的系统通知。")
+        case .lifi: String(localized: "AI 助手、快速添加的 AI 识别与记忆。")
+        case .backup: String(localized: "导出或导入与手机端格式一致的完整备份。")
+        case .menuBar: String(localized: "菜单栏图标与下拉面板的内容。")
+        case .taskCard: String(localized: "任务卡片的进度条、剩余时间与状态颜色。")
+        case .appearance: String(localized: "深浅色、顶部浮光、字体与主题色。")
+        case .about: String(localized: "版本信息与新手引导。")
         }
     }
 
@@ -84,14 +84,14 @@ struct TaskStatusPreview: View {
     static func sample(_ status: IndicatorStatus, now: Date) -> TaskItem {
         let day: TimeInterval = 86400
         let (title, start, due, state, starred): (String, TimeInterval?, TimeInterval, TaskItem.State, Bool) = switch status {
-        case .notStarted: ("准备演讲", day * 2, day * 6, .active, false)
-        case .undergo: ("阅读论文", nil, day * 4, .active, true)
-        case .near: ("提交作业", nil, 3600 * 5, .active, false)
-        case .passed: ("整理笔记", nil, -day, .active, false)
-        case .completed: ("购买咖啡豆", nil, 60, .completed, false)
-        case .completedAhead: ("预习下周课程", day * 2, day * 5, .completed, false)
-        case .completedEarly: ("交实验报告", nil, day * 3, .completed, false)
-        case .abandoned: ("旧的计划", nil, day, .abandoned, false)
+        case .notStarted: (String(localized: "准备演讲"), day * 2, day * 6, .active, false)
+        case .undergo: (String(localized: "阅读论文"), nil, day * 4, .active, true)
+        case .near: (String(localized: "提交作业"), nil, 3600 * 5, .active, false)
+        case .passed: (String(localized: "整理笔记"), nil, -day, .active, false)
+        case .completed: (String(localized: "购买咖啡豆"), nil, 60, .completed, false)
+        case .completedAhead: (String(localized: "预习下周课程"), day * 2, day * 5, .completed, false)
+        case .completedEarly: (String(localized: "交实验报告"), nil, day * 3, .completed, false)
+        case .abandoned: (String(localized: "旧的计划"), nil, day, .abandoned, false)
         }
         // 已完成的示例都在「现在」完成：「已完成」示例在截止前一分钟完成（按时完成）。
         return TaskItem(id: "preview-\(status.rawValue)", title: title, note: status.title,

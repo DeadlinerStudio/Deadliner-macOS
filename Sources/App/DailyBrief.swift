@@ -104,7 +104,7 @@ struct DailyBriefView: View {
                 }
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        group("正在进行的任务", count: tasks.count, empty: "没有进行中的任务") {
+                        group(String(localized: "正在进行的任务"), count: tasks.count, empty: String(localized: "没有进行中的任务")) {
                             ForEach(tasks) { task in
                                 let status = TaskStatus.indicator(task, now: context.date)
                                 HStack(spacing: 8) {
@@ -117,7 +117,7 @@ struct DailyBriefView: View {
                                 }
                             }
                         }
-                        group("今天的习惯", count: habits.count, empty: "今天没有要打卡的习惯") {
+                        group(String(localized: "今天的习惯"), count: habits.count, empty: String(localized: "今天没有要打卡的习惯")) {
                             ForEach(habits) { habit in
                                 HStack(spacing: 8) {
                                     Image(systemName: habit.isCompleted ? "checkmark.circle.fill" : "circle")

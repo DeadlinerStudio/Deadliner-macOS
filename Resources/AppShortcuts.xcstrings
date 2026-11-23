@@ -1,0 +1,76 @@
+{
+  "sourceLanguage": "zh-Hans",
+  "strings": {
+    "在 ${applicationName} 创建灵感": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create an idea in ${applicationName}"
+          }
+        }
+      }
+    },
+    "在 ${applicationName} 添加任务": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a task in ${applicationName}"
+          }
+        }
+      }
+    },
+    "打开 ${applicationName} 新建任务": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a new task in ${applicationName}"
+          }
+        }
+      }
+    },
+    "把想法存到 ${applicationName}": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save a thought to ${applicationName}"
+          }
+        }
+      }
+    },
+    "用 ${applicationName} 导入分享链接": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import a share link with ${applicationName}"
+          }
+        }
+      }
+    },
+    "用 ${applicationName} 新建任务": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a task in ${applicationName}"
+          }
+        }
+      }
+    },
+    "用 ${applicationName} 记录灵感": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save an idea in ${applicationName}"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

@@ -5,7 +5,7 @@ import Foundation
 /// 指令在应用进程中执行；应用没有运行时系统会在后台启动它。写入走与界面相同的命令，同步照常进行。
 enum IntentFailure: LocalizedError {
     case notReady
-    var errorDescription: String? { "Deadliner 还没有准备好，请先打开应用" }
+    var errorDescription: String? { String(localized: "Deadliner 还没有准备好，请先打开应用") }
 }
 
 @MainActor

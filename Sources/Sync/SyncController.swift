@@ -100,14 +100,14 @@ final class SyncController {
         if newSettings.enabled, let error = newSettings.validationError { throw SyncError.invalid(error) }
         if let password, !password.isEmpty {
             guard keychain.setPassword(password, url: newSettings.normalizedURL, username: newSettings.username) else {
-                throw SyncError.invalid("无法把密码保存到钥匙串")
+                throw SyncError.invalid(String(localized: "无法把密码保存到钥匙串"))
             }
         }
         settings = newSettings
         newSettings.save(to: defaults)
         if newSettings.enabled {
             guard let stored = keychain.password(url: newSettings.normalizedURL, username: newSettings.username) else {
-                throw SyncError.invalid("请填写应用密码")
+                throw SyncError.invalid(String(localized: "请填写应用密码"))
             }
             disable()
             status = .backingUp
@@ -213,12 +213,12 @@ final class SyncController {
         // 单元测试与正式应用共用同一个 Bundle ID，会读到用户真实的同步设置与钥匙串密码。
         // 测试中绝不连接 WebDAV（内存传输请用 configureForTesting）。
         guard !AppDelegate.isRunningTests else {
-            status = .failed("测试运行中，不连接 WebDAV")
+            status = .failed(String(localized: "测试运行中，不连接 WebDAV"))
             return
         }
         guard settings.validationError == nil,
               let password = keychain.password(url: settings.normalizedURL, username: settings.username) else {
-            status = .failed("同步设置不完整")
+            status = .failed(String(localized: "同步设置不完整"))
             return
         }
         let configuration = WebDavTransportConfiguration(
@@ -263,7 +263,7 @@ final class SyncController {
             Diagnostics.sync.notice("sync transient failure, retrying: \(outcome.failure ?? "", privacy: .private)")
             if !appActive { scheduleTransientRetry() }
         } else {
-            status = .failed(entry.message ?? "同步失败")
+            status = .failed(entry.message ?? String(localized: "同步失败"))
             Diagnostics.sync.error("sync failed transient=\(transient, privacy: .public): \(outcome.failure ?? "", privacy: .private)")
         }
         if outcome.applied > 0 { didApplyRemoteChanges() }
@@ -318,7 +318,7 @@ final class SyncController {
         DispatchQueue.main.asyncAfter(deadline: .now() + grace, execute: task)
     }
 
-    static let transientMessage = "暂时连不上服务器（可能刚唤醒或网络切换），稍后自动重试"
+    static let transientMessage = String(localized: "暂时连不上服务器（可能刚唤醒或网络切换），稍后自动重试")
 
     /// 找不到服务器、超时、断网、连接中断等临时错误（NSURLError -1001/-1003/-1004/-1005/-1009 等）。
     static func isTransient(_ message: String) -> Bool {
@@ -348,11 +348,11 @@ final class SyncController {
 
     /// 把常见的传输错误转成中文说明；不包含密码。
     static func friendly(_ message: String) -> String {
-        if message.contains("HTTP 401") || message.contains("HTTP 403") { return "用户名或应用密码不正确（\(message)）" }
-        if message.contains("HTTP 404") { return "服务器上找不到同步目录（\(message)）" }
-        if message.contains("conditional write") { return "云端数据刚被其他设备更新，稍后会自动重试" }
-        if message.localizedCaseInsensitiveContains("timeout") || message.localizedCaseInsensitiveContains("timed out") { return "连接超时，请检查网络" }
-        if isTransient(message) { return "连不上服务器，请检查网络或 VPN（\(message)）" }
+        if message.contains("HTTP 401") || message.contains("HTTP 403") { return String(localized: "用户名或应用密码不正确（\(message)）") }
+        if message.contains("HTTP 404") { return String(localized: "服务器上找不到同步目录（\(message)）") }
+        if message.contains("conditional write") { return String(localized: "云端数据刚被其他设备更新，稍后会自动重试") }
+        if message.localizedCaseInsensitiveContains("timeout") || message.localizedCaseInsensitiveContains("timed out") { return String(localized: "连接超时，请检查网络") }
+        if isTransient(message) { return String(localized: "连不上服务器，请检查网络或 VPN（\(message)）") }
         return message
     }
 }

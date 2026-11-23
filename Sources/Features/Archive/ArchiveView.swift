@@ -84,7 +84,7 @@ struct ArchiveContent: View {
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: 18) {
                         if !tasks.isEmpty {
-                            sectionTitle("任务")
+                            sectionTitle(String(localized: "任务"))
                             LazyVGrid(columns: layout.columns, spacing: MiuixCard.gap) {
                                 ForEach(tasks) { task in
                                     TaskCard(task: task, category: task.categoryId.flatMap { categories[$0] }, now: Date())
@@ -96,7 +96,7 @@ struct ArchiveContent: View {
                             }
                         }
                         if !habits.isEmpty {
-                            sectionTitle("习惯")
+                            sectionTitle(String(localized: "习惯"))
                             GroupedSection {
                                 ForEach(habits) { habit in
                                     GroupedRow(title: habit.name, systemImage: "target",

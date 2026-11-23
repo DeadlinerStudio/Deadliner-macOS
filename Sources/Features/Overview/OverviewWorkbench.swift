@@ -4,6 +4,8 @@ import Charts
 enum OverviewTab: String, CaseIterable, Identifiable {
     case dashboard = "总览", tasks = "任务统计", trends = "趋势分析", review = "月度复盘"
     var id: String { rawValue }
+    /// 原始值是保存在设置里的标识，显示时按界面语言翻译。
+    var title: String { String(localized: String.LocalizationValue(rawValue)) }
 }
 
 struct OverviewWorkbench: View {
@@ -46,7 +48,7 @@ struct OverviewWorkbench: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Picker("概览分区", selection: $tab) {
-                    ForEach(OverviewTab.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(OverviewTab.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -71,7 +73,7 @@ struct OverviewWorkbench: View {
     private var monthControls: some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(OverviewDates.label(OverviewPeriod.key(selectedMonth), "yyyy 年 M 月")).font(.title2.bold())
+                Text(OverviewDates.label(OverviewPeriod.key(selectedMonth), String(localized: "yyyy 年 M 月"))).font(.title2.bold())
                 Text(selectedMonth == OverviewPeriod.month() ? "本月进行中" : "历史月份 · 按当前任务状态统计")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -106,7 +108,7 @@ struct OverviewWorkbench: View {
                 }
             }
             if let focus = store.focusMonth { OverviewFocusInvestmentCard(focus: focus) }
-            OverviewCompletionTimingCard(counts: store.monthTiming, subtitle: "\(Self.monthPhrase(selectedMonth))内完成的任务")
+            OverviewCompletionTimingCard(counts: store.monthTiming, subtitle: String(localized: "\(Self.monthPhrase(selectedMonth))内完成的任务"))
         } else { ProgressView("加载月份…").frame(maxWidth: .infinity, minHeight: 240) }
     }
 
@@ -120,13 +122,13 @@ struct OverviewWorkbench: View {
                             day: selectedMonth == OverviewPeriod.month() ? OverviewPeriod.calendar.component(.day, from: Date()) : detail.review.daily.count))
                             .font(.callout).foregroundStyle(comparisonColor(detail.review, previous))
                     } else if let error = store.comparisonError {
-                        OverviewError(message: "同期比较：" + error) { selectMonth() }
+                        OverviewError(message: String(localized: "同期比较：") + error) { selectMonth() }
                     } else { ProgressView("加载同期数据…").controlSize(.small) }
                 }
                 Spacer()
                 Button("任务统计") { tab = .tasks; scope = "所选月"; loadRange() }
             }
-            OverviewHistoryCard(history: detail.distribution, title: "所选月成果", subtitle: "完成活动与当前状态",
+            OverviewHistoryCard(history: detail.distribution, title: String(localized: "所选月成果"), subtitle: String(localized: "完成活动与当前状态"),
                                 completedTiming: store.monthTiming)
         }
         .padding(18).background(t.groupBg, in: RoundedRectangle(cornerRadius: MiuixRadius.card))
@@ -139,7 +141,7 @@ struct OverviewWorkbench: View {
     }
 
     private var preview: some View {
-        OverviewCard(title: "近期趋势", subtitle: "最近 7 天") {
+        OverviewCard(title: String(localized: "近期趋势"), subtitle: String(localized: "最近 7 天")) {
             if let error = store.errorMessage { OverviewError(message: error, retry: refresh) }
             else {
                 OverviewRecentTimingChart(days: store.daily, timings: store.dayTimings)
@@ -149,7 +151,7 @@ struct OverviewWorkbench: View {
     }
 
     private var reviewPreview: some View {
-        OverviewCard(title: "月度复盘", subtitle: store.lastMonth.monthStart.map { OverviewDates.label($0, "yyyy 年 M 月") }) {
+        OverviewCard(title: String(localized: "月度复盘"), subtitle: store.lastMonth.monthStart.map { OverviewDates.label($0, String(localized: "yyyy 年 M 月")) }) {
             MonthlyInsightContent(store: insight, review: store.lastMonth)
             Button("查看完整复盘与分享") { tab = .review }
         }
@@ -160,7 +162,7 @@ struct OverviewWorkbench: View {
             Text("任务统计").font(.title2.bold())
             Spacer()
             Picker("范围", selection: $scope) {
-                ForEach(["所选月", "近30天", "本年", "自定义", "全部时间"], id: \.self) { Text($0) }
+                ForEach(["所选月", "近30天", "本年", "自定义", "全部时间"], id: \.self) { Text(LocalizedStringKey($0)) }
             }.frame(width: 180).onChange(of: scope) { loadRange() }
         }
         if scope == "所选月" { monthControls }
@@ -179,14 +181,14 @@ struct OverviewWorkbench: View {
             else {
                 Menu("卡片排序") {
                     ForEach(taskOrder, id: \.self) { name in
-                        Button("将「\(name)」置顶") { taskOrderRaw = ([name] + taskOrder.filter { $0 != name }).joined(separator: ",") }
+                        Button("将「\(String(localized: String.LocalizationValue(name)))」置顶") { taskOrderRaw = ([name] + taskOrder.filter { $0 != name }).joined(separator: ",") }
                     }
                 }
                 ForEach(taskOrder, id: \.self) { name in
                     switch name {
                     case "今日概况": OverviewTodayCard(today: store.today)
                     case "完成时间分布": OverviewPeriodCard(periods: store.periods)
-                    default: OverviewHistoryCard(history: store.history, title: "历史统计", subtitle: "全部时间")
+                    default: OverviewHistoryCard(history: store.history, title: String(localized: "历史统计"), subtitle: String(localized: "全部时间"))
                     }
                 }
             }
@@ -199,18 +201,18 @@ struct OverviewWorkbench: View {
         } else if let review = store.interval {
             Text("\(OverviewPeriod.key(start)) — \(OverviewPeriod.key(end)) · 指标较前一个等长周期")
                 .font(.callout).foregroundStyle(.secondary)
-            OverviewMetricsCard(review: review, comparison: "较上一等长周期")
+            OverviewMetricsCard(review: review, comparison: String(localized: "较上一等长周期"))
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .top), count: min(columns, 2)), spacing: 18) {
-                OverviewHistoryCard(history: store.intervalDistribution, title: "状态分布", subtitle: "四种状态互斥",
+                OverviewHistoryCard(history: store.intervalDistribution, title: String(localized: "状态分布"), subtitle: String(localized: "四种状态互斥"),
                                     completedTiming: store.intervalTiming)
                 OverviewPeriodCard(periods: store.intervalPeriods)
             }
-            OverviewActivityChart(days: review.daily, title: "\(rangePhrase)完成活动")
+            OverviewActivityChart(days: review.daily, title: String(localized: "\(rangePhrase)完成活动"))
             if let focus = store.focusInterval { OverviewFocusInvestmentCard(focus: focus) }
-            OverviewCompletionTimingCard(counts: store.intervalTiming, subtitle: "\(rangePhrase)内完成的任务")
+            OverviewCompletionTimingCard(counts: store.intervalTiming, subtitle: String(localized: "\(rangePhrase)内完成的任务"))
             Text("完成活动按实际完成日期；待办、逾期、放弃及指标按截止日期。指标中的逾期沿用 Core 未完成口径，含放弃。")
                 .font(.caption).foregroundStyle(.secondary)
-            if !review.completedTitles.isEmpty { OverviewTitlesCard(review: review, title: "\(rangePhrase)内完成的任务") }
+            if !review.completedTitles.isEmpty { OverviewTitlesCard(review: review, title: String(localized: "\(rangePhrase)内完成的任务")) }
         }
     }
 
@@ -219,21 +221,21 @@ struct OverviewWorkbench: View {
         let calendar = OverviewPeriod.calendar
         switch scope {
         case "所选月": return Self.monthPhrase(selectedMonth)
-        case "近30天": return "近30天"
-        case "本年": return "\(calendar.component(.year, from: Date()))年"
+        case "近30天": return String(localized: "近30天")
+        case "本年": return String(localized: "\(calendar.component(.year, from: Date()))年")
         case "自定义":
             let thisYear = calendar.component(.year, from: Date())
             let sameYear = calendar.component(.year, from: start) == thisYear && calendar.component(.year, from: end) == thisYear
-            let format = sameYear ? "M月d日" : "yyyy年M月d日"
+            let format = sameYear ? String(localized: "M月d日") : String(localized: "yyyy年M月d日")
             return "\(OverviewDates.label(OverviewPeriod.key(start), format))–\(OverviewDates.label(OverviewPeriod.key(end), format))"
-        default: return "全部时间"
+        default: return String(localized: "全部时间")
         }
     }
 
     /// 「11月」；不是今年时带年份。
     static func monthPhrase(_ month: Date) -> String {
         let calendar = OverviewPeriod.calendar
-        let format = calendar.component(.year, from: month) == calendar.component(.year, from: Date()) ? "M月" : "yyyy年M月"
+        let format = calendar.component(.year, from: month) == calendar.component(.year, from: Date()) ? String(localized: "M月") : String(localized: "yyyy年M月")
         return OverviewDates.label(OverviewPeriod.key(month), format)
     }
 
@@ -270,7 +272,7 @@ struct OverviewWorkbench: View {
         default: break
         }
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: start), to: calendar.startOfDay(for: end)).day ?? -1
-        guard days >= 0 && days < 3660 else { rangeError = "请选择 1 至 3660 天的有效日期范围"; return }
+        guard days >= 0 && days < 3660 else { rangeError = String(localized: "请选择 1 至 3660 天的有效日期范围"); return }
         rangeError = nil
         store.loadInterval(start: OverviewPeriod.key(start), end: OverviewPeriod.key(calendar.date(byAdding: .day, value: 1, to: end)!))
     }
@@ -293,9 +295,9 @@ struct OverviewActivityCalendar: View {
     var focus: [String: Int] = [:]
     @Environment(\.palette) private var t
     var body: some View {
-        OverviewCard(title: "月度活动", subtitle: "每日完成任务") {
+        OverviewCard(title: String(localized: "月度活动"), subtitle: String(localized: "每日完成任务")) {
             let weeks = OverviewHeatmapCard.weeks(review.daily)
-            HStack { ForEach(["一", "二", "三", "四", "五", "六", "日"], id: \.self) { Text($0).font(.caption).frame(maxWidth: .infinity) } }
+            HStack { ForEach(Array(AppLanguage.weekdays().enumerated()), id: \.offset) { Text($0.element).font(.caption).frame(maxWidth: .infinity) } }
             ForEach(weeks.indices, id: \.self) { index in
                 HStack(spacing: 5) {
                     ForEach(0..<7, id: \.self) { weekday in
@@ -319,11 +321,11 @@ struct OverviewActivityCalendar: View {
 
 struct OverviewActivityChart: View {
     let days: [OverviewStore.DayCount]
-    var title = "每日完成"
+    var title = String(localized: "每日完成")
     @State private var selected: Date?
     @Environment(\.palette) private var t
     var body: some View {
-        OverviewCard(title: title, subtitle: "\(days.count) 天") {
+        OverviewCard(title: title, subtitle: String(localized: "\(days.count) 天")) {
             Chart(days) { day in
                 BarMark(x: .value("日期", OverviewDates.date(day.date) ?? Date(), unit: .day), y: .value("完成", day.completed))
                     .foregroundStyle(OverviewColors(t: t).completed).cornerRadius(3)
@@ -353,7 +355,7 @@ struct OverviewTrendWorkspace: View {
             Spacer()
             Menu("卡片排序") {
                 ForEach(order, id: \.self) { name in
-                    Button("将「\(name)」置顶") { orderRaw = ([name] + order.filter { $0 != name }).joined(separator: ",") }
+                    Button("将「\(String(localized: String.LocalizationValue(name)))」置顶") { orderRaw = ([name] + order.filter { $0 != name }).joined(separator: ",") }
                 }
             }
         }
@@ -367,7 +369,7 @@ struct OverviewTrendWorkspace: View {
                 else { OverviewHeatmapCard(days: store.annual, focus: store.annualFocus) }
             case "每日完成": OverviewDailyCard(days: store.daily)
             case "每月趋势": OverviewMonthlyCard(months: store.monthly, timings: store.monthTimings)
-            case "专注时长": OverviewFocusBarsCard(points: store.focusLast30?.daily ?? [], subtitle: "近 30 天", unit: .day)
+            case "专注时长": OverviewFocusBarsCard(points: store.focusLast30?.daily ?? [], subtitle: String(localized: "近 30 天"), unit: .day)
             default: OverviewWeeklyCard(weeks: store.weekly)
             }
         }

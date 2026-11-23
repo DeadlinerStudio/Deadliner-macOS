@@ -37,26 +37,26 @@ enum TaskStatus {
     /// 卡片右上角的文字。`detailed` 为 false 时只保留最大的单位（「2天」而不是「2天 3小时」）。
     static func remainingText(_ task: TaskItem, now: Date, detailed: Bool = true) -> String {
         let text = fullRemainingText(task, now: now)
-        guard !detailed, let space = text.lastIndex(of: " "), text.hasSuffix("小时"), text.contains("天") else { return text }
+        guard !detailed, let space = text.lastIndex(of: " "), text.hasSuffix(String(localized: "小时")), text.contains(String(localized: "天")) else { return text }
         return String(text[..<space])
     }
 
     private static func fullRemainingText(_ task: TaskItem, now: Date) -> String {
-        if task.isAbandoned { return "已放弃" }
+        if task.isAbandoned { return String(localized: "已放弃") }
         if task.isCompleted { return completedText(task) }
-        if let start = task.startAt, now < start { return "\(span(start.timeIntervalSince(now)))后开始" }
+        if let start = task.startAt, now < start { return String(localized: "\(span(start.timeIntervalSince(now)))后开始") }
         guard let due = task.dueAt else { return "" }
-        if now > due { return "已逾期 \(span(now.timeIntervalSince(due)))" }
+        if now > due { return String(localized: "已逾期 \(span(now.timeIntervalSince(due)))") }
         return span(due.timeIntervalSince(now))
     }
 
     /// 已完成任务右上角：超前完成 / 提前 N 天完成 / 逾期完成 / 已完成。
     static func completedText(_ task: TaskItem) -> String {
         switch CompletionTiming.of(task) {
-        case .ahead: "超前完成"
-        case .early: CompletionTiming.daysBeforeDue(task).map { "提前 \($0) 天完成" } ?? "提前完成"
-        case .late: "逾期完成"
-        case .onTime, nil: "已完成"
+        case .ahead: String(localized: "超前完成")
+        case .early: CompletionTiming.daysBeforeDue(task).map { String(localized: "提前 \($0) 天完成") } ?? String(localized: "提前完成")
+        case .late: String(localized: "逾期完成")
+        case .onTime, nil: String(localized: "已完成")
         }
     }
 
@@ -64,9 +64,9 @@ enum TaskStatus {
         let minutes = max(1, Int(interval / 60))
         let days = minutes / 1440
         let hours = (minutes % 1440) / 60
-        if days > 0 { return hours > 0 ? "\(days)天 \(hours)小时" : "\(days)天" }
-        if hours > 0 { return "\(hours)小时" }
-        return "\(minutes)分钟"
+        if days > 0 { return hours > 0 ? String(localized: "\(days)天 \(hours)小时") : String(localized: "\(days)天") }
+        if hours > 0 { return String(localized: "\(hours)小时") }
+        return String(localized: "\(minutes)分钟")
     }
 }
 
@@ -81,6 +81,6 @@ enum TaskDisplaySettings {
 
     /// 延期选项：Core 允许 1～168 小时或 1～7 天。
     static let postponeOptions: [(title: String, amount: Int, hours: Bool)] = [
-        ("1 小时", 1, true), ("3 小时", 3, true), ("1 天", 1, false), ("2 天", 2, false), ("3 天", 3, false), ("1 周", 7, false),
+        (String(localized: "1 小时"), 1, true), (String(localized: "3 小时"), 3, true), (String(localized: "1 天"), 1, false), (String(localized: "2 天"), 2, false), (String(localized: "3 天"), 3, false), (String(localized: "1 周"), 7, false),
     ]
 }

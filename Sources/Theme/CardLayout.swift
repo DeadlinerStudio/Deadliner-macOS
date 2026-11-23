@@ -9,9 +9,9 @@ enum CardLayout: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .single: "单列"
-        case .double: "双列"
-        case .triple: "三列"
+        case .single: String(localized: "单列")
+        case .double: String(localized: "双列")
+        case .triple: String(localized: "三列")
         }
     }
 

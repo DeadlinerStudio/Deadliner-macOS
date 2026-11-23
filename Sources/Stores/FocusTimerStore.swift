@@ -289,29 +289,29 @@ final class FocusTimerStore {
     static func message(for outcome: String) -> String? {
         switch outcome {
         case "APPLIED", "NO_OP": nil
-        case "TASK_REQUIRED": "请选择要专注的任务"
-        case "TASK_NOT_FOUND": "任务不存在，可能已在其他设备上删除"
-        case "TASK_NOT_ACTIVE": "只有进行中的任务可以开始专注"
-        case "TIMER_ALREADY_ACTIVE": "已经有一个正在进行的专注，请先结束它"
-        case "TIMER_NOT_FOUND": "这次专注已经结束"
-        case "TIMER_REQUIRES_RESOLUTION": "请先结束正在进行的专注"
-        case "INVALID_DURATION": "专注时长无效"
-        case "CLOCK_ANOMALY": "系统时间发生了变化，请检查时间设置后重试"
-        case "HABIT_NOT_FOUND": "习惯不存在，可能已在其他设备上删除"
-        case "HABIT_NOT_ACTIVE": "只有进行中的习惯可以开始专注"
-        case "HABIT_NOT_DUE": "这个习惯今天不需要打卡"
-        case "HABIT_INVALID_AMOUNT": "打卡数量无效"
-        default: "当前状态下不能执行这个操作"
+        case "TASK_REQUIRED": String(localized: "请选择要专注的任务")
+        case "TASK_NOT_FOUND": String(localized: "任务不存在，可能已在其他设备上删除")
+        case "TASK_NOT_ACTIVE": String(localized: "只有进行中的任务可以开始专注")
+        case "TIMER_ALREADY_ACTIVE": String(localized: "已经有一个正在进行的专注，请先结束它")
+        case "TIMER_NOT_FOUND": String(localized: "这次专注已经结束")
+        case "TIMER_REQUIRES_RESOLUTION": String(localized: "请先结束正在进行的专注")
+        case "INVALID_DURATION": String(localized: "专注时长无效")
+        case "CLOCK_ANOMALY": String(localized: "系统时间发生了变化，请检查时间设置后重试")
+        case "HABIT_NOT_FOUND": String(localized: "习惯不存在，可能已在其他设备上删除")
+        case "HABIT_NOT_ACTIVE": String(localized: "只有进行中的习惯可以开始专注")
+        case "HABIT_NOT_DUE": String(localized: "这个习惯今天不需要打卡")
+        case "HABIT_INVALID_AMOUNT": String(localized: "打卡数量无效")
+        default: String(localized: "当前状态下不能执行这个操作")
         }
     }
 
     static func warningText(_ warning: String) -> String {
         switch warning {
-        case "CLOCK_ANOMALY": "系统时间发生了变化，计时可能不准确"
-        case "LONG_RUNNING": "已经专注很久了，记得结束计时"
-        case "EXCESSIVE_DURATION": "这次计时过长，是否忘记结束了？"
-        case "ALARM_UNAVAILABLE": "无法安排倒计时结束提醒，请在设置中开启通知"
-        default: "计时状态异常"
+        case "CLOCK_ANOMALY": String(localized: "系统时间发生了变化，计时可能不准确")
+        case "LONG_RUNNING": String(localized: "已经专注很久了，记得结束计时")
+        case "EXCESSIVE_DURATION": String(localized: "这次计时过长，是否忘记结束了？")
+        case "ALARM_UNAVAILABLE": String(localized: "无法安排倒计时结束提醒，请在设置中开启通知")
+        default: String(localized: "计时状态异常")
         }
     }
 
@@ -330,14 +330,14 @@ final class FocusAlarmScheduler: NSObject, FocusAlarmPort, @unchecked Sendable {
 
     func scheduleCountdown(sessionUid: String, fireAt: String, taskTitle: String) -> FocusAlarmResult {
         guard UserDefaults.standard.bool(forKey: NotificationSettings.enabledKey) else {
-            return FocusAlarmResult(succeeded: false, failureMessage: "通知未开启")
+            return FocusAlarmResult(succeeded: false, failureMessage: String(localized: "通知未开启"))
         }
         guard let date = CoreDates.parseInstant(fireAt) else {
-            return FocusAlarmResult(succeeded: false, failureMessage: "提醒时间无效")
+            return FocusAlarmResult(succeeded: false, failureMessage: String(localized: "提醒时间无效"))
         }
         let content = UNMutableNotificationContent()
-        content.title = "专注结束"
-        content.body = "「\(taskTitle)」的倒计时已经结束"
+        content.title = String(localized: "专注结束")
+        content.body = String(localized: "「\(taskTitle)」的倒计时已经结束")
         content.sound = .default
         content.userInfo = ["ownerUid": sessionUid, "kind": "FOCUS_TIMER"]
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, date.timeIntervalSinceNow), repeats: false)

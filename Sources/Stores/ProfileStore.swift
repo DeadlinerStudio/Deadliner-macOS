@@ -72,7 +72,7 @@ final class ProfileStore {
 
     enum ProfileError: LocalizedError {
         case unreadableImage
-        var errorDescription: String? { "无法读取这张图片" }
+        var errorDescription: String? { String(localized: "无法读取这张图片") }
     }
 
     /// 第一份未删除的资料（各端共用一份）。

@@ -20,10 +20,10 @@ enum TaskShareLink {
 
         var errorDescription: String? {
             switch self {
-            case .notALink: "不是 Deadliner 的分享链接"
-            case .unsupported: "分享链接的版本不受支持"
-            case .corrupted: "分享链接解析错误"
-            case .habit: "这是习惯的分享链接，Mac 暂时只能导入任务"
+            case .notALink: String(localized: "不是 Deadliner 的分享链接")
+            case .unsupported: String(localized: "分享链接的版本不受支持")
+            case .corrupted: String(localized: "分享链接解析错误")
+            case .habit: String(localized: "这是习惯的分享链接，Mac 暂时只能导入任务")
             }
         }
     }

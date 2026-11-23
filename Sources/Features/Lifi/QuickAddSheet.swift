@@ -87,7 +87,7 @@ struct QuickAddSheet: View {
         if proposal.isHabit {
             LabeledContent("目标", value: LifiAssistantView.habitSummary(proposal.habitDraft))
         } else {
-            LabeledContent("截止", value: proposal.taskDraft.dueAt.map { $0.formatted(.dateTime.year().month().day().weekday(.abbreviated).hour().minute()) } ?? "未指定")
+            LabeledContent("截止", value: proposal.taskDraft.dueAt.map { $0.formatted(.dateTime.year().month().day().weekday(.abbreviated).hour().minute()) } ?? String(localized: "未指定"))
         }
         if !proposal.note.isEmpty { LabeledContent("备注", value: proposal.note) }
     }
@@ -97,7 +97,7 @@ struct QuickAddSheet: View {
         guard !input.isEmpty else { proposal = nil; message = nil; return }
         let json = QuickAddParser().parseJson(text: input, preferredKind: kind, timezone: TimeZone.current.identifier)
         proposal = LifiDrafts.QuickProposal.decode(json)
-        message = proposal.flatMap { $0.message.isEmpty ? ($0.needsAI ? "这句话比较复杂，可以用 AI 识别或展开补充" : nil) : $0.message }
+        message = proposal.flatMap { $0.message.isEmpty ? ($0.needsAI ? String(localized: "这句话比较复杂，可以用 AI 识别或展开补充") : nil) : $0.message }
     }
 
     private func recognize() {
@@ -111,10 +111,10 @@ struct QuickAddSheet: View {
                     proposal = result
                     message = result.message.isEmpty ? nil : result.message
                 } else {
-                    message = "AI 没有识别出内容，请修改后重试或展开补充"
+                    message = String(localized: "AI 没有识别出内容，请修改后重试或展开补充")
                 }
             } catch {
-                message = "AI 识别失败：\(error.localizedDescription)"
+                message = String(localized: "AI 识别失败：\(error.localizedDescription)")
             }
             recognizing = false
         }
@@ -138,13 +138,13 @@ struct QuickAddSheet: View {
         do {
             if proposal.isHabit {
                 try habitCommands.save(proposal.habitDraft)
-                onAdded("已开启习惯：\(proposal.title)")
+                onAdded(String(localized: "已开启习惯：\(proposal.title)"))
             } else {
                 try taskCommands.save(proposal.taskDraft)
-                onAdded("已添加任务：\(proposal.title)")
+                onAdded(String(localized: "已添加任务：\(proposal.title)"))
             }
         } catch {
-            message = "保存失败：\(error.localizedDescription)"
+            message = String(localized: "保存失败：\(error.localizedDescription)")
         }
     }
 }

@@ -80,8 +80,8 @@ struct OnboardingView: View {
     }
 
     private var welcome: some View {
-        page("calendar.badge.clock", "欢迎使用 Deadliner",
-             "管理截止时间、习惯和灵感。Mac 版与手机共用同一套数据和规则，通过 WebDAV 与手机双向同步。") {
+        page("calendar.badge.clock", String(localized: "欢迎使用 Deadliner"),
+             String(localized: "管理截止时间、习惯和灵感。Mac 版与手机共用同一套数据和规则，通过 WebDAV 与手机双向同步。")) {
             VStack(alignment: .leading, spacing: 8) {
                 Label("任务：截止时间、子任务、分类，单列 / 多列显示", systemImage: "checklist")
                 Label("习惯：打卡、计量、艾宾浩斯复习", systemImage: "target")
@@ -94,8 +94,8 @@ struct OnboardingView: View {
     }
 
     private var sync: some View {
-        page("arrow.triangle.2.circlepath", "连接手机",
-             "第一次打开时这里没有数据。填写与手机相同的 WebDAV 服务器地址、用户名和应用密码后，会先备份云端文件，再双向同步。") {
+        page("arrow.triangle.2.circlepath", String(localized: "连接手机"),
+             String(localized: "第一次打开时这里没有数据。填写与手机相同的 WebDAV 服务器地址、用户名和应用密码后，会先备份云端文件，再双向同步。")) {
             HStack {
                 Button("现在设置同步") {
                     finish()
@@ -109,7 +109,7 @@ struct OnboardingView: View {
     }
 
     private var notifications: some View {
-        page("bell.badge", "开启提醒", "任务到期前一天、到期时以及习惯打卡时提醒你，提醒时间与手机一致。") {
+        page("bell.badge", String(localized: "开启提醒"), String(localized: "任务到期前一天、到期时以及习惯打卡时提醒你，提醒时间与手机一致。")) {
             Toggle("开启通知", isOn: Binding(get: { notificationsEnabled }, set: { enable($0) }))
                 .toggleStyle(.switch)
                 .padding(.top, 6)
@@ -121,7 +121,7 @@ struct OnboardingView: View {
     }
 
     private var menuBar: some View {
-        page("menubar.rectangle", "菜单栏", "在菜单栏查看今天到期、逾期和习惯进度，点击打开面板。样式和面板内容都可以在设置中调整。") {
+        page("menubar.rectangle", String(localized: "菜单栏"), String(localized: "在菜单栏查看今天到期、逾期和习惯进度，点击打开面板。样式和面板内容都可以在设置中调整。")) {
             Toggle("在菜单栏显示 Deadliner", isOn: $menuBarEnabled).toggleStyle(.switch).padding(.top, 6)
             if menuBarEnabled {
                 Picker("样式", selection: $statusStyleRaw) {
@@ -133,7 +133,7 @@ struct OnboardingView: View {
     }
 
     private var done: some View {
-        page("checkmark.seal", "准备好了", "按 ⌘N 新建任务，⌘F 搜索，⌘R 立即同步。这份引导可以在 设置 → 关于 中再次打开。") {}
+        page("checkmark.seal", String(localized: "准备好了"), String(localized: "按 ⌘N 新建任务，⌘F 搜索，⌘R 立即同步。这份引导可以在 设置 → 关于 中再次打开。")) {}
     }
 
     private func enable(_ on: Bool) {

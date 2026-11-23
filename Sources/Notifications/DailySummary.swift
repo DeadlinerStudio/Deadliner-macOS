@@ -35,11 +35,11 @@ enum DailySummary {
     }
 
     static func title(_ counts: Counts) -> String {
-        counts.dueToday == 0 ? "今日任务概览" : "今日任务概览 - \(counts.dueToday) 个任务今日到期"
+        counts.dueToday == 0 ? String(localized: "今日任务概览") : String(localized: "今日任务概览 - \(counts.dueToday) 个任务今日到期")
     }
 
     static func body(_ counts: Counts) -> String {
-        "🔥逾期 \(counts.overdue) ｜ ⌛️进行中 \(counts.inProgress)"
+        String(localized: "🔥逾期 \(counts.overdue) ｜ ⌛️进行中 \(counts.inProgress)")
     }
 
     /// 设置：是否开启（需要同时开启通知）与推送时间（分钟，默认 9:00，与安卓相同）。

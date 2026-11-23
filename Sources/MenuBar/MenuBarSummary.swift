@@ -88,7 +88,7 @@ struct MenuBarSummary: Equatable {
         summary.focusTodaySeconds = focusTodaySeconds
         summary.focusDays = focusDays.map { point in
             let label = HabitDates.date(point.date).map { HabitDates.weekday(HabitDates.string($0)) } ?? point.date
-            return FocusDay(label: label.replacingOccurrences(of: "周", with: ""), seconds: point.seconds)
+            return FocusDay(label: label.replacingOccurrences(of: String(localized: "周"), with: ""), seconds: point.seconds)
         }
         return summary
     }

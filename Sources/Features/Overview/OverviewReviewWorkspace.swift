@@ -17,7 +17,7 @@ struct MonthlyInsightContent: View {
                     }
                 }
             } else {
-                Text(store.error ?? "月度洞察尚未生成").foregroundStyle(.secondary)
+                Text(store.error ?? String(localized: "月度洞察尚未生成")).foregroundStyle(.secondary)
                 HStack {
                     Button("AI 配置") { settings = true }
                     Button("重试") { store.resolve(review: review, retry: true) }.disabled(review.monthStart == nil)
@@ -54,7 +54,7 @@ struct MonthlyInsightSettingsView: View {
             if let error { Text(error).foregroundStyle(.red) }
             if let probeResult {
                 Text(probeResult).font(.caption).textSelection(.enabled)
-                    .foregroundStyle(probeResult.hasPrefix("连接正常") ? Color.green : Color.red)
+                    .foregroundStyle(probeResult.hasPrefix(String(localized: "连接正常")) ? Color.green : Color.red)
             }
             HStack {
                 Button("取消") { dismiss() }
@@ -81,10 +81,10 @@ struct MonthlyInsightSettingsView: View {
             guard let parsed = URL(string: address), parsed.scheme == "https", parsed.host != nil,
                   parsed.user == nil, parsed.password == nil,
                   !model.trimmingCharacters(in: .whitespaces).isEmpty, !key.isEmpty else {
-                error = "请填写 HTTPS 服务地址、模型和 API Key"; return
+                error = String(localized: "请填写 HTTPS 服务地址、模型和 API Key"); return
             }
             guard MonthlyInsightSettings.keychain.setPassword(key, url: address, username: "api") else {
-                error = "钥匙串保存失败"; return
+                error = String(localized: "钥匙串保存失败"); return
             }
         }
         UserDefaults.standard.set(address, forKey: "overview.ai.url")
@@ -104,7 +104,7 @@ struct OverviewReviewWorkspace: View {
         HStack {
             VStack(alignment: .leading, spacing: 6) {
                 Text("月度复盘").font(.title2.bold())
-                Text(store.lastMonth.monthStart.map { OverviewDates.label($0, "yyyy 年 M 月") } ?? "上月")
+                Text(store.lastMonth.monthStart.map { OverviewDates.label($0, String(localized: "yyyy 年 M 月")) } ?? String(localized: "上月"))
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -117,7 +117,7 @@ struct OverviewReviewWorkspace: View {
         if store.isLoading { ProgressView("加载复盘…") }
         else if let error = store.errorMessage { OverviewError(message: error) { store.refresh() } }
         else {
-            OverviewCard(title: "AI 月度洞察") { MonthlyInsightContent(store: insight, review: store.lastMonth) }
+            OverviewCard(title: String(localized: "AI 月度洞察")) { MonthlyInsightContent(store: insight, review: store.lastMonth) }
             OverviewMetricsCard(review: store.lastMonth)
             OverviewRow(columns: min(columns, 2)) {
                 OverviewActivityCalendar(review: store.lastMonth)
@@ -175,19 +175,19 @@ struct OverviewReviewExport: View {
     private func save() {
         guard let image = render(), let data = image.tiffRepresentation,
               let rep = NSBitmapImageRep(data: data), let png = rep.representation(using: .png, properties: [:]) else {
-            message = "无法生成复盘图片"; return
+            message = String(localized: "无法生成复盘图片"); return
         }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = "Deadliner-复盘-\(review.monthStart ?? "上月").png"
+        panel.nameFieldStringValue = String(localized: "Deadliner-复盘-\(review.monthStart ?? String(localized: "上月")).png")
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
-            do { try png.write(to: url, options: .atomic); message = "已保存复盘图片" }
-            catch { message = "保存失败：\(error.localizedDescription)" }
+            do { try png.write(to: url, options: .atomic); message = String(localized: "已保存复盘图片") }
+            catch { message = String(localized: "保存失败：\(error.localizedDescription)") }
         }
     }
     private func share() {
-        guard let image = render(), let view = NSApp.keyWindow?.contentView else { message = "无法生成分享图片"; return }
+        guard let image = render(), let view = NSApp.keyWindow?.contentView else { message = String(localized: "无法生成分享图片"); return }
         rendered = image
         NSSharingServicePicker(items: [image]).show(relativeTo: NSRect(x: view.bounds.midX, y: view.bounds.maxY - 50, width: 1, height: 1), of: view, preferredEdge: .minY)
     }
@@ -202,25 +202,25 @@ struct OverviewReviewPoster: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             Text("Deadliner · 月度复盘").font(.headline)
-            Text(review.monthStart.map { OverviewDates.label($0, "yyyy 年 M 月") } ?? "上月").font(.largeTitle.bold())
+            Text(review.monthStart.map { OverviewDates.label($0, String(localized: "yyyy 年 M 月")) } ?? String(localized: "上月")).font(.largeTitle.bold())
             if let insight, insight.month == review.monthStart {
                 Text(insight.summary).fixedSize(horizontal: false, vertical: true)
                 Text(insight.keywords.joined(separator: " · ")).font(.callout)
             }
             Divider()
             HStack {
-                metric("任务总数", "\(review.totalTasks)")
-                metric("已完成", "\(review.completedTasks)")
-                metric("完成率", OverviewMetricsCard.percent(review.completionRate))
+                metric(String(localized: "任务总数"), "\(review.totalTasks)")
+                metric(String(localized: "已完成"), "\(review.completedTasks)")
+                metric(String(localized: "完成率"), OverviewMetricsCard.percent(review.completionRate))
             }
             HStack {
-                metric("逾期", "\(review.overdueTasks)")
-                metric("活跃时段", review.mostActivePeriod?.title ?? "—")
-                metric("平均完成用时", review.averageCompletionMinutes.map(OverviewMetricsCard.minutes) ?? "—")
+                metric(String(localized: "逾期"), "\(review.overdueTasks)")
+                metric(String(localized: "活跃时段"), review.mostActivePeriod?.title ?? "—")
+                metric(String(localized: "平均完成用时"), review.averageCompletionMinutes.map(OverviewMetricsCard.minutes) ?? "—")
             }
             Text("每日完成活动").font(.headline)
             let weeks = OverviewHeatmapCard.weeks(review.daily)
-            HStack { ForEach(["一", "二", "三", "四", "五", "六", "日"], id: \.self) { Text($0).frame(maxWidth: .infinity) } }
+            HStack { ForEach(Array(AppLanguage.weekdays().enumerated()), id: \.offset) { Text($0.element).frame(maxWidth: .infinity) } }
             ForEach(weeks.indices, id: \.self) { index in
                 HStack(spacing: 6) {
                     ForEach(0..<7, id: \.self) { day in

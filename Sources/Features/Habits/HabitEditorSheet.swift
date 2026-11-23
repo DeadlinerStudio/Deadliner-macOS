@@ -23,7 +23,7 @@ struct HabitEditorSheet: View {
     }
 
     private var isEditing: Bool { draft.id != nil }
-    private static let weekdayNames = ["一", "二", "三", "四", "五", "六", "日"]
+    private static var weekdayNames: [String] { AppLanguage.weekdays() }
 
     var body: some View {
         NavigationStack {
@@ -47,7 +47,7 @@ struct HabitEditorSheet: View {
                     }
                     .padding(.vertical, 4)
                     FlowLayout(spacing: 8) {
-                        CategoryChoiceChip(title: "无分类", selected: draft.categoryId == nil) { draft.categoryId = nil }
+                        CategoryChoiceChip(title: String(localized: "无分类"), selected: draft.categoryId == nil) { draft.categoryId = nil }
                         ForEach(categories) { category in
                             CategoryChoiceChip(title: category.name, icon: CategoryIcons.symbol(for: category.iconKey),
                                                color: Color(hexString: category.colorHex), selected: draft.categoryId == category.id) {
@@ -82,7 +82,7 @@ struct HabitEditorSheet: View {
                         DeadlinerDatePicker(selection: $draft.startOn, components: .date)
                     }
                     if draft.scheduleKind != .once {
-                        OptionalDateRow(title: "结束日期", date: $draft.endOn, components: .date) {
+                        OptionalDateRow(title: String(localized: "结束日期"), date: $draft.endOn, components: .date) {
                             Calendar.current.date(byAdding: .month, value: 1, to: draft.startOn) ?? draft.startOn
                         }
                     }

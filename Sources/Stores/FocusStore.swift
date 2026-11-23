@@ -72,8 +72,8 @@ final class FocusStore {
                 self?.refresh()
                 switch outcome.name {
                 case "APPLIED", "NO_OP": completion(nil)
-                case "INVALID_DURATION": completion("时长只能改短，且不能为 0")
-                default: completion(error ?? "操作失败（\(outcome.name)）")
+                case "INVALID_DURATION": completion(String(localized: "时长只能改短，且不能为 0"))
+                default: completion(error ?? String(localized: "操作失败（\(outcome.name)）"))
                 }
             }
         }

@@ -31,7 +31,7 @@ struct FocusView: View {
                             presenting: pendingDelete) { session in
             Button("删除", role: .destructive) { store.delete(session.id) { errorMessage = $0 } }
         } message: { session in
-            Text("「\(session.title.isEmpty ? "未命名" : session.title)」\(FocusTexts.duration(session.durationSeconds))。删除会同步到其他设备。")
+            Text("「\(session.title.isEmpty ? String(localized: "未命名") : session.title)」\(FocusTexts.duration(session.durationSeconds))。删除会同步到其他设备。")
         }
         .alert("操作失败", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("好", role: .cancel) {}
@@ -60,7 +60,7 @@ private struct FocusAdjustSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("调整专注时长").font(.headline)
-            Text(verbatim: session.title.isEmpty ? "未命名" : session.title).foregroundStyle(.secondary)
+            Text(verbatim: session.title.isEmpty ? String(localized: "未命名") : session.title).foregroundStyle(.secondary)
             Stepper(value: $minutes, in: 1...maxMinutes) {
                 Text("\(minutes) 分钟").font(.title3.monospacedDigit())
             }
@@ -93,10 +93,10 @@ struct FocusContent: View {
         Form {
             Section {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 10)], spacing: 10) {
-                    tile("今天", today, tint: t.primary)
-                    tile("本周", thisWeek, tint: Color(hex: 0x10B981), days: FocusTexts.elapsedDays(in: .weekOfYear))
-                    tile("本月", thisMonth, tint: Color(hex: 0xF59E0B), days: FocusTexts.elapsedDays(in: .month))
-                    tile("累计", allTime, tint: Color(hex: 0x8B5CF6))
+                    tile(String(localized: "今天"), today, tint: t.primary)
+                    tile(String(localized: "本周"), thisWeek, tint: Color(hex: 0x10B981), days: FocusTexts.elapsedDays(in: .weekOfYear))
+                    tile(String(localized: "本月"), thisMonth, tint: Color(hex: 0xF59E0B), days: FocusTexts.elapsedDays(in: .month))
+                    tile(String(localized: "累计"), allTime, tint: Color(hex: 0x8B5CF6))
                 }
                 .padding(.vertical, 4)
             }
@@ -129,7 +129,7 @@ struct FocusContent: View {
             Text(FocusTexts.duration(summary.totalSeconds))
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(t.onSurface)
-            Text([ "\(summary.sessionCount) 次专注", days.map { "日均 \(FocusTexts.duration(summary.totalSeconds / max(1, $0)))" } ]
+            Text([ String(localized: "\(summary.sessionCount) 次专注"), days.map { String(localized: "日均 \(FocusTexts.duration(summary.totalSeconds / max(1, $0)))") } ]
                     .compactMap { $0 }.joined(separator: " · "))
                 .font(.system(size: 12))
                 .foregroundStyle(t.onSurfaceVariant)
@@ -145,7 +145,7 @@ struct FocusContent: View {
                 Text(FocusTexts.duration(session.durationSeconds))
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(.primary)
-                Text([FocusTexts.timeRange(session), session.isCountdown ? "倒计时" : "正计时", FocusTexts.completion(session.completionKind)]
+                Text([FocusTexts.timeRange(session), session.isCountdown ? String(localized: "倒计时") : String(localized: "正计时"), FocusTexts.completion(session.completionKind)]
                         .compactMap { $0 }.joined(separator: " · "))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -153,7 +153,7 @@ struct FocusContent: View {
         } label: {
             Label {
                 HStack(spacing: 6) {
-                    Text(session.title.isEmpty ? "（未命名）" : session.title).lineLimit(1)
+                    Text(session.title.isEmpty ? String(localized: "（未命名）") : session.title).lineLimit(1)
                     // 超前、提前完成的任务加一个与卡片同色的标签。
                     if let timing = session.timing, timing == .ahead || timing == .early {
                         let color = timing.status.solid(t)
@@ -183,7 +183,7 @@ struct FocusContent: View {
     private var groups: [(title: String, sessions: [FocusStore.Session])] {
         var result: [(title: String, sessions: [FocusStore.Session])] = []
         for session in sessions {
-            let title = session.startedAt.map(FocusTexts.dayTitle) ?? "未知日期"
+            let title = session.startedAt.map(FocusTexts.dayTitle) ?? String(localized: "未知日期")
             if result.last?.title == title {
                 result[result.count - 1].sessions.append(session)
             } else {
@@ -233,9 +233,9 @@ enum FocusTexts {
 
     static func duration(_ seconds: Int) -> String {
         let minutes = seconds / 60
-        if minutes >= 60 { return minutes % 60 == 0 ? "\(minutes / 60)小时" : "\(minutes / 60)小时\(minutes % 60)分" }
-        if minutes > 0 { return "\(minutes)分钟" }
-        return "\(seconds)秒"
+        if minutes >= 60 { return minutes % 60 == 0 ? String(localized: "\(minutes / 60)小时") : String(localized: "\(minutes / 60)小时\(minutes % 60)分") }
+        if minutes > 0 { return String(localized: "\(minutes)分钟") }
+        return String(localized: "\(seconds)秒")
     }
 
     static func timeRange(_ session: FocusStore.Session) -> String? {
@@ -248,18 +248,18 @@ enum FocusTexts {
 
     static func dayTitle(_ date: Date) -> String {
         let calendar = Calendar.current
-        if calendar.isDateInToday(date) { return "今天" }
-        if calendar.isDateInYesterday(date) { return "昨天" }
+        if calendar.isDateInToday(date) { return String(localized: "今天") }
+        if calendar.isDateInYesterday(date) { return String(localized: "昨天") }
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
         let sameYear = parts.year == calendar.component(.year, from: Date())
-        return sameYear ? "\(parts.month!)月\(parts.day!)日" : "\(parts.year!)年\(parts.month!)月\(parts.day!)日"
+        return sameYear ? String(localized: "\(parts.month!)月\(parts.day!)日") : String(localized: "\(parts.year!)年\(parts.month!)月\(parts.day!)日")
     }
 
     static func completion(_ kind: String) -> String? {
         switch kind {
-        case "FOCUS_AND_TASK_COMPLETED": "完成了任务"
-        case "FOCUS_AND_HABIT_RECORDED": "记录了习惯"
-        case "COUNTDOWN_ELAPSED": "倒计时结束"
+        case "FOCUS_AND_TASK_COMPLETED": String(localized: "完成了任务")
+        case "FOCUS_AND_HABIT_RECORDED": String(localized: "记录了习惯")
+        case "COUNTDOWN_ELAPSED": String(localized: "倒计时结束")
         default: nil
         }
     }

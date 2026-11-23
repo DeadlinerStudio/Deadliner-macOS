@@ -26,8 +26,8 @@ enum OverviewPeriod {
         let count = current.prefix(day).reduce(0, +)
         let baseline = previous.prefix(day).reduce(0, +)
         let delta = count - baseline
-        if delta == 0 { return "较上月同期持平" }
-        if baseline == 0 { return "较上月同期新增 \(delta) 项" }
-        return String(format: "较上月同期%@ %.1f%%", delta > 0 ? "增长" : "减少", abs(Double(delta) / Double(baseline)) * 100)
+        if delta == 0 { return String(localized: "较上月同期持平") }
+        if baseline == 0 { return String(localized: "较上月同期新增 \(delta) 项") }
+        return String(format: String(localized: "较上月同期%@ %.1f%%"), delta > 0 ? String(localized: "增长") : String(localized: "减少"), abs(Double(delta) / Double(baseline)) * 100)
     }
 }

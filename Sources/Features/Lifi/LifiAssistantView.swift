@@ -8,7 +8,7 @@ struct LifiAssistantView: View {
     @FocusState private var inputFocused: Bool
     @Environment(\.palette) private var t
 
-    private let examples = ["明天下午 3 点和产品开评审会", "每周 3 次力量训练，每次 40 分钟", "这周有什么快到期的任务？", "把这周要交付的任务排一下优先级"]
+    private let examples = [String(localized: "明天下午 3 点和产品开评审会"), String(localized: "每周 3 次力量训练，每次 40 分钟"), String(localized: "这周有什么快到期的任务？"), String(localized: "把这周要交付的任务排一下优先级")]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -130,7 +130,7 @@ struct LifiAssistantView: View {
                 } else {
                     HStack {
                         Button("允许一次") { store.resolve(id, .once) }.buttonStyle(.borderedProminent)
-                        if title.hasPrefix("允许读取") {
+                        if title.hasPrefix(String(localized: "允许读取")) {
                             Button("记住本会话") { store.resolve(id, .session) }
                             Button("永久开启") { store.resolve(id, .always) }
                         }
@@ -153,7 +153,7 @@ struct LifiAssistantView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(proposal.draft.title)
-                            Text(proposal.draft.dueAt.map { "截止：" + $0.formatted(.dateTime.month().day().weekday(.abbreviated).hour().minute()) } ?? "未设置截止时间")
+                            Text(proposal.draft.dueAt.map { String(localized: "截止：") + $0.formatted(.dateTime.month().day().weekday(.abbreviated).hour().minute()) } ?? String(localized: "未设置截止时间"))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -184,13 +184,13 @@ struct LifiAssistantView: View {
 
     static func habitSummary(_ draft: HabitDraft) -> String {
         let window = switch draft.goalWindow {
-        case .scheduledDay: "每个执行日"
-        case .week: "每周"
-        case .month: "每月"
-        case .lifetime: "累计"
+        case .scheduledDay: String(localized: "每个执行日")
+        case .week: String(localized: "每周")
+        case .month: String(localized: "每月")
+        case .lifetime: String(localized: "累计")
         }
-        var text = "\(window) \(draft.targetCount) 次"
-        if draft.reminderEnabled { text += " · 提醒 " + draft.reminderTime.formatted(.dateTime.hour().minute()) }
+        var text = String(localized: "\(window) \(draft.targetCount) 次")
+        if draft.reminderEnabled { text += String(localized: " · 提醒 ") + draft.reminderTime.formatted(.dateTime.hour().minute()) }
         return text
     }
 }

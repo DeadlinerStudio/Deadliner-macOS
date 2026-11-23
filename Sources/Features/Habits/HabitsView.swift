@@ -13,7 +13,7 @@ struct HabitsView: View {
 
     private var subtitle: String {
         guard let day = store.selectedDay else { return "" }
-        return "\(HabitDates.isToday(store.selectedDate) ? "今日" : HabitDates.monthDay(store.selectedDate)) \(day.completed)/\(day.total)"
+        return String(localized: "\(HabitDates.isToday(store.selectedDate) ? String(localized: "今日") : HabitDates.monthDay(store.selectedDate)) \(day.completed)/\(day.total)")
     }
 
     var body: some View {
@@ -116,9 +116,9 @@ struct HabitsContent: View {
                     if daily.isEmpty && period.isEmpty && upcoming.isEmpty && !isLoading {
                         emptyState
                     }
-                    section("今日习惯", daily)
-                    section("周期目标", period)
-                    section("即将复习", upcoming)
+                    section(String(localized: "今日习惯"), daily)
+                    section(String(localized: "周期目标"), period)
+                    section(String(localized: "即将复习"), upcoming)
                 }
                 .readableWidth(layout.maxContentWidth)
                 .padding(.horizontal, 24)
@@ -340,7 +340,7 @@ enum HabitDates {
 
     static func weekday(_ raw: String) -> String {
         guard let date = date(raw) else { return "" }
-        return ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][Calendar.current.component(.weekday, from: date) - 1]
+        return [String(localized: "周日"), String(localized: "周一"), String(localized: "周二"), String(localized: "周三"), String(localized: "周四"), String(localized: "周五"), String(localized: "周六")][Calendar.current.component(.weekday, from: date) - 1]
     }
 
     static func dayOfMonth(_ raw: String) -> String {
@@ -351,6 +351,6 @@ enum HabitDates {
     static func monthDay(_ raw: String) -> String {
         guard let date = date(raw) else { return raw }
         let calendar = Calendar.current
-        return "\(calendar.component(.month, from: date))月\(calendar.component(.day, from: date))日"
+        return String(localized: "\(calendar.component(.month, from: date))月\(calendar.component(.day, from: date))日")
     }
 }

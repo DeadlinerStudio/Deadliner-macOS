@@ -59,7 +59,7 @@ struct CategoryBrowserSheet: View {
                 .foregroundStyle(.white)
                 .frame(width: 26, height: 26)
                 .background(category.flatMap { Color(hexString: $0.colorHex) } ?? Color.gray, in: Circle())
-            Text(category?.name ?? "未分类")
+            Text(category?.name ?? String(localized: "未分类"))
             Spacer()
             Text("\(active) 个进行中 · \(contents.tasks.count) 个任务 · \(contents.habits.count) 个习惯")
                 .font(.caption)
@@ -110,7 +110,7 @@ private struct CategoryContentsView: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle(category?.name ?? "未分类")
+        .navigationTitle(category?.name ?? String(localized: "未分类"))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("在任务页只看这个分类", systemImage: "line.3.horizontal.decrease.circle", action: filterTasks)
@@ -128,7 +128,7 @@ private struct CategoryContentsView: View {
                     .foregroundStyle(task.isCompleted || task.isAbandoned ? .secondary : .primary)
                     .lineLimit(1)
                 Spacer()
-                Text(task.state == .archived || task.state == .abandonedArchived ? "已归档" : TaskStatus.remainingText(task, now: now))
+                Text(task.state == .archived || task.state == .abandonedArchived ? String(localized: "已归档") : TaskStatus.remainingText(task, now: now))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -40,40 +40,40 @@ struct LifiToolExecutor {
                              limit: Int(tool.limit), sort: tool.sort, now: now)
         case let tool as ToolCall.CreateTask:
             let name = tool.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !name.isEmpty else { return failure("create_task", "INVALID_ARGS", "create_task 需要非空任务名称") }
+            guard !name.isEmpty else { return failure("create_task", "INVALID_ARGS", String(localized: "create_task 需要非空任务名称")) }
             let due = (tool.dueTime ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             if !due.isEmpty && LifiDrafts.parseDue(due) == nil {
                 return encode("create_task", CreateTaskPayload(ok: false, task: nil, createdTasks: [],
-                                                               items: [.init(ok: false, item: nil, message: "dueTime 格式无效，需为 yyyy-MM-dd HH:mm")],
+                                                               items: [.init(ok: false, item: nil, message: String(localized: "dueTime 格式无效，需为 yyyy-MM-dd HH:mm"))],
                                                                summary: .init(total: 1, success: 0, failed: 1), pendingUserConfirmation: false),
-                              message: "任务草案无效")
+                              message: String(localized: "任务草案无效"))
             }
             let item = TaskItemPayload(id: nil, name: name, due: due, note: tool.note ?? "")
             return encode("create_task", CreateTaskPayload(ok: true, task: item, createdTasks: [item], items: [.init(ok: true, item: item, message: nil)],
                                                            summary: .init(total: 1, success: 1, failed: 0), pendingUserConfirmation: true),
-                          message: "已生成任务草案，请确认是否创建")
+                          message: String(localized: "已生成任务草案，请确认是否创建"))
         case let tool as ToolCall.UpdateDeadline:
             return updateDeadline(uid: tool.taskId, newDue: tool.newDueTime)
         case let tool as ToolCall.ReadHabits:
             return readHabits(keywords: tool.keywords)
         case let tool as ToolCall.CreateHabit:
             let name = tool.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !name.isEmpty else { return failure("create_habit", "INVALID_ARGS", "create_habit 需要非空习惯名称") }
+            guard !name.isEmpty else { return failure("create_habit", "INVALID_ARGS", String(localized: "create_habit 需要非空习惯名称")) }
             let item = HabitItemPayload(id: nil, name: name, period: tool.period, timesPerPeriod: max(1, Int(tool.timesPerPeriod)),
                                         goalType: tool.goalType, totalTarget: tool.totalTarget.map { Int(truncating: $0) })
             return encode("create_habit", CreateHabitPayload(ok: true, habit: item, createdHabits: [item], items: [.init(ok: true, item: item, message: nil)],
                                                              summary: .init(total: 1, success: 1, failed: 0), pendingUserConfirmation: true),
-                          message: "已生成习惯草案，请确认是否创建")
+                          message: String(localized: "已生成习惯草案，请确认是否创建"))
         default:
-            return failure("unknown", "UNSUPPORTED_TOOL", "Lifi 请求了未支持的工具")
+            return failure("unknown", "UNSUPPORTED_TOOL", String(localized: "Lifi 请求了未支持的工具"))
         }
     }
 
     static func denied(_ call: ToolCall) -> Result {
         let tool = name(of: call)
-        let json = (try? String(data: JSONEncoder().encode(Failure(ok: false, errorCode: "USER_DENIED", message: "用户拒绝了这次操作")), encoding: .utf8))
+        let json = (try? String(data: JSONEncoder().encode(Failure(ok: false, errorCode: "USER_DENIED", message: String(localized: "用户拒绝了这次操作"))), encoding: .utf8))
             ?? #"{"ok":false,"errorCode":"USER_DENIED"}"#
-        return Result(tool: tool, json: json, message: "已拒绝")
+        return Result(tool: tool, json: json, message: String(localized: "已拒绝"))
     }
 
     // MARK: - 读取任务（与 iOS 相同的筛选：默认前后 7 天、未完成、按截止时间升序、最多 20 条）
@@ -109,7 +109,7 @@ struct LifiToolExecutor {
             tasks: picked.map { TaskDigest(id: $0.id, name: $0.title, due: $0.dueAt.map { TaskShareLink.localString($0) } ?? "",
                                            status: $0.isCompleted ? "DONE" : "OPEN", notePreview: String($0.note.prefix(40))) },
             summary: .init(count: picked.count, overdue: overdue, dueSoon24h: soon))
-        return encode("read_tasks", payload, message: "已读取任务 \(picked.count) 条（逾期 \(overdue)，24 小时内 \(soon)）")
+        return encode("read_tasks", payload, message: String(localized: "已读取任务 \(picked.count) 条（逾期 \(overdue)，24 小时内 \(soon)）"))
     }
 
     private func readHabits(keywords: [String]) -> Result {
@@ -124,26 +124,26 @@ struct LifiToolExecutor {
                                              status: $0.status.name) },
             summary: .init(count: habits.count, active: habits.filter { $0.status.name == "ACTIVE" }.count,
                            archived: habits.filter { $0.status.name == "ARCHIVED" }.count))
-        return encode("read_habits", payload, message: "已读取习惯 \(habits.count) 条")
+        return encode("read_habits", payload, message: String(localized: "已读取习惯 \(habits.count) 条"))
     }
 
     private func updateDeadline(uid: String, newDue: String) -> Result {
-        guard !uid.trimmingCharacters(in: .whitespaces).isEmpty else { return failure("update_deadline", "INVALID_ARGS", "update_deadline 需要任务 ID") }
-        guard let due = LifiDrafts.parseDue(newDue) else { return failure("update_deadline", "INVALID_DATE", "newDueTime 无法解析") }
-        guard let task = database.tasks.find(uid: uid), !task.isDeleted else { return failure("update_deadline", "TASK_NOT_FOUND", "未找到任务 \(uid)") }
+        guard !uid.trimmingCharacters(in: .whitespaces).isEmpty else { return failure("update_deadline", "INVALID_ARGS", String(localized: "update_deadline 需要任务 ID")) }
+        guard let due = LifiDrafts.parseDue(newDue) else { return failure("update_deadline", "INVALID_DATE", String(localized: "newDueTime 无法解析")) }
+        guard let task = database.tasks.find(uid: uid), !task.isDeleted else { return failure("update_deadline", "TASK_NOT_FOUND", String(localized: "未找到任务 \(uid)")) }
         let updated = task.doCopy(uid: task.uid, title: task.title, note: task.note, startAt: task.startAt, dueAt: CoreClock.local(due),
                                   state: task.state, completedAt: task.completedAt, categoryUid: task.categoryUid, isStarred: task.isStarred,
                                   calendarEventId: task.calendarEventId, createdAt: task.createdAt, updatedAt: CoreClock.now(),
                                   isDeleted: false, subtasks: task.subtasks)
         let outcome = database.tasks.update(task: updated).outcome.name
-        guard outcome == "APPLIED" || outcome == "NO_OP" else { return failure("update_deadline", outcome, "无法修改这个任务的截止时间") }
+        guard outcome == "APPLIED" || outcome == "NO_OP" else { return failure("update_deadline", outcome, String(localized: "无法修改这个任务的截止时间")) }
         didChange()
         let item = TaskItemPayload(id: task.uid, name: task.title, due: TaskShareLink.localString(due), note: task.note)
-        return encode("update_deadline", UpdateDeadlinePayload(ok: true, task: item), message: "已更新截止时间：\(task.title)")
+        return encode("update_deadline", UpdateDeadlinePayload(ok: true, task: item), message: String(localized: "已更新截止时间：\(task.title)"))
     }
 
     private func failure(_ tool: String, _ code: String, _ message: String) -> Result {
-        encode(tool, Failure(ok: false, errorCode: code, message: message), message: "工具执行失败：\(message)")
+        encode(tool, Failure(ok: false, errorCode: code, message: message), message: String(localized: "工具执行失败：\(message)"))
     }
 
     private func encode<T: Encodable>(_ tool: String, _ payload: T, message: String) -> Result {

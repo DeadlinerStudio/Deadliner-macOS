@@ -10,8 +10,8 @@ struct SyncSettings: Equatable {
     var backgroundInterval = 15
 
     static let intervalOptions: [(minutes: Int, title: String)] = [
-        (0, "仅手动"), (15, "每 15 分钟"), (30, "每 30 分钟"), (60, "每 1 小时"), (180, "每 3 小时"),
-        (360, "每 6 小时"), (720, "每 12 小时"), (1440, "每 24 小时"),
+        (0, String(localized: "仅手动")), (15, String(localized: "每 15 分钟")), (30, String(localized: "每 30 分钟")), (60, String(localized: "每 1 小时")), (180, String(localized: "每 3 小时")),
+        (360, String(localized: "每 6 小时")), (720, String(localized: "每 12 小时")), (1440, String(localized: "每 24 小时")),
     ]
 
     private static let urlKey = "sync.webdav.url"
@@ -44,11 +44,11 @@ struct SyncSettings: Equatable {
     /// 交给 Core 之前的检查：Core 的 WebDavSyncTransport 要求地址以 http(s):// 开头，否则直接抛异常。
     var validationError: String? {
         let trimmed = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "请填写服务器地址" }
+        guard !trimmed.isEmpty else { return String(localized: "请填写服务器地址") }
         guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme), url.host != nil else {
-            return "服务器地址需要以 https:// 开头"
+            return String(localized: "服务器地址需要以 https:// 开头")
         }
-        if username.trimmingCharacters(in: .whitespaces).isEmpty { return "请填写用户名" }
+        if username.trimmingCharacters(in: .whitespaces).isEmpty { return String(localized: "请填写用户名") }
         return nil
     }
 

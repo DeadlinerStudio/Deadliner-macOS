@@ -112,8 +112,8 @@ struct TaskDetailSheet: View {
                     .font(.callout)
                 }
                 Section("时间") {
-                    LabeledContent("开始", value: item.startAt.map(Self.format) ?? "未设置")
-                    LabeledContent("截止", value: item.dueAt.map(Self.format) ?? "未设置")
+                    LabeledContent("开始", value: item.startAt.map(Self.format) ?? String(localized: "未设置"))
+                    LabeledContent("截止", value: item.dueAt.map(Self.format) ?? String(localized: "未设置"))
                     if let done = item.completedAt, item.isCompleted {
                         LabeledContent("完成于", value: Self.format(done))
                     }

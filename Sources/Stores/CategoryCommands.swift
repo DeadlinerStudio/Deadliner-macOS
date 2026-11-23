@@ -7,8 +7,8 @@ enum CategoryCommandError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .emptyName: "分类名称不能为空"
-        case .notFound: "分类不存在，可能已在其他设备上删除"
+        case .emptyName: String(localized: "分类名称不能为空")
+        case .notFound: String(localized: "分类不存在，可能已在其他设备上删除")
         }
     }
 }

@@ -66,8 +66,8 @@ final class LifiAssistantStore {
 
     /// 配置变化时重新创建会话；没有配置时返回错误文字。
     private func ensureCore() -> String? {
-        guard LifiSettings.isAvailable else { return "当前构建未包含 Lifi AI" }
-        guard let config = LifiSettings.configuration() else { return "请先在「设置 → Lifi AI」中启用并填写服务地址、模型和 API Key" }
+        guard LifiSettings.isAvailable else { return String(localized: "当前构建未包含 Lifi AI") }
+        guard let config = LifiSettings.configuration() else { return String(localized: "请先在「设置 → Lifi AI」中启用并填写服务地址、模型和 API Key") }
         let print = LifiSettings.fingerprint()
         if core != nil && fingerprint == print { return nil }
         close()
@@ -87,7 +87,7 @@ final class LifiAssistantStore {
     /// 快速添加用的 AI 识别（与 iOS 相同，走 Core 的 `IosQuickAddBridge`）。返回 `QuickAddProposal` 的 JSON。
     func extractQuickAdd(_ text: String, kind: String) async throws -> String {
         if let problem = ensureCore() { throw LifiError(message: problem) }
-        guard let core else { throw LifiError(message: "Lifi 尚未初始化") }
+        guard let core else { throw LifiError(message: String(localized: "Lifi 尚未初始化")) }
         return try await IosQuickAddBridge().extractJson(core: core, text: LifiSettings.extractionInput(text), kind: kind)
     }
 
@@ -102,12 +102,12 @@ final class LifiAssistantStore {
         guard let core else { return }
         isRunning = true
         streamedReply = false
-        status = "Lifi 正在思考…"
+        status = String(localized: "Lifi 正在思考…")
         _Concurrency.Task {
             do {
                 try await core.processInput(text: text)
             } catch {
-                finish(error: "请求失败：\(error.localizedDescription)")
+                finish(error: String(localized: "请求失败：\(error.localizedDescription)"))
             }
         }
     }
@@ -116,7 +116,7 @@ final class LifiAssistantStore {
         guard let core, isRunning else { return }
         _Concurrency.Task { try? await core.cancelRun() }
         finish(error: nil)
-        messages.append(Message(kind: .notice("已停止")))
+        messages.append(Message(kind: .notice(String(localized: "已停止"))))
     }
 
     /// 清空对话并开始新的会话（记忆保留）。
@@ -169,7 +169,7 @@ final class LifiAssistantStore {
             finish(error: nil)
         case let event as CoreEvent.OnMemoryCommitted:
             for memory in event.addedMemories where !memory.trimmingCharacters(in: .whitespaces).isEmpty {
-                messages.append(Message(kind: .notice("记住了：\(memory)")))
+                messages.append(Message(kind: .notice(String(localized: "记住了：\(memory)"))))
             }
         case let event as CoreEvent.OnError:
             finish(error: event.message)
@@ -180,10 +180,10 @@ final class LifiAssistantStore {
 
     static func phaseText(agent: String, phase: String) -> String {
         switch phase.lowercased() {
-        case "deciding", "thinking": "\(agent) 正在思考…"
-        case "tool", "waiting_tool", "awaiting_tool": "\(agent) 正在等待工具结果…"
-        case "responding", "streaming": "\(agent) 正在组织回复…"
-        default: "\(agent) 正在处理（\(phase)）…"
+        case "deciding", "thinking": String(localized: "\(agent) 正在思考…")
+        case "tool", "waiting_tool", "awaiting_tool": String(localized: "\(agent) 正在等待工具结果…")
+        case "responding", "streaming": String(localized: "\(agent) 正在组织回复…")
+        default: String(localized: "\(agent) 正在处理（\(phase)）…")
         }
     }
 
@@ -194,7 +194,7 @@ final class LifiAssistantStore {
         if (LifiToolExecutor.isRead(call) && !autoRead) || LifiToolExecutor.isWrite(call) {
             pendingCalls[id] = call
             messages.append(Message(kind: .approval(id: id, title: Self.approvalTitle(call), detail: Self.approvalDetail(call), resolved: nil)))
-            status = "等待你的确认"
+            status = String(localized: "等待你的确认")
             return
         }
         run(id: id, call: call)
@@ -206,16 +206,16 @@ final class LifiAssistantStore {
         guard let call = pendingCalls.removeValue(forKey: id) else { return }
         let resolved: String
         switch answer {
-        case .once: resolved = "已允许一次"
-        case .session: sessionAllowsRead = true; resolved = "已允许（本次会话）"
-        case .always: UserDefaults.standard.set(true, forKey: LifiSettings.autoApproveReadKey); resolved = "已永久允许读取"
-        case .deny: resolved = "已拒绝"
+        case .once: resolved = String(localized: "已允许一次")
+        case .session: sessionAllowsRead = true; resolved = String(localized: "已允许（本次会话）")
+        case .always: UserDefaults.standard.set(true, forKey: LifiSettings.autoApproveReadKey); resolved = String(localized: "已永久允许读取")
+        case .deny: resolved = String(localized: "已拒绝")
         }
         if let index = messages.firstIndex(where: { if case .approval(let key, _, _, nil) = $0.kind { return key == id }; return false }),
            case .approval(_, let title, let detail, _) = messages[index].kind {
             messages[index].kind = .approval(id: id, title: title, detail: detail, resolved: resolved)
         }
-        status = "Lifi 正在思考…"
+        status = String(localized: "Lifi 正在思考…")
         if answer == .deny {
             submit(id: id, result: LifiToolExecutor.denied(call))
         } else {
@@ -237,17 +237,17 @@ final class LifiAssistantStore {
             do {
                 try await core.submitToolResult(toolCallId: id, tool: result.tool, payload: result.json)
             } catch {
-                finish(error: "工具结果回传失败：\(error.localizedDescription)")
+                finish(error: String(localized: "工具结果回传失败：\(error.localizedDescription)"))
             }
         }
     }
 
     static func approvalTitle(_ call: ToolCall) -> String {
         switch call {
-        case is ToolCall.ReadTasks: "允许读取任务列表？"
-        case is ToolCall.ReadHabits: "允许读取习惯列表？"
-        case is ToolCall.UpdateDeadline: "允许修改截止时间？"
-        default: "允许执行这次操作？"
+        case is ToolCall.ReadTasks: String(localized: "允许读取任务列表？")
+        case is ToolCall.ReadHabits: String(localized: "允许读取习惯列表？")
+        case is ToolCall.UpdateDeadline: String(localized: "允许修改截止时间？")
+        default: String(localized: "允许执行这次操作？")
         }
     }
 
@@ -255,9 +255,9 @@ final class LifiAssistantStore {
         var lines: [String] = []
         if let reason = call.reason, !reason.isEmpty { lines.append(reason) }
         if let update = call as? ToolCall.UpdateDeadline {
-            lines.append("新的截止时间：\(update.newDueTime)")
+            lines.append(String(localized: "新的截止时间：\(update.newDueTime)"))
         } else if LifiToolExecutor.isRead(call) {
-            lines.append("为了回答你的问题，Lifi 需要查看相关内容。你可以只允许本次，也可以记住本会话，或直接永久开启自动确认。")
+            lines.append(String(localized: "为了回答你的问题，Lifi 需要查看相关内容。你可以只允许本次，也可以记住本会话，或直接永久开启自动确认。"))
         }
         return lines.joined(separator: "\n")
     }
@@ -270,7 +270,7 @@ final class LifiAssistantStore {
             var proposals = tasks.filter(\.isValid).map { Proposal(draft: $0) }
             if silent { for index in proposals.indices { proposals[index].addedId = try? taskCommands.save(proposals[index].draft) } }
             messages.append(Message(kind: .tasks(proposals)))
-            if silent { messages.append(Message(kind: .notice("已静默添加 \(proposals.filter { $0.addedId != nil }.count) 条任务，若有误可以撤回"))) }
+            if silent { messages.append(Message(kind: .notice(String(localized: "已静默添加 \(proposals.filter { $0.addedId != nil }.count) 条任务，若有误可以撤回")))) }
         }
         if !habits.isEmpty {
             var proposals = habits.filter { $0.validationError == nil }.map { HabitProposal(draft: $0) }

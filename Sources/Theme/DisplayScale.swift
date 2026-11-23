@@ -11,11 +11,11 @@ enum DisplayScale: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .compact: "更紧凑"
-        case .slightlyCompact: "稍紧凑"
-        case .standard: "标准"
-        case .slightlyLarge: "稍大"
-        case .large: "更大"
+        case .compact: String(localized: "更紧凑")
+        case .slightlyCompact: String(localized: "稍紧凑")
+        case .standard: String(localized: "标准")
+        case .slightlyLarge: String(localized: "稍大")
+        case .large: String(localized: "更大")
         }
     }
 

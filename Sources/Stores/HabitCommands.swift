@@ -29,11 +29,11 @@ struct HabitDraft: Equatable {
     /// 不满足时返回原因。这些条件与 Core 构造 HabitSchedule / HabitGoal / HabitTracking 时的检查一致——
     /// Core 的检查会直接抛出 Kotlin 异常而导致崩溃，所以必须在交给 Core 之前拦下。
     var validationError: String? {
-        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "名称不能为空" }
-        if targetCount <= 0 { return "目标次数必须大于 0" }
-        if defaultIncrement <= 0 { return "每次记录的数量必须大于 0" }
-        if scheduleKind == .weeklyDays && !(1...0b111_1111).contains(weekdaysMask) { return "请至少选择一天" }
-        if let endOn, Calendar.current.startOfDay(for: endOn) < Calendar.current.startOfDay(for: startOn) { return "结束日期不能早于开始日期" }
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return String(localized: "名称不能为空") }
+        if targetCount <= 0 { return String(localized: "目标次数必须大于 0") }
+        if defaultIncrement <= 0 { return String(localized: "每次记录的数量必须大于 0") }
+        if scheduleKind == .weeklyDays && !(1...0b111_1111).contains(weekdaysMask) { return String(localized: "请至少选择一天") }
+        if let endOn, Calendar.current.startOfDay(for: endOn) < Calendar.current.startOfDay(for: startOn) { return String(localized: "结束日期不能早于开始日期") }
         return nil
     }
 }
@@ -174,7 +174,7 @@ enum HabitCommandError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalid(let message): message
-        case .notFound: "习惯不存在，可能已在其他设备上删除"
+        case .notFound: String(localized: "习惯不存在，可能已在其他设备上删除")
         }
     }
 }

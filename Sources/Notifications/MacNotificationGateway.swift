@@ -57,7 +57,7 @@ struct TaskReminderOptions: Equatable {
 
     /// 「1 天」「3 小时」。
     static func phrase(hours: Int) -> String {
-        hours % 24 == 0 ? "\(hours / 24) 天" : "\(hours) 小时"
+        hours % 24 == 0 ? String(localized: "\(hours / 24) 天") : String(localized: "\(hours) 小时")
     }
 }
 
@@ -98,7 +98,7 @@ enum NotificationShaping {
                 let fire = calendar.date(byAdding: .minute, value: options.daytimeMinutes, to: day)!
                 // 白天的时间已经过了：不再补发（否则每次刷新都会立刻弹出）。
                 guard fire > now else { continue }
-                let body = item.kind != "TASK_NEARBY" ? "今天 23:59 截止" : daysBefore == 1 ? "明天 23:59 截止" : "\(daysBefore) 天后 23:59 截止"
+                let body = item.kind != "TASK_NEARBY" ? String(localized: "今天 23:59 截止") : daysBefore == 1 ? String(localized: "明天 23:59 截止") : String(localized: "\(daysBefore) 天后 23:59 截止")
                 item = PlannedNotification(id: item.id, ownerUid: item.ownerUid, kind: item.kind, title: item.title,
                                            body: body, fireAt: fire, dueAt: item.dueAt)
             }
@@ -112,11 +112,11 @@ enum NotificationShaping {
         for (key, group) in groups {
             guard group.count > 1, let first = group.first else { result += group; continue }
             let titles = group.map(\.title).sorted()
-            let names = titles.prefix(5).joined(separator: "、") + (titles.count > 5 ? " 等" : "")
+            let names = titles.prefix(5).joined(separator: "、") + (titles.count > 5 ? String(localized: " 等") : "")
             let endOfDay = group.allSatisfy { $0.body.contains("23:59") }
             let title: String = switch first.kind {
-            case "TASK_NEARBY": group.allSatisfy { $0.body == "明天 23:59 截止" } ? "明天有 \(group.count) 项任务截止" : "\(group.count) 项任务即将到期"
-            default: endOfDay ? "今天有 \(group.count) 项任务截止" : "\(group.count) 项任务已到截止时间"
+            case "TASK_NEARBY": group.allSatisfy { $0.body == String(localized: "明天 23:59 截止") } ? String(localized: "明天有 \(group.count) 项任务截止") : String(localized: "\(group.count) 项任务即将到期")
+            default: endOfDay ? String(localized: "今天有 \(group.count) 项任务截止") : String(localized: "\(group.count) 项任务已到截止时间")
             }
             result.append(PlannedNotification(id: "deadliner.group.\(key)", ownerUid: "", kind: first.kind, title: title,
                                               body: names, fireAt: first.fireAt))
@@ -182,7 +182,7 @@ final class MacNotificationGateway: NSObject, NotificationGateway {
                         result.append(PlannedNotification(
                             id: item.id.replacingOccurrences(of: "deadliner.", with: "deadliner.nearby."), ownerUid: item.ownerUid,
                             kind: "TASK_NEARBY", title: item.title,
-                            body: "还有 \(TaskReminderOptions.phrase(hours: options.nearbyHours))到期（\(due.formatted(.dateTime.month().day().hour().minute()))）",
+                            body: String(localized: "还有 \(TaskReminderOptions.phrase(hours: options.nearbyHours))到期（\(due.formatted(.dateTime.month().day().hour().minute()))）"),
                             fireAt: fire, dueAt: due))
                     }
                 }
@@ -212,10 +212,10 @@ final class MacNotificationGateway: NSObject, NotificationGateway {
     static func body(kind: String, dueAt: String) -> String? {
         switch kind {
         case "TASK_NEARBY":
-            guard let due = CoreDates.parseInstant(dueAt) else { return "还有 1 天到期" }
-            return "还有 1 天到期（\(due.formatted(.dateTime.month().day().hour().minute()))）"
-        case "TASK_DUE": return "已到截止时间"
-        case "HABIT_DUE", "HABIT_START": return "该打卡了"
+            guard let due = CoreDates.parseInstant(dueAt) else { return String(localized: "还有 1 天到期") }
+            return String(localized: "还有 1 天到期（\(due.formatted(.dateTime.month().day().hour().minute()))）")
+        case "TASK_DUE": return String(localized: "已到截止时间")
+        case "HABIT_DUE", "HABIT_START": return String(localized: "该打卡了")
         default: return nil
         }
     }

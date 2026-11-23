@@ -47,7 +47,7 @@ struct LifiSettingsSection: View {
                 HStack {
                     if let message {
                         Text(message).font(.caption).textSelection(.enabled)
-                            .foregroundStyle(message.hasPrefix("连接正常") || message.hasPrefix("已保存") ? Color.green : Color.red)
+                            .foregroundStyle(message.hasPrefix(String(localized: "连接正常")) || message.hasPrefix(String(localized: "已保存")) ? Color.green : Color.red)
                     }
                     Spacer()
                     Button(probing ? "测试中…" : "测试连接") { probe() }
@@ -115,17 +115,17 @@ struct LifiSettingsSection: View {
         let address = url.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard let parsed = URL(string: address), parsed.scheme == "https", parsed.host != nil, parsed.user == nil, parsed.password == nil,
               !model.trimmingCharacters(in: .whitespaces).isEmpty, !key.isEmpty else {
-            message = "请填写 HTTPS 服务地址、模型和 API Key"
+            message = String(localized: "请填写 HTTPS 服务地址、模型和 API Key")
             return
         }
         guard MonthlyInsightSettings.keychain.setPassword(key, url: address, username: "api") else {
-            message = "钥匙串保存失败"
+            message = String(localized: "钥匙串保存失败")
             return
         }
         UserDefaults.standard.set(address, forKey: LifiSettings.urlKey)
         UserDefaults.standard.set(model.trimmingCharacters(in: .whitespaces), forKey: LifiSettings.modelKey)
         url = address
-        message = "已保存"
+        message = String(localized: "已保存")
         onChange()
     }
 }

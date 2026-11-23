@@ -31,7 +31,7 @@ final class MonthlyInsightStore {
         result = nil
         error = nil
         loading = pending[month] != nil
-        guard let directory else { error = "无法打开复盘存储目录"; return }
+        guard let directory else { error = String(localized: "无法打开复盘存储目录"); return }
         let url = directory.appendingPathComponent(month + ".json")
         do {
             if FileManager.default.fileExists(atPath: url.path) {
@@ -39,11 +39,11 @@ final class MonthlyInsightStore {
                 if let result = record.result, result.month == month, !result.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     self.result = result; loading = false; return
                 }
-                if record.attempted && !retry && pending[month] == nil { error = "上次分析未完成，请点击重试"; return }
+                if record.attempted && !retry && pending[month] == nil { error = String(localized: "上次分析未完成，请点击重试"); return }
             }
             if pending[month] != nil { return }
-            guard LifiAvailability.shared.isAvailable else { error = "当前构建未包含 AI 服务"; return }
-            guard let config = MonthlyInsightSettings.configuration() else { error = "配置 AI 服务后可生成月度洞察"; return }
+            guard LifiAvailability.shared.isAvailable else { error = String(localized: "当前构建未包含 AI 服务"); return }
+            guard let config = MonthlyInsightSettings.configuration() else { error = String(localized: "配置 AI 服务后可生成月度洞察"); return }
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             try JSONEncoder().encode(Record(attempted: true)).write(to: url, options: .atomic)
             let bridge = AppleMonthlyInsightBridge()
@@ -57,7 +57,7 @@ final class MonthlyInsightStore {
                         guard !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw CocoaError(.coderInvalidValue) }
                         try JSONEncoder().encode(Record(attempted: true, result: value)).write(to: url, options: .atomic)
                         if activeMonth == month { result = value; error = nil }
-                    } catch { if activeMonth == month { self.error = "无法保存月度洞察，请重试" } }
+                    } catch { if activeMonth == month { self.error = String(localized: "无法保存月度洞察，请重试") } }
                     pending[month] = nil
                     if activeMonth == month { loading = false }
                 }
@@ -67,7 +67,7 @@ final class MonthlyInsightStore {
                     if activeMonth == month { error = message; loading = false }
                 }
             })
-        } catch { self.error = "复盘存储读写失败，请重试"; loading = false }
+        } catch { self.error = String(localized: "复盘存储读写失败，请重试"); loading = false }
     }
 }
 
@@ -99,7 +99,7 @@ enum MonthlyInsightSettings {
     nonisolated static func probe(url: String, model: String, key: String) async -> String {
         var address = url.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         if !address.hasSuffix("/chat/completions") { address += "/chat/completions" }
-        guard let endpoint = URL(string: address), endpoint.scheme == "https" else { return "服务地址无效（需要 https）" }
+        guard let endpoint = URL(string: address), endpoint.scheme == "https" else { return String(localized: "服务地址无效（需要 https）") }
         var body: [String: Any] = ["model": model.trimmingCharacters(in: .whitespaces),
                                    "messages": [["role": "user", "content": "请只回复 OK"]]]
         if let temperature = temperature(for: model) { body["temperature"] = temperature } else { body["temperature"] = 0.1 }
@@ -111,13 +111,13 @@ enum MonthlyInsightSettings {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            if (200..<300).contains(status) { return "连接正常（HTTP \(status)）" }
+            if (200..<300).contains(status) { return String(localized: "连接正常（HTTP \(status)）") }
             let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             let message = (json?["error"] as? [String: Any])?["message"] as? String
                 ?? String(data: data.prefix(300), encoding: .utf8) ?? ""
             return "HTTP \(status)：\(message)"
         } catch {
-            return "请求失败：\(error.localizedDescription)"
+            return String(localized: "请求失败：\(error.localizedDescription)")
         }
     }
 }

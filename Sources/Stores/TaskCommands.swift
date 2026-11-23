@@ -32,11 +32,11 @@ enum TaskCommandError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .notFound: "任务不存在，可能已在其他设备上删除"
-        case .invalidTransition: "当前状态下不能执行这个操作"
-        case .focusTimerRunning: "这个任务正在专注计时，请先结束计时"
-        case .emptyTitle: "标题不能为空"
-        case .noDeadline: "这个任务没有有效的截止时间"
+        case .notFound: String(localized: "任务不存在，可能已在其他设备上删除")
+        case .invalidTransition: String(localized: "当前状态下不能执行这个操作")
+        case .focusTimerRunning: String(localized: "这个任务正在专注计时，请先结束计时")
+        case .emptyTitle: String(localized: "标题不能为空")
+        case .noDeadline: String(localized: "这个任务没有有效的截止时间")
         }
     }
 }

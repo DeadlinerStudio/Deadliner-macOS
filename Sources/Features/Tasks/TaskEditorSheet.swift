@@ -59,8 +59,8 @@ struct TaskEditorSheet: View {
                 .disabled(isLocked)
 
                 Section("时间") {
-                    OptionalDateRow(title: "开始时间", date: $draft.startAt, defaultValue: Self.defaultStart)
-                    OptionalDateRow(title: "截止时间", date: $draft.dueAt, defaultValue: Self.defaultDue)
+                    OptionalDateRow(title: String(localized: "开始时间"), date: $draft.startAt, defaultValue: Self.defaultStart)
+                    OptionalDateRow(title: String(localized: "截止时间"), date: $draft.dueAt, defaultValue: Self.defaultDue)
                     Toggle("标星", isOn: $draft.isStarred)
                 }
                 .disabled(isLocked)
@@ -71,7 +71,7 @@ struct TaskEditorSheet: View {
 
                 Section {
                     FlowLayout(spacing: 8) {
-                        CategoryChoiceChip(title: "无分类", selected: draft.categoryId == nil) { draft.categoryId = nil }
+                        CategoryChoiceChip(title: String(localized: "无分类"), selected: draft.categoryId == nil) { draft.categoryId = nil }
                         ForEach(categories) { category in
                             CategoryChoiceChip(title: category.name, icon: CategoryIcons.symbol(for: category.iconKey),
                                                color: Color(hexString: category.colorHex), selected: draft.categoryId == category.id) {

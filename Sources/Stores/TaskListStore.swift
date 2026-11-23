@@ -15,9 +15,9 @@ final class TaskListStore {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .dueDate: "截止时间"
-            case .createdAt: "创建时间"
-            case .title: "标题"
+            case .dueDate: String(localized: "截止时间")
+            case .createdAt: String(localized: "创建时间")
+            case .title: String(localized: "标题")
             }
         }
     }

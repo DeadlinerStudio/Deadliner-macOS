@@ -8,9 +8,9 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .system: "跟随系统"
-        case .light: "浅色"
-        case .dark: "深色"
+        case .system: String(localized: "跟随系统")
+        case .light: String(localized: "浅色")
+        case .dark: String(localized: "深色")
         }
     }
     var colorScheme: ColorScheme? {
@@ -136,11 +136,11 @@ struct SettingsView: View {
             Button("先检查地址", role: .cancel) {
                 sync.cancelPendingSync()
                 form = sync.settings
-                message = "同步已关闭，请确认服务器地址与手机一致"
+                message = String(localized: "同步已关闭，请确认服务器地址与手机一致")
             }
             Button("新建同步文件") { sync.confirmCreatingRemoteFile() }
         } message: {
-            Text(verbatim: "在 \(sync.remoteFileURL) 没有找到同步文件。\n\n如果手机已经在使用同步，通常是服务器地址不一致（例如少了一层文件夹）。请对照手机「云与同步 → WebDAV」中的地址。\n\n只有这是第一台开始同步的设备时，才选择「新建同步文件」。")
+            Text(verbatim: String(localized: "在 \(sync.remoteFileURL) 没有找到同步文件。\n\n如果手机已经在使用同步，通常是服务器地址不一致（例如少了一层文件夹）。请对照手机「云与同步 → WebDAV」中的地址。\n\n只有这是第一台开始同步的设备时，才选择「新建同步文件」。"))
         }
     }
 
@@ -223,7 +223,7 @@ struct SettingsView: View {
         } header: {
             Text("WebDAV 同步")
         } footer: {
-            Text(verbatim: "坚果云：地址填 https://dav.jianguoyun.com/dav/ 加上与手机相同的文件夹，密码使用「第三方应用管理」中生成的应用密码。同步文件与手机相同：<地址>/Deadliner/kmp-changelog-v1.json。")
+            Text(verbatim: String(localized: "坚果云：地址填 https://dav.jianguoyun.com/dav/ 加上与手机相同的文件夹，密码使用「第三方应用管理」中生成的应用密码。同步文件与手机相同：<地址>/Deadliner/kmp-changelog-v1.json。"))
         }
     }
 
@@ -257,7 +257,7 @@ struct SettingsView: View {
             }
             ForEach(sync.log.prefix(8)) { entry in
                 LabeledContent(entry.date.formatted(date: .abbreviated, time: .standard)) {
-                    Text(entry.succeeded ? (entry.applied > 0 ? "成功，合并了 \(entry.applied) 项云端修改" : "成功") : (entry.message ?? "失败"))
+                    Text(entry.succeeded ? (entry.applied > 0 ? String(localized: "成功，合并了 \(entry.applied) 项云端修改") : String(localized: "成功")) : (entry.message ?? String(localized: "失败")))
                         .foregroundStyle(entry.succeeded || entry.message == SyncController.transientMessage ? Color.secondary : Color.red)
                         .lineLimit(2)
                 }
@@ -645,7 +645,7 @@ struct SettingsView: View {
         guard let backup else { return }
         do {
             let safety = try backup.restore(item.raw, safetyDirectory: LocalBackup.defaultSafetyDirectory())
-            backupMessage = "已导入。原来的数据保存在 \(safety.path(percentEncoded: false))"
+            backupMessage = String(localized: "已导入。原来的数据保存在 \(safety.path(percentEncoded: false))")
             onBackupImported?()
         } catch {
             backupMessage = error.localizedDescription
@@ -661,9 +661,9 @@ struct SettingsView: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try backup.export(to: url)
-            backupMessage = "已导出到 \(url.path(percentEncoded: false))"
+            backupMessage = String(localized: "已导出到 \(url.path(percentEncoded: false))")
         } catch {
-            backupMessage = "导出失败：\(error.localizedDescription)"
+            backupMessage = String(localized: "导出失败：\(error.localizedDescription)")
         }
     }
 
@@ -741,13 +741,13 @@ struct SettingsView: View {
 
     private var statusText: String {
         switch sync.status {
-        case .disabled: "同步未启用"
-        case .backingUp: "正在备份云端数据…"
-        case .awaitingConfirmation: "等待确认：云端没有找到同步文件"
-        case .idle: "等待同步"
-        case .syncing: "正在同步…"
-        case .succeeded(let date): "上次同步：\(date.formatted(date: .omitted, time: .shortened))"
-        case .failed(let reason): "同步失败：\(reason)"
+        case .disabled: String(localized: "同步未启用")
+        case .backingUp: String(localized: "正在备份云端数据…")
+        case .awaitingConfirmation: String(localized: "等待确认：云端没有找到同步文件")
+        case .idle: String(localized: "等待同步")
+        case .syncing: String(localized: "正在同步…")
+        case .succeeded(let date): String(localized: "上次同步：\(date.formatted(date: .omitted, time: .shortened))")
+        case .failed(let reason): String(localized: "同步失败：\(reason)")
         }
     }
 
@@ -776,7 +776,7 @@ struct SettingsView: View {
         do {
             try sync.save(form, password: password.isEmpty ? nil : password)
             password = ""
-            message = form.enabled ? "已保存，开始同步" : "已保存，同步已关闭"
+            message = form.enabled ? String(localized: "已保存，开始同步") : String(localized: "已保存，同步已关闭")
         } catch {
             message = error.localizedDescription
         }

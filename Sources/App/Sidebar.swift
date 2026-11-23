@@ -18,7 +18,7 @@ struct Sidebar: View {
 
     private static let groups: [(title: String?, pages: [AppModel.Page])] = [
         (nil, [.tasks, .habits, .capture]),
-        ("记录", [.overview, .focus, .archive]),
+        (String(localized: "记录"), [.overview, .focus, .archive]),
         (nil, [.settings]),
     ]
 
@@ -116,24 +116,24 @@ struct Sidebar: View {
     /// 按时间段的问候（与 Android 首页问候的时间段一致）。
     static func greeting(_ date: Date, calendar: Calendar = .current) -> String {
         switch calendar.component(.hour, from: date) {
-        case 5..<9: "早上好"
-        case 9..<12: "上午好"
-        case 12..<14: "中午好"
-        case 14..<18: "下午好"
-        case 18..<23: "晚上好"
-        default: "夜深了，早点休息"
+        case 5..<9: String(localized: "早上好")
+        case 9..<12: String(localized: "上午好")
+        case 12..<14: String(localized: "中午好")
+        case 14..<18: String(localized: "下午好")
+        case 18..<23: String(localized: "晚上好")
+        default: String(localized: "夜深了，早点休息")
         }
     }
 
     private func syncFooter(_ status: SyncController.Status) -> some View {
         let (icon, text, tint): (String, String, Color) = switch status {
-        case .disabled: ("icloud.slash", "未启用同步", t.onSurfaceVariant)
-        case .backingUp: ("arrow.down.doc", "正在备份云端…", t.primary)
-        case .awaitingConfirmation: ("questionmark.circle", "等待确认", Color(hex: 0xF59E0B))
-        case .idle: ("icloud", "等待同步", t.onSurfaceVariant)
-        case .syncing: ("arrow.triangle.2.circlepath", "正在同步…", t.primary)
-        case .succeeded(let date): ("checkmark.icloud", "已同步 \(date.formatted(date: .omitted, time: .shortened))", Color(hex: 0x10B981))
-        case .failed: ("exclamationmark.icloud", "同步失败", t.error)
+        case .disabled: ("icloud.slash", String(localized: "未启用同步"), t.onSurfaceVariant)
+        case .backingUp: ("arrow.down.doc", String(localized: "正在备份云端…"), t.primary)
+        case .awaitingConfirmation: ("questionmark.circle", String(localized: "等待确认"), Color(hex: 0xF59E0B))
+        case .idle: ("icloud", String(localized: "等待同步"), t.onSurfaceVariant)
+        case .syncing: ("arrow.triangle.2.circlepath", String(localized: "正在同步…"), t.primary)
+        case .succeeded(let date): ("checkmark.icloud", String(localized: "已同步 \(date.formatted(date: .omitted, time: .shortened))"), Color(hex: 0x10B981))
+        case .failed: ("exclamationmark.icloud", String(localized: "同步失败"), t.error)
         }
         let busy = status == .syncing || status == .backingUp
         return HStack(spacing: 4) {

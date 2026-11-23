@@ -38,8 +38,8 @@ struct DateRange: Equatable {
         func text(_ date: Date) -> String {
             let year = calendar.component(.year, from: date)
             let f = DateFormatter()
-            f.locale = Locale(identifier: "zh_CN")
-            f.dateFormat = year == thisYear ? "M月d日" : "yyyy年M月d日"
+            f.locale = AppLanguage.locale
+            f.dateFormat = year == thisYear ? String(localized: "M月d日") : String(localized: "yyyy年M月d日")
             return f.string(from: date)
         }
         return start == end ? text(start) : "\(text(start)) – \(text(end))"
@@ -59,10 +59,10 @@ struct DateRange: Equatable {
         let yearStart = calendar.date(from: DateComponents(year: year, month: 1, day: 1)) ?? today
         let yearEnd = calendar.date(from: DateComponents(year: year, month: 12, day: 31)) ?? today
         return [
-            ("最近 7 天", DateRange(start: daysAgo(6), end: today)),
-            ("最近 30 天", DateRange(start: daysAgo(29), end: today)),
-            ("本季度", DateRange(start: quarterStart, end: quarterEnd)),
-            ("今年", DateRange(start: yearStart, end: yearEnd)),
+            (String(localized: "最近 7 天"), DateRange(start: daysAgo(6), end: today)),
+            (String(localized: "最近 30 天"), DateRange(start: daysAgo(29), end: today)),
+            (String(localized: "本季度"), DateRange(start: quarterStart, end: quarterEnd)),
+            (String(localized: "今年"), DateRange(start: yearStart, end: yearEnd)),
         ]
     }
 
@@ -132,7 +132,7 @@ struct DateRangeSheet: View {
             HStack {
                 let range = DateRange(start: start, end: end)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(verbatim: "\(range.label) · 共 \(range.dayCount) 天")
+                    Text(verbatim: String(localized: "\(range.label) · 共 \(range.dayCount) 天"))
                         .font(.callout)
                         .foregroundStyle(.secondary)
                     Text(pickingEnd ? "再点一天作为结束日期" : "点一天重新选择开始日期")

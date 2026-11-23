@@ -10,21 +10,21 @@ enum ThemeAccent: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .classic: "经典"
-        case .cool: "冷调"
-        case .blue: "晴空"
-        case .brown: "琥珀"
-        case .cyan: "冰川"
-        case .gray: "雾灰"
-        case .green: "森屿"
-        case .indigo: "深海"
-        case .mint: "薄荷"
-        case .orange: "落日"
-        case .pink: "樱语"
-        case .purple: "暮紫"
-        case .red: "绯红"
-        case .teal: "潮汐"
-        case .yellow: "晨光"
+        case .classic: String(localized: "经典")
+        case .cool: String(localized: "冷调")
+        case .blue: String(localized: "晴空")
+        case .brown: String(localized: "琥珀")
+        case .cyan: String(localized: "冰川")
+        case .gray: String(localized: "雾灰")
+        case .green: String(localized: "森屿")
+        case .indigo: String(localized: "深海")
+        case .mint: String(localized: "薄荷")
+        case .orange: String(localized: "落日")
+        case .pink: String(localized: "樱语")
+        case .purple: String(localized: "暮紫")
+        case .red: String(localized: "绯红")
+        case .teal: String(localized: "潮汐")
+        case .yellow: String(localized: "晨光")
         }
     }
 
@@ -81,9 +81,9 @@ enum GlowStyle: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .immersive: "沉浸"
-        case .vivid: "幻彩"
-        case .off: "关闭"
+        case .immersive: String(localized: "沉浸")
+        case .vivid: String(localized: "幻彩")
+        case .off: String(localized: "关闭")
         }
     }
 }

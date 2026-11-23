@@ -89,14 +89,14 @@ enum IndicatorStatus: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .notStarted: "未开始"
-        case .undergo: "进行中"
-        case .near: "即将到期"
-        case .passed: "已逾期"
-        case .completed: "已完成"
-        case .completedAhead: "超前完成"
-        case .completedEarly: "提前完成"
-        case .abandoned: "已放弃"
+        case .notStarted: String(localized: "未开始")
+        case .undergo: String(localized: "进行中")
+        case .near: String(localized: "即将到期")
+        case .passed: String(localized: "已逾期")
+        case .completed: String(localized: "已完成")
+        case .completedAhead: String(localized: "超前完成")
+        case .completedEarly: String(localized: "提前完成")
+        case .abandoned: String(localized: "已放弃")
         }
     }
 

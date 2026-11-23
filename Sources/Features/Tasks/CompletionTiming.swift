@@ -15,10 +15,10 @@ enum CompletionTiming: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .ahead: "超前完成"
-        case .early: "提前完成"
-        case .onTime: "按时完成"
-        case .late: "逾期完成"
+        case .ahead: String(localized: "超前完成")
+        case .early: String(localized: "提前完成")
+        case .onTime: String(localized: "按时完成")
+        case .late: String(localized: "逾期完成")
         }
     }
 

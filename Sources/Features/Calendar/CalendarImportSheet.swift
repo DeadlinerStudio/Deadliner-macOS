@@ -78,7 +78,7 @@ struct CalendarImportSheet: View {
                         set: { if $0 { selected.insert(event.id) } else { selected.remove(event.id) } }
                     )) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(event.title.isEmpty ? "（无标题）" : event.title)
+                            Text(event.title.isEmpty ? String(localized: "（无标题）") : event.title)
                             Text("\(Self.time(event)) · \(event.calendarTitle)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -94,7 +94,7 @@ struct CalendarImportSheet: View {
     }
 
     static func time(_ event: CalendarBridge.Event) -> String {
-        if event.isAllDay { return event.start.formatted(.dateTime.month().day().weekday(.abbreviated)) + " 全天" }
+        if event.isAllDay { return event.start.formatted(.dateTime.month().day().weekday(.abbreviated)) + String(localized: " 全天") }
         return event.start.formatted(.dateTime.month().day().weekday(.abbreviated).hour().minute())
             + " – " + event.end.formatted(.dateTime.hour().minute())
     }
@@ -124,7 +124,7 @@ struct CalendarImportSheet: View {
             }
             onImported(count)
         } catch {
-            errorMessage = "已导入 \(count) 个，之后出错：\(error.localizedDescription)"
+            errorMessage = String(localized: "已导入 \(count) 个，之后出错：\(error.localizedDescription)")
         }
     }
 }

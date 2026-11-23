@@ -16,9 +16,9 @@ final class CalendarBridge {
 
         var errorDescription: String? {
             switch self {
-            case .denied: "没有日历权限。请在「系统设置 → 隐私与安全性 → 日历」中允许 Deadliner for macOS。"
-            case .noDeadline: "这个任务没有截止时间，无法放进日历"
-            case .noCalendar: "没有可写入的日历，请先在「日历」App 中添加一个日历"
+            case .denied: String(localized: "没有日历权限。请在「系统设置 → 隐私与安全性 → 日历」中允许 Deadliner for macOS。")
+            case .noDeadline: String(localized: "这个任务没有截止时间，无法放进日历")
+            case .noCalendar: String(localized: "没有可写入的日历，请先在「日历」App 中添加一个日历")
             }
         }
     }
@@ -109,7 +109,7 @@ final class CalendarBridge {
     /// 事件 → 新任务草稿：截止取事件结束时间；全天事件截止在最后一天的 23:59。
     nonisolated static func draft(from event: Event, calendar: Foundation.Calendar = .current) -> TaskDraft {
         var draft = TaskDraft()
-        draft.title = event.title.isEmpty ? "日历事件" : event.title
+        draft.title = event.title.isEmpty ? String(localized: "日历事件") : event.title
         draft.note = event.notes
         if event.isAllDay {
             let lastDay = calendar.date(byAdding: .second, value: -1, to: event.end) ?? event.end

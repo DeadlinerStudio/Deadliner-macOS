@@ -25,34 +25,34 @@ enum PanelStat: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .dueToday: "今天到期"
-        case .dueTomorrow: "明天到期"
-        case .dueThisWeek: "本周到期"
-        case .overdue: "已逾期"
-        case .active: "进行中"
-        case .activeToday: "今日进行中"
-        case .activeThisWeek: "本周进行中"
-        case .pendingThisWeek: "本周待完成"
-        case .habits: "今日习惯"
-        case .focusToday: "今日专注"
-        case .focusThisWeek: "本周专注"
+        case .dueToday: String(localized: "今天到期")
+        case .dueTomorrow: String(localized: "明天到期")
+        case .dueThisWeek: String(localized: "本周到期")
+        case .overdue: String(localized: "已逾期")
+        case .active: String(localized: "进行中")
+        case .activeToday: String(localized: "今日进行中")
+        case .activeThisWeek: String(localized: "本周进行中")
+        case .pendingThisWeek: String(localized: "本周待完成")
+        case .habits: String(localized: "今日习惯")
+        case .focusToday: String(localized: "今日专注")
+        case .focusThisWeek: String(localized: "本周专注")
         }
     }
 
     /// 设置中的说明。
     var detail: String {
         switch self {
-        case .dueToday: "今天剩余时间内到期的任务"
-        case .dueTomorrow: "明天到期的任务"
-        case .dueThisWeek: "从现在到本周日结束前到期的任务"
-        case .overdue: "已过截止时间、尚未完成的任务"
-        case .active: "所有未完成、未放弃的任务"
-        case .activeToday: "时间段（开始到截止）覆盖今天的任务"
-        case .activeThisWeek: "时间段（开始到截止）覆盖本周的任务"
-        case .pendingThisWeek: "本周日结束前到期、尚未完成的任务（含已逾期）"
-        case .habits: "今天已完成 / 需要完成的习惯"
-        case .focusToday: "今天的专注时长"
-        case .focusThisWeek: "本周（周一起）的专注时长"
+        case .dueToday: String(localized: "今天剩余时间内到期的任务")
+        case .dueTomorrow: String(localized: "明天到期的任务")
+        case .dueThisWeek: String(localized: "从现在到本周日结束前到期的任务")
+        case .overdue: String(localized: "已过截止时间、尚未完成的任务")
+        case .active: String(localized: "所有未完成、未放弃的任务")
+        case .activeToday: String(localized: "时间段（开始到截止）覆盖今天的任务")
+        case .activeThisWeek: String(localized: "时间段（开始到截止）覆盖本周的任务")
+        case .pendingThisWeek: String(localized: "本周日结束前到期、尚未完成的任务（含已逾期）")
+        case .habits: String(localized: "今天已完成 / 需要完成的习惯")
+        case .focusToday: String(localized: "今天的专注时长")
+        case .focusThisWeek: String(localized: "本周（周一起）的专注时长")
         }
     }
 
@@ -70,11 +70,11 @@ enum UpcomingRange: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .today: "今天"
-        case .threeDays: "3 天内"
-        case .week: "本周"
-        case .all: "全部"
-        case .custom: "自定义"
+        case .today: String(localized: "今天")
+        case .threeDays: String(localized: "3 天内")
+        case .week: String(localized: "本周")
+        case .all: String(localized: "全部")
+        case .custom: String(localized: "自定义")
         }
     }
 }
@@ -89,8 +89,8 @@ enum FocusChartOrientation: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .vertical: "竖向"
-        case .horizontal: "横向"
+        case .vertical: String(localized: "竖向")
+        case .horizontal: String(localized: "横向")
         }
     }
 }
@@ -110,10 +110,10 @@ enum StatusItemStyle: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .icon: "只显示图标"
-        case .iconCount: "图标和数量"
-        case .stats: "多项数据"
-        case .capsule: "胶囊（下一个截止）"
+        case .icon: String(localized: "只显示图标")
+        case .iconCount: String(localized: "图标和数量")
+        case .stats: String(localized: "多项数据")
+        case .capsule: String(localized: "胶囊（下一个截止）")
         }
     }
 }
@@ -127,22 +127,22 @@ enum StatusField: String, CaseIterable, Identifiable {
     /// 菜单栏上方的小字标签。
     var label: String {
         switch self {
-        case .today: "今日"
-        case .overdue: "逾期"
-        case .habits: "习惯"
-        case .focus: "专注"
-        case .next: "下一个"
+        case .today: String(localized: "今日")
+        case .overdue: String(localized: "逾期")
+        case .habits: String(localized: "习惯")
+        case .focus: String(localized: "专注")
+        case .next: String(localized: "下一个")
         }
     }
 
     /// 设置中的说明。
     var title: String {
         switch self {
-        case .today: "今天到期的任务数"
-        case .overdue: "已逾期的任务数"
-        case .habits: "今日习惯完成情况"
-        case .focus: "今日专注时长"
-        case .next: "下一个截止的剩余时间"
+        case .today: String(localized: "今天到期的任务数")
+        case .overdue: String(localized: "已逾期的任务数")
+        case .habits: String(localized: "今日习惯完成情况")
+        case .focus: String(localized: "今日专注时长")
+        case .next: String(localized: "下一个截止的剩余时间")
         }
     }
 
@@ -168,8 +168,8 @@ enum PanelStyle: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .dashboard: "仪表盘"
-        case .list: "列表菜单"
+        case .dashboard: String(localized: "仪表盘")
+        case .list: String(localized: "列表菜单")
         }
     }
 }
@@ -182,12 +182,12 @@ enum PanelSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .overview: "今日概况"
-        case .tasks: "即将到期的任务"
-        case .habits: "今日习惯"
-        case .focusChart: "最近 7 天专注"
-        case .quickAdd: "快速新建"
-        case .sync: "同步状态"
+        case .overview: String(localized: "今日概况")
+        case .tasks: String(localized: "即将到期的任务")
+        case .habits: String(localized: "今日习惯")
+        case .focusChart: String(localized: "最近 7 天专注")
+        case .quickAdd: String(localized: "快速新建")
+        case .sync: String(localized: "同步状态")
         }
     }
 

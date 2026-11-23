@@ -123,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         super.init()
         Self.current = self
         guard !Self.isRunningTests else {
-            startupError = "测试运行中"
+            startupError = String(localized: "测试运行中")
             return
         }
         if let root = try? AppPaths.applicationSupportDirectory() { Diagnostics.configureCoreLog(root: root) }
@@ -256,7 +256,7 @@ struct RootView: View {
                     }
                 }
         } else {
-            Text("数据库打开失败：\(appDelegate.startupError ?? "未知错误")")
+            Text("数据库打开失败：\(appDelegate.startupError ?? String(localized: "未知错误"))")
                 .foregroundStyle(t.error)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(t.pageBg)
@@ -394,16 +394,16 @@ struct MainView: View {
     }
 
     private var shareAlertTitle: String {
-        if case .failure = model.pendingShare?.result { return "无法导入分享链接" }
-        return "检测到分享链接"
+        if case .failure = model.pendingShare?.result { return String(localized: "无法导入分享链接") }
+        return String(localized: "检测到分享链接")
     }
 
     /// 导入前的确认文字：任务名、截止时间和子任务数。
     static func shareSummary(_ draft: TaskDraft) -> String {
         var lines = ["「\(draft.title)」"]
-        if let due = draft.dueAt { lines.append("截止：\(due.formatted(.dateTime.year().month().day().hour().minute()))") }
-        if !draft.subtasks.isEmpty { lines.append("\(draft.subtasks.count) 个子任务") }
-        lines.append("添加后会打开编辑窗口，保存后才会写入。")
+        if let due = draft.dueAt { lines.append(String(localized: "截止：\(due.formatted(.dateTime.year().month().day().hour().minute()))")) }
+        if !draft.subtasks.isEmpty { lines.append(String(localized: "\(draft.subtasks.count) 个子任务")) }
+        lines.append(String(localized: "添加后会打开编辑窗口，保存后才会写入。"))
         return lines.joined(separator: "\n")
     }
 }

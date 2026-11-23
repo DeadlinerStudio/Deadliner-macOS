@@ -14,13 +14,13 @@ final class AppModel {
 
         var title: String {
             switch self {
-            case .tasks: "任务"
-            case .habits: "习惯"
-            case .capture: "灵感"
-            case .overview: "概览"
-            case .focus: "专注"
-            case .archive: "归档"
-            case .settings: "设置"
+            case .tasks: String(localized: "任务")
+            case .habits: String(localized: "习惯")
+            case .capture: String(localized: "灵感")
+            case .overview: String(localized: "概览")
+            case .focus: String(localized: "专注")
+            case .archive: String(localized: "归档")
+            case .settings: String(localized: "设置")
             }
         }
 
@@ -111,7 +111,7 @@ final class AppModel {
         let title = container.database.tasks.find(uid: id)?.title ?? ""
         if var current = undoCompletion, now.timeIntervalSince(current.startedAt) < 1 {
             current.ids.append(id)
-            current.title = "\(current.ids.count) 个任务"
+            current.title = String(localized: "\(current.ids.count) 个任务")
             undoCompletion = current
             return
         }

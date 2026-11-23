@@ -10,8 +10,8 @@ struct LocalBackup {
 
         var errorDescription: String? {
             switch self {
-            case .notBackup: "这不是 Deadliner 的备份文件。"
-            case .rejected(let detail): "备份文件无法导入：\(detail)"
+            case .notBackup: String(localized: "这不是 Deadliner 的备份文件。")
+            case .rejected(let detail): String(localized: "备份文件无法导入：\(detail)")
             }
         }
     }
@@ -19,7 +19,7 @@ struct LocalBackup {
     let database: DeadlinerDatabase
 
     /// 默认文件名，例如 `Deadliner-备份-20261101-1530.json`。
-    static func suggestedFileName(prefix: String = "Deadliner-备份", now: Date = Date()) -> String {
+    static func suggestedFileName(prefix: String = String(localized: "Deadliner-备份"), now: Date = Date()) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmm"
@@ -50,7 +50,7 @@ struct LocalBackup {
     /// Core 拒绝文件时本机数据不变（替换在一个事务中完成）。
     @discardableResult
     func restore(_ raw: String, safetyDirectory: URL) throws -> URL {
-        let safety = safetyDirectory.appendingPathComponent(Self.suggestedFileName(prefix: "导入前自动备份"))
+        let safety = safetyDirectory.appendingPathComponent(Self.suggestedFileName(prefix: String(localized: "导入前自动备份")))
         try export(to: safety)
         do {
             try database.backups.restore(raw: raw)

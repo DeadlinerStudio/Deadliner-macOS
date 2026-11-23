@@ -190,7 +190,7 @@ struct TaskListView: View {
                             onShare: {
                                 run {
                                     try commands.copyShareLink(request.id)
-                                    show(notice: "已复制分享链接")
+                                    show(notice: String(localized: "已复制分享链接"))
                                 }
                             },
                             onClose: { store.detail = nil })
@@ -199,7 +199,7 @@ struct TaskListView: View {
         .sheet(isPresented: $importingCalendar) {
             CalendarImportSheet(commands: commands, onClose: { importingCalendar = false }) { count in
                 importingCalendar = false
-                show(notice: "已从日历导入 \(count) 个任务")
+                show(notice: String(localized: "已从日历导入 \(count) 个任务"))
             }
             .deadlinerTheme()
         }
@@ -251,7 +251,7 @@ struct TaskListView: View {
             share: {
                 run {
                     try commands.copyShareLink(task.id)
-                    show(notice: "已复制「\(task.title)」的分享链接")
+                    show(notice: String(localized: "已复制「\(task.title)」的分享链接"))
                 }
             },
             detail: { store.detail = .init(id: task.id) },
@@ -266,8 +266,8 @@ struct TaskListView: View {
         _Concurrency.Task {
             do {
                 switch try await CalendarBridge.shared.save(draft) {
-                case .saved(let calendar): show(notice: "已添加到日历「\(calendar)」")
-                case .duplicate(let calendar): show(notice: "日历「\(calendar)」中已有这个事件")
+                case .saved(let calendar): show(notice: String(localized: "已添加到日历「\(calendar)」"))
+                case .duplicate(let calendar): show(notice: String(localized: "日历「\(calendar)」中已有这个事件"))
                 }
             } catch {
                 errorMessage = error.localizedDescription
@@ -283,9 +283,9 @@ struct TaskListView: View {
     }
 
     private var subtitle: String {
-        if let selection { return "已选 \(selection.count) 个" }
+        if let selection { return String(localized: "已选 \(selection.count) 个") }
         let filtered = !store.searchText.isEmpty || store.isFiltered
-        return filtered ? "\(store.visibleTasks.count) / \(store.tasks.count) 个任务" : "\(store.tasks.count) 个任务"
+        return filtered ? String(localized: "\(store.visibleTasks.count) / \(store.tasks.count) 个任务") : String(localized: "\(store.tasks.count) 个任务")
     }
 
     private var selectedTasks: [TaskItem] {

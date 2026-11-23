@@ -31,10 +31,10 @@ final class OverviewStore {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .overnight: "凌晨"
-            case .morning: "上午"
-            case .afternoon: "下午"
-            case .evening: "晚上"
+            case .overnight: String(localized: "凌晨")
+            case .morning: String(localized: "上午")
+            case .afternoon: String(localized: "下午")
+            case .evening: String(localized: "晚上")
             }
         }
     }
@@ -235,7 +235,7 @@ final class OverviewStore {
             activeDays: Int(snapshot.summary.activeDayCount),
             daily: snapshot.daily.map { FocusPoint(start: $0.startDate, seconds: Int($0.durationSeconds)) },
             categories: snapshot.categories
-                .map { (title: $0.categoryTitle ?? "未分类", seconds: Int($0.durationSeconds)) }
+                .map { (title: $0.categoryTitle ?? String(localized: "未分类"), seconds: Int($0.durationSeconds)) }
                 .filter { $0.seconds > 0 }
                 .sorted { $0.seconds > $1.seconds }
         )

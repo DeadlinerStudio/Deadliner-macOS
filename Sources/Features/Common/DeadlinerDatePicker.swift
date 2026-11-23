@@ -26,10 +26,10 @@ enum DeadlinerDateMath {
 
         var title: String {
             switch self {
-            case .today: "今天"
-            case .tomorrow: "明天"
-            case .weekend: "本周末"
-            case .nextMonday: "下周一"
+            case .today: String(localized: "今天")
+            case .tomorrow: String(localized: "明天")
+            case .weekend: String(localized: "本周末")
+            case .nextMonday: String(localized: "下周一")
             }
         }
     }
@@ -136,21 +136,26 @@ enum DeadlinerDateMath {
         let today = calendar.startOfDay(for: now)
         let day = calendar.startOfDay(for: date)
         let dayText: String
-        if day == today { dayText = "今天" }
-        else if day == calendar.date(byAdding: .day, value: 1, to: today) { dayText = "明天" }
+        if day == today { dayText = String(localized: "今天") }
+        else if day == calendar.date(byAdding: .day, value: 1, to: today) { dayText = String(localized: "明天") }
         else {
             let f = DateFormatter()
             f.calendar = calendar
             f.timeZone = calendar.timeZone
-            f.locale = Locale(identifier: "zh_CN")
-            f.dateFormat = calendar.component(.year, from: date) == calendar.component(.year, from: now) ? "M月d日 EEE" : "yyyy年M月d日 EEE"
+            f.locale = AppLanguage.locale
+            f.dateFormat = calendar.component(.year, from: date) == calendar.component(.year, from: now)
+                ? String(localized: "M月d日 EEE") : String(localized: "yyyy年M月d日 EEE")
             dayText = f.string(from: date)
         }
         return mode.hasTime ? "\(dayText) \(time)" : dayText
     }
 
     static func monthTitle(_ month: Date, calendar: Calendar = .current) -> String {
-        "\(calendar.component(.year, from: month))年\(calendar.component(.month, from: month))月"
+        let f = DateFormatter()
+        f.calendar = calendar
+        f.locale = AppLanguage.locale
+        f.dateFormat = String(localized: "yyyy年M月")
+        return f.string(from: month)
     }
 }
 
@@ -189,7 +194,7 @@ struct DeadlinerDatePicker: View {
                 Image(systemName: components == .time ? "clock" : "calendar")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(t.primary)
-                Text(selection.map { DeadlinerDateMath.label($0, mode: components) } ?? "未设置")
+                Text(selection.map { DeadlinerDateMath.label($0, mode: components) } ?? String(localized: "未设置"))
                     .foregroundStyle(selection == nil ? t.onSurfaceVariant : t.onSurface)
                     .monospacedDigit()
                     .lineLimit(1)
@@ -201,7 +206,7 @@ struct DeadlinerDatePicker: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(selection.map { DeadlinerDateMath.label($0, mode: components) } ?? "未设置")
+        .accessibilityLabel(selection.map { DeadlinerDateMath.label($0, mode: components) } ?? String(localized: "未设置"))
         .accessibilityHint("选择日期")
         .popover(isPresented: $isOpen, arrowEdge: .bottom) {
             DeadlinerDatePickerPanel(selection: $selection, components: components, bounds: bounds,
@@ -251,7 +256,7 @@ struct DeadlinerDatePickerPanel: View {
                         }
                     }
                     if allowsNone {
-                        PickerChip(title: "不设时间", selected: false, tint: t.onSurfaceVariant) { selection = nil; close() }
+                        PickerChip(title: String(localized: "不设时间"), selected: false, tint: t.onSurfaceVariant) { selection = nil; close() }
                     }
                 }
             }
@@ -262,7 +267,7 @@ struct DeadlinerDatePickerPanel: View {
             }
             if components.hasTime { timeRow }
             HStack {
-                Text(selection.map { DeadlinerDateMath.label($0, mode: components, now: now) } ?? "未设置")
+                Text(selection.map { DeadlinerDateMath.label($0, mode: components, now: now) } ?? String(localized: "未设置"))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -353,15 +358,15 @@ struct DeadlinerMonthGrid: View {
         let calendar = DeadlinerDateMath.mondayFirst()
         VStack(spacing: 6) {
             HStack {
-                pageButton(-1, symbol: "chevron.left", help: "上个月").opacity(showsPrevious ? 1 : 0).disabled(!showsPrevious || !canPage(-1))
+                pageButton(-1, symbol: "chevron.left", help: String(localized: "上个月")).opacity(showsPrevious ? 1 : 0).disabled(!showsPrevious || !canPage(-1))
                 Spacer()
                 Text(DeadlinerDateMath.monthTitle(month)).font(.headline).monospacedDigit()
                 Spacer()
-                pageButton(1, symbol: "chevron.right", help: "下个月").opacity(showsNext ? 1 : 0).disabled(!showsNext || !canPage(1))
+                pageButton(1, symbol: "chevron.right", help: String(localized: "下个月")).opacity(showsNext ? 1 : 0).disabled(!showsNext || !canPage(1))
             }
             HStack(spacing: 4) {
-                ForEach(["一", "二", "三", "四", "五", "六", "日"], id: \.self) {
-                    Text($0).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                ForEach(Array(AppLanguage.weekdays().enumerated()), id: \.offset) {
+                    Text($0.element).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity)
                 }
             }
             let weeks = DeadlinerDateMath.monthGrid(for: month, calendar: calendar)

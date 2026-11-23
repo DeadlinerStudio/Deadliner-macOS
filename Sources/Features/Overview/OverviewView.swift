@@ -12,8 +12,8 @@ enum OverviewSection: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .stats: "总览"
-        case .trends: "趋势"
+        case .stats: String(localized: "总览")
+        case .trends: String(localized: "趋势")
         }
     }
 }
@@ -38,10 +38,10 @@ enum TrendRange: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .week: "周"
-        case .month: "月"
-        case .year: "年"
-        case .custom: "自定义"
+        case .week: String(localized: "周")
+        case .month: String(localized: "月")
+        case .year: String(localized: "年")
+        case .custom: String(localized: "自定义")
         }
     }
 }
@@ -100,7 +100,7 @@ struct OverviewContent: View {
                     Text("全部时间").tag(OverviewRange.all)
                     Divider()
                     ForEach(monthOptions, id: \.self) { month in
-                        Text(OverviewDates.label(month, "yyyy 年 M 月")).tag(month)
+                        Text(OverviewDates.label(month, String(localized: "yyyy 年 M 月"))).tag(month)
                     }
                     Divider()
                     Text("自定义…").tag(OverviewRange.custom)
@@ -149,13 +149,13 @@ struct OverviewContent: View {
             OverviewTodayCard(today: store.today, focusSeconds: store.focus.todaySeconds)
             OverviewRow(columns: columns) {
                 OverviewPeriodCard(periods: store.periods)
-                OverviewHistoryCard(history: store.history, title: "历史统计", subtitle: "全部时间")
+                OverviewHistoryCard(history: store.history, title: String(localized: "历史统计"), subtitle: String(localized: "全部时间"))
             }
         } else if let month = store.month, month.review.monthStart == range {
             OverviewMetricsCard(review: month.review, headline: samePeriodText(month))
             OverviewRow(columns: columns) {
                 OverviewMonthMapCard(review: month.review, focus: store.focusMonth)
-                OverviewHistoryCard(history: month.distribution, title: "状态分布", subtitle: "完成按完成日期，其余按截止日期")
+                OverviewHistoryCard(history: month.distribution, title: String(localized: "状态分布"), subtitle: String(localized: "完成按完成日期，其余按截止日期"))
             }
             if let focus = store.focusMonth { OverviewFocusInvestmentCard(focus: focus) }
             if !month.review.completedTitles.isEmpty {
@@ -175,21 +175,21 @@ struct OverviewContent: View {
     private var customStatsBody: some View {
         if let detail = currentRange {
             if detail.extendsIntoFuture { futureNote(detail) }
-            OverviewMetricsCard(review: detail.review, subtitle: customRange.label, comparison: "较前一时段",
-                                emptyText: "这段时间没有任务")
+            OverviewMetricsCard(review: detail.review, subtitle: customRange.label, comparison: String(localized: "较前一时段"),
+                                emptyText: String(localized: "这段时间没有任务"))
             OverviewRow(columns: columns) {
                 OverviewPeriodCard(periods: detail.periods)
-                OverviewHistoryCard(history: detail.distribution, title: "状态分布", subtitle: "截止日期在范围内的任务")
+                OverviewHistoryCard(history: detail.distribution, title: String(localized: "状态分布"), subtitle: String(localized: "截止日期在范围内的任务"))
             }
             // 两个月以内用日历（可以看到具体日期），更长的范围用热力图。
             if let focus = store.focusCustom { OverviewFocusInvestmentCard(focus: focus) }
             if detail.review.daily.count <= 62 {
                 OverviewMonthMapCard(review: detail.review, focus: store.focusCustom)
             } else {
-                OverviewHeatmapCard(days: detail.review.daily, title: "活动分布")
+                OverviewHeatmapCard(days: detail.review.daily, title: String(localized: "活动分布"))
             }
             if !detail.review.completedTitles.isEmpty {
-                OverviewTitlesCard(review: detail.review, title: "范围内完成的任务")
+                OverviewTitlesCard(review: detail.review, title: String(localized: "范围内完成的任务"))
             }
         } else if let error = store.rangeError {
             Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(t.error)
@@ -205,9 +205,9 @@ struct OverviewContent: View {
               let (current, previous) = OverviewStore.samePeriod(current: month.review.daily, previous: store.previousMonthDaily,
                                                                  today: Date()) else { return nil }
         let change = current - previous
-        let comparison = previous == 0 ? (current > 0 ? "较上月同期 +\(current) 项" : "与上月同期持平")
-            : change == 0 ? "与上月同期持平" : "较上月同期 \(change > 0 ? "↑" : "↓") \(abs(change)) 项"
-        return "本月至今完成 \(current) 项 · \(comparison)"
+        let comparison = previous == 0 ? (current > 0 ? String(localized: "较上月同期 +\(current) 项") : String(localized: "与上月同期持平"))
+            : change == 0 ? String(localized: "与上月同期持平") : String(localized: "较上月同期 \(change > 0 ? "↑" : "↓") \(abs(change)) 项")
+        return String(localized: "本月至今完成 \(current) 项 · \(comparison)")
     }
 
     /// 与当前选择一致的范围数据（切换范围后、新数据到达前不显示旧数据）。
@@ -218,7 +218,7 @@ struct OverviewContent: View {
     }
 
     private func futureNote(_ detail: OverviewStore.RangeDetail) -> some View {
-        Label("完成情况统计到今天（\(OverviewDates.label(detail.asOf, "M月d日"))）；之后的日期只计入到期的任务。",
+        Label("完成情况统计到今天（\(OverviewDates.label(detail.asOf, String(localized: "M月d日")))）；之后的日期只计入到期的任务。",
               systemImage: "info.circle")
             .font(.callout)
             .foregroundStyle(t.onSurfaceVariant)
@@ -231,39 +231,39 @@ struct OverviewContent: View {
         case .week:
             let completed = store.daily.map(\.completed).reduce(0, +)
             OverviewSummaryCard(items: [
-                ("近 7 天完成", "\(completed)", c.completed),
-                ("近 7 天逾期", "\(store.daily.map(\.overdue).reduce(0, +))", c.overdue),
-                ("日均完成", Self.average(completed, store.daily.count), c.pending),
+                (String(localized: "近 7 天完成"), "\(completed)", c.completed),
+                (String(localized: "近 7 天逾期"), "\(store.daily.map(\.overdue).reduce(0, +))", c.overdue),
+                (String(localized: "日均完成"), Self.average(completed, store.daily.count), c.pending),
             ])
             OverviewDailyCard(days: store.daily)
-            OverviewFocusBarsCard(points: Array(store.focus.daily.suffix(7)), subtitle: "近 7 天", unit: .day)
+            OverviewFocusBarsCard(points: Array(store.focus.daily.suffix(7)), subtitle: String(localized: "近 7 天"), unit: .day)
         case .month:
             let days = Array(store.contribution.suffix(30))
             let completed = days.map(\.completed).reduce(0, +)
             OverviewSummaryCard(items: [
-                ("近 30 天完成", "\(completed)", c.completed),
-                ("有完成的天数", "\(days.filter { $0.completed > 0 }.count)", t.tertiary),
-                ("日均完成", Self.average(completed, days.count), c.pending),
+                (String(localized: "近 30 天完成"), "\(completed)", c.completed),
+                (String(localized: "有完成的天数"), "\(days.filter { $0.completed > 0 }.count)", t.tertiary),
+                (String(localized: "日均完成"), Self.average(completed, days.count), c.pending),
             ])
             OverviewRangeDailyCard(days: days)
-            OverviewFocusBarsCard(points: store.focusLast30?.daily ?? [], subtitle: "近 30 天", unit: .day)
+            OverviewFocusBarsCard(points: store.focusLast30?.daily ?? [], subtitle: String(localized: "近 30 天"), unit: .day)
         case .year:
             OverviewSummaryCard(items: [
-                ("近 12 个月任务", "\(store.monthly.map(\.total).reduce(0, +))", c.pending),
-                ("已完成", "\(store.monthly.map(\.completed).reduce(0, +))", c.completed),
-                ("逾期完成", "\(store.monthly.map(\.overdueCompleted).reduce(0, +))", c.overdue),
+                (String(localized: "近 12 个月任务"), "\(store.monthly.map(\.total).reduce(0, +))", c.pending),
+                (String(localized: "已完成"), "\(store.monthly.map(\.completed).reduce(0, +))", c.completed),
+                (String(localized: "逾期完成"), "\(store.monthly.map(\.overdueCompleted).reduce(0, +))", c.overdue),
             ])
             OverviewMonthlyCard(months: store.monthly)
-            OverviewFocusBarsCard(points: Array(store.focus.monthly.suffix(12)), subtitle: "近 12 个月", unit: .month)
+            OverviewFocusBarsCard(points: Array(store.focus.monthly.suffix(12)), subtitle: String(localized: "近 12 个月"), unit: .month)
         case .custom:
             if let detail = currentRange {
                 let elapsed = detail.elapsedDaily
                 let completed = elapsed.map(\.completed).reduce(0, +)
                 if detail.extendsIntoFuture { futureNote(detail) }
                 OverviewSummaryCard(items: [
-                    ("完成", "\(completed)", c.completed),
-                    ("逾期", "\(elapsed.map(\.overdue).reduce(0, +))", c.overdue),
-                    ("日均完成", Self.average(completed, elapsed.count), c.pending),
+                    (String(localized: "完成"), "\(completed)", c.completed),
+                    (String(localized: "逾期"), "\(elapsed.map(\.overdue).reduce(0, +))", c.overdue),
+                    (String(localized: "日均完成"), Self.average(completed, elapsed.count), c.pending),
                 ])
                 OverviewRangeDailyCard(days: detail.review.daily, subtitle: customRange.label)
                 OverviewFocusBarsCard(points: store.focusCustom?.daily ?? [], subtitle: customRange.label, unit: .day)
@@ -329,13 +329,13 @@ enum OverviewDates {
 
     /// 悬停提示：日期、当日完成任务数，换行后当日专注时长。
     static func dayTooltip(_ day: OverviewStore.DayCount, focusSeconds: Int) -> String {
-        "\(label(day.date, "M月d日 EEE"))\n完成 \(day.completed) 项任务\n专注 \(focusSeconds > 0 ? FocusTexts.duration(focusSeconds) : "0 分钟")"
+        String(localized: "\(label(day.date, String(localized: "M月d日 EEE")))\n完成 \(day.completed) 项任务\n专注 \(focusSeconds > 0 ? FocusTexts.duration(focusSeconds) : String(localized: "0 分钟"))")
     }
 
     static func label(_ raw: String, _ format: String) -> String {
         guard let date = date(raw) else { return raw }
         let f = DateFormatter()
-        f.locale = Locale(identifier: "zh_CN")
+        f.locale = AppLanguage.locale
         f.calendar = OverviewPeriod.calendar
         f.dateFormat = format
         return f.string(from: date)
@@ -375,7 +375,7 @@ struct OverviewCardBackground: ViewModifier {
 }
 
 private struct EmptyChart: View {
-    var text = "暂无数据"
+    var text = String(localized: "暂无数据")
     @Environment(\.palette) private var t
 
     var body: some View {
@@ -411,13 +411,13 @@ struct OverviewTodayCard: View {
 
     var body: some View {
         let c = OverviewColors(t: t)
-        OverviewCard(title: "今日概况") {
+        OverviewCard(title: String(localized: "今日概况")) {
             HStack {
-                BigNumber(title: "今日完成", value: "\(today.completed)", tint: c.completed)
-                BigNumber(title: "待完成", value: "\(today.pending)", tint: c.pending)
-                BigNumber(title: "今日逾期", value: "\(today.overdue)", tint: c.overdue)
-                BigNumber(title: "已放弃", value: "\(today.abandoned)", tint: c.abandoned)
-                BigNumber(title: "今日专注", value: FocusTexts.compact(focusSeconds), tint: c.focus)
+                BigNumber(title: String(localized: "今日完成"), value: "\(today.completed)", tint: c.completed)
+                BigNumber(title: String(localized: "待完成"), value: "\(today.pending)", tint: c.pending)
+                BigNumber(title: String(localized: "今日逾期"), value: "\(today.overdue)", tint: c.overdue)
+                BigNumber(title: String(localized: "已放弃"), value: "\(today.abandoned)", tint: c.abandoned)
+                BigNumber(title: String(localized: "今日专注"), value: FocusTexts.compact(focusSeconds), tint: c.focus)
             }
         }
     }
@@ -428,9 +428,9 @@ struct OverviewPeriodCard: View {
     @Environment(\.palette) private var t
 
     var body: some View {
-        OverviewCard(title: "完成时间分布") {
+        OverviewCard(title: String(localized: "完成时间分布")) {
             if periods.allSatisfy({ $0.count == 0 }) {
-                EmptyChart(text: "暂无已完成数据")
+                EmptyChart(text: String(localized: "暂无已完成数据"))
             } else {
                 let peak = max(1, periods.map(\.count).max() ?? 1)
                 VStack(spacing: 12) {
@@ -457,7 +457,7 @@ struct OverviewPeriodCard: View {
 
 struct OverviewHistoryCard: View {
     let history: OverviewStore.History
-    var title = "历史统计"
+    var title = String(localized: "历史统计")
     var subtitle: String?
     /// 已完成中超前、提前完成各多少（Mac 端推算）；有值时环图和图例里把它们从「已完成」中分出来。
     var completedTiming: [CompletionTiming: Int]?
@@ -477,20 +477,20 @@ struct OverviewHistoryCard: View {
         let splits = completedTiming != nil && ahead + early > 0
         // 环图：已完成拆成超前、提前与其余；图例：「已完成」下面缩进列出超前、提前。
         let sectors: [Slice] = (splits ? [
-            Slice(id: "超前完成", count: ahead, color: IndicatorStatus.completedAhead.solid(t)),
-            Slice(id: "提前完成", count: early, color: IndicatorStatus.completedEarly.solid(t)),
-            Slice(id: "已完成", count: history.completed - ahead - early, color: c.completed),
-        ] : [Slice(id: "已完成", count: history.completed, color: c.completed)]) + [
-            Slice(id: "未完成", count: history.onTime, color: c.pending),
-            Slice(id: "逾期", count: history.overdue, color: c.overdue),
-            Slice(id: "已放弃", count: history.abandoned, color: c.abandoned),
+            Slice(id: String(localized: "超前完成"), count: ahead, color: IndicatorStatus.completedAhead.solid(t)),
+            Slice(id: String(localized: "提前完成"), count: early, color: IndicatorStatus.completedEarly.solid(t)),
+            Slice(id: String(localized: "已完成"), count: history.completed - ahead - early, color: c.completed),
+        ] : [Slice(id: String(localized: "已完成"), count: history.completed, color: c.completed)]) + [
+            Slice(id: String(localized: "未完成"), count: history.onTime, color: c.pending),
+            Slice(id: String(localized: "逾期"), count: history.overdue, color: c.overdue),
+            Slice(id: String(localized: "已放弃"), count: history.abandoned, color: c.abandoned),
         ]
-        let legend: [Slice] = [Slice(id: "已完成", count: history.completed, color: c.completed)]
+        let legend: [Slice] = [Slice(id: String(localized: "已完成"), count: history.completed, color: c.completed)]
             + (splits ? [
-                Slice(id: "超前完成", count: ahead, color: IndicatorStatus.completedAhead.solid(t), indented: true),
-                Slice(id: "提前完成", count: early, color: IndicatorStatus.completedEarly.solid(t), indented: true),
+                Slice(id: String(localized: "超前完成"), count: ahead, color: IndicatorStatus.completedAhead.solid(t), indented: true),
+                Slice(id: String(localized: "提前完成"), count: early, color: IndicatorStatus.completedEarly.solid(t), indented: true),
             ] : [])
-            + sectors.filter { !["已完成", "超前完成", "提前完成"].contains($0.id) }
+            + sectors.filter { ![String(localized: "已完成"), String(localized: "超前完成"), String(localized: "提前完成")].contains($0.id) }
         OverviewCard(title: title, subtitle: subtitle) {
             if history.total == 0 {
                 EmptyChart()
@@ -533,7 +533,7 @@ struct OverviewHistoryCard: View {
 
 struct OverviewHeatmapCard: View {
     let days: [OverviewStore.DayCount]
-    var title = "活跃热力图"
+    var title = String(localized: "活跃热力图")
     /// 每天的专注秒数（键为 `yyyy-MM-dd`），用于悬停提示。
     var focus: [String: Int] = [:]
     @State private var width: CGFloat = 400
@@ -543,11 +543,11 @@ struct OverviewHeatmapCard: View {
     static func monthLabel(_ weeks: [[OverviewStore.DayCount?]], _ index: Int) -> String {
         guard let first = weeks[index].compactMap({ $0 }).first(where: { $0.date.hasSuffix("-01") })
                 ?? (index == 0 ? weeks[index].compactMap({ $0 }).first : nil) else { return "" }
-        return OverviewDates.label(first.date, "M月")
+        return OverviewDates.label(first.date, String(localized: "M月"))
     }
 
     var body: some View {
-        OverviewCard(title: title, subtitle: days.isEmpty ? nil : "\(days.count) 天内") {
+        OverviewCard(title: title, subtitle: days.isEmpty ? nil : String(localized: "\(days.count) 天内")) {
             if days.isEmpty {
                 EmptyChart()
             } else {
@@ -571,7 +571,7 @@ struct OverviewHeatmapCard: View {
                     }
                     ForEach(0..<7, id: \.self) { d in
                         HStack(spacing: gap) {
-                            Text(d % 2 == 0 ? ["一", "", "三", "", "五", "", "日"][d] : "")
+                            Text(d % 2 == 0 ? AppLanguage.weekdays()[d] : "")
                                 .font(.system(size: 9))
                                 .foregroundStyle(t.onSurfaceVariant)
                                 .frame(width: labelWidth, height: cell, alignment: .leading)
@@ -631,7 +631,7 @@ struct OverviewDailyCard: View {
 
     var body: some View {
         let c = OverviewColors(t: t)
-        OverviewCard(title: "每日完成", subtitle: "近 7 天") {
+        OverviewCard(title: String(localized: "每日完成"), subtitle: String(localized: "近 7 天")) {
             if days.isEmpty {
                 EmptyChart()
             } else {
@@ -641,16 +641,16 @@ struct OverviewDailyCard: View {
                 Chart {
                     ForEach(days) { day in
                         BarMark(x: .value("日期", OverviewDates.label(day.date, "EEE")), y: .value("数量", day.completed))
-                            .foregroundStyle(by: .value("类型", "已完成"))
+                            .foregroundStyle(by: .value("类型", String(localized: "已完成")))
                             .cornerRadius(4)
                         if showOverdue {
                             BarMark(x: .value("日期", OverviewDates.label(day.date, "EEE")), y: .value("数量", day.overdue))
-                                .foregroundStyle(by: .value("类型", "逾期"))
+                                .foregroundStyle(by: .value("类型", String(localized: "逾期")))
                                 .cornerRadius(4)
                         }
                     }
                 }
-                .chartForegroundStyleScale(["已完成": c.completed, "逾期": c.overdue])
+                .chartForegroundStyleScale([String(localized: "已完成"): c.completed, String(localized: "逾期"): c.overdue])
                 // 坐标范围始终包含逾期，开关「显示逾期」时坐标系不缩放。
                 .chartYScale(domain: 0...Double(max(1, days.map { $0.completed + $0.overdue }.max() ?? 1)))
                 .chartLegend(.visible)
@@ -678,13 +678,13 @@ struct OverviewSummaryCard: View {
 /// 近 30 天每日完成（Core 热力图数据的最后 30 天）。
 struct OverviewRangeDailyCard: View {
     let days: [OverviewStore.DayCount]
-    var subtitle = "近 30 天"
+    var subtitle = String(localized: "近 30 天")
     @Environment(\.palette) private var t
 
     var body: some View {
         // 横轴最多标约 6 个日期，范围很长时也不会挤在一起。
         let stride = max(1, Int((Double(days.count) / 6).rounded(.up)))
-        OverviewCard(title: "每日完成", subtitle: subtitle) {
+        OverviewCard(title: String(localized: "每日完成"), subtitle: subtitle) {
             if days.allSatisfy({ $0.completed == 0 }) {
                 EmptyChart()
             } else {
@@ -717,33 +717,33 @@ struct OverviewMonthlyCard: View {
 
     var body: some View {
         let c = OverviewColors(t: t)
-        OverviewCard(title: "每月趋势", subtitle: "近 12 个月") {
+        OverviewCard(title: String(localized: "每月趋势"), subtitle: String(localized: "近 12 个月")) {
             if months.isEmpty {
                 EmptyChart()
             } else {
                 Chart {
                     ForEach(months) { month in
-                        let label = OverviewDates.label(month.monthStart, "M月")
+                        let label = OverviewDates.label(month.monthStart, String(localized: "M月"))
                         LineMark(x: .value("月份", label), y: .value("数量", month.total))
-                            .foregroundStyle(by: .value("类型", "任务总数"))
+                            .foregroundStyle(by: .value("类型", String(localized: "任务总数")))
                             .symbol(.circle)
                         LineMark(x: .value("月份", label), y: .value("数量", month.completed))
-                            .foregroundStyle(by: .value("类型", "已完成"))
+                            .foregroundStyle(by: .value("类型", String(localized: "已完成")))
                             .symbol(.circle)
                         LineMark(x: .value("月份", label), y: .value("数量", month.overdueCompleted))
-                            .foregroundStyle(by: .value("类型", "逾期完成"))
+                            .foregroundStyle(by: .value("类型", String(localized: "逾期完成")))
                             .symbol(.circle)
                         LineMark(x: .value("月份", label), y: .value("数量", timings[month.monthStart]?[.ahead] ?? 0))
-                            .foregroundStyle(by: .value("类型", "超前完成"))
+                            .foregroundStyle(by: .value("类型", String(localized: "超前完成")))
                             .symbol(.circle)
                         LineMark(x: .value("月份", label), y: .value("数量", timings[month.monthStart]?[.early] ?? 0))
-                            .foregroundStyle(by: .value("类型", "提前完成"))
+                            .foregroundStyle(by: .value("类型", String(localized: "提前完成")))
                             .symbol(.circle)
                     }
                 }
-                .chartForegroundStyleScale(["任务总数": c.pending, "已完成": c.completed, "逾期完成": c.overdue,
-                                            "超前完成": IndicatorStatus.completedAhead.solid(t),
-                                            "提前完成": IndicatorStatus.completedEarly.solid(t)])
+                .chartForegroundStyleScale([String(localized: "任务总数"): c.pending, String(localized: "已完成"): c.completed, String(localized: "逾期完成"): c.overdue,
+                                            String(localized: "超前完成"): IndicatorStatus.completedAhead.solid(t),
+                                            String(localized: "提前完成"): IndicatorStatus.completedEarly.solid(t)])
                 .frame(height: 200)
             }
         }
@@ -755,7 +755,7 @@ struct OverviewWeeklyCard: View {
     @Environment(\.palette) private var t
 
     var body: some View {
-        OverviewCard(title: "近 4 周完成") {
+        OverviewCard(title: String(localized: "近 4 周完成")) {
             if weeks.isEmpty {
                 EmptyChart()
             } else {
@@ -781,16 +781,16 @@ struct OverviewMetricsCard: View {
     /// 默认显示月份；自定义范围时显示范围。
     var subtitle: String?
     /// 对比的说法：某个月为「较前一月」，自定义范围为「较前一时段」（等长）。
-    var comparison = "较前一月"
-    var emptyText = "这个月没有任务"
+    var comparison = String(localized: "较前一月")
+    var emptyText = String(localized: "这个月没有任务")
     /// 卡片顶部的一行说明（例如「较上月同期」）。
     var headline: String?
     @Environment(\.palette) private var t
 
     var body: some View {
         let c = OverviewColors(t: t)
-        let month = subtitle ?? review.monthStart.map { OverviewDates.label($0, "yyyy 年 M 月") }
-        OverviewCard(title: "数据汇总", subtitle: month) {
+        let month = subtitle ?? review.monthStart.map { OverviewDates.label($0, String(localized: "yyyy 年 M 月")) }
+        OverviewCard(title: String(localized: "数据汇总"), subtitle: month) {
             if let headline {
                 Text(headline).font(.callout.weight(.medium)).foregroundStyle(c.completed)
             }
@@ -798,13 +798,13 @@ struct OverviewMetricsCard: View {
                 EmptyChart(text: emptyText)
             } else {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                    metric("任务总数", "\(review.totalTasks)", delta: review.totalTasks - review.previousTotalTasks, tint: c.pending)
-                    metric("已完成", "\(review.completedTasks)", delta: review.completedTasks - review.previousCompletedTasks, tint: c.completed)
-                    metric("完成率", Self.percent(review.completionRate),
+                    metric(String(localized: "任务总数"), "\(review.totalTasks)", delta: review.totalTasks - review.previousTotalTasks, tint: c.pending)
+                    metric(String(localized: "已完成"), "\(review.completedTasks)", delta: review.completedTasks - review.previousCompletedTasks, tint: c.completed)
+                    metric(String(localized: "完成率"), Self.percent(review.completionRate),
                            deltaText: Self.pointDelta(review.completionRate - review.previousCompletionRate), tint: c.completed)
-                    metric("逾期", "\(review.overdueTasks)", delta: review.overdueTasks - review.previousOverdueTasks, tint: c.overdue, lowerIsBetter: true)
-                    metric("最活跃时段", review.mostActivePeriod?.title ?? "—", tint: t.tertiary)
-                    metric("平均完成用时", review.averageCompletionMinutes.map(Self.minutes) ?? "—", tint: t.tertiary)
+                    metric(String(localized: "逾期"), "\(review.overdueTasks)", delta: review.overdueTasks - review.previousOverdueTasks, tint: c.overdue, lowerIsBetter: true)
+                    metric(String(localized: "最活跃时段"), review.mostActivePeriod?.title ?? "—", tint: t.tertiary)
+                    metric(String(localized: "平均完成用时"), review.averageCompletionMinutes.map(Self.minutes) ?? "—", tint: t.tertiary)
                 }
             }
         }
@@ -835,9 +835,9 @@ struct OverviewMetricsCard: View {
     }
 
     static func minutes(_ value: Int) -> String {
-        if value < 60 { return "\(value) 分钟" }
-        if value < 60 * 24 { return String(format: "%.1f 小时", Double(value) / 60) }
-        return String(format: "%.1f 天", Double(value) / 1440)
+        if value < 60 { return String(localized: "\(value) 分钟") }
+        if value < 60 * 24 { return String(format: String(localized: "%.1f 小时"), Double(value) / 60) }
+        return String(format: String(localized: "%.1f 天"), Double(value) / 1440)
     }
 }
 
@@ -849,8 +849,8 @@ struct OverviewMonthMapCard: View {
     @Environment(\.palette) private var t
 
     var body: some View {
-        let title = review.monthStart.map { OverviewDates.label($0, "M月") + "活动分布" } ?? "活动分布"
-        OverviewCard(title: title, subtitle: focus == nil ? "每日完成数" : "每日完成数 · 点为有专注") {
+        let title = review.monthStart.map { OverviewDates.label($0, String(localized: "M月")) + String(localized: "活动分布") } ?? String(localized: "活动分布")
+        OverviewCard(title: title, subtitle: focus == nil ? String(localized: "每日完成数") : String(localized: "每日完成数 · 点为有专注")) {
             if review.daily.isEmpty {
                 EmptyChart()
             } else {
@@ -858,8 +858,8 @@ struct OverviewMonthMapCard: View {
                 let peak = max(1, review.daily.map(\.completed).max() ?? 1)
                 VStack(spacing: 6) {
                     HStack(spacing: 6) {
-                        ForEach(["一", "二", "三", "四", "五", "六", "日"], id: \.self) {
-                            Text($0).font(.caption2).foregroundStyle(t.onSurfaceVariant).frame(maxWidth: .infinity)
+                        ForEach(Array(AppLanguage.weekdays().enumerated()), id: \.offset) {
+                            Text($0.element).font(.caption2).foregroundStyle(t.onSurfaceVariant).frame(maxWidth: .infinity)
                         }
                     }
                     ForEach(weeks.indices, id: \.self) { w in
@@ -900,8 +900,8 @@ struct OverviewMonthMapCard: View {
                 .popover(isPresented: Binding(get: { selectedDay == day.date }, set: { if !$0 { selectedDay = nil } })) {
                     dayDetail(day, focusSeconds: focusSeconds)
                 }
-                .help("完成 \(day.completed)" + (day.overdue > 0 ? "，逾期 \(day.overdue)" : "") +
-                      (focusSeconds > 0 ? "，专注 \(FocusTexts.duration(focusSeconds))" : ""))
+                .help(String(localized: "完成 \(day.completed)") + (day.overdue > 0 ? String(localized: "，逾期 \(day.overdue)") : "") +
+                      (focusSeconds > 0 ? String(localized: "，专注 \(FocusTexts.duration(focusSeconds))") : ""))
         } else {
             Color.clear.frame(maxWidth: .infinity).frame(height: 30)
         }
@@ -911,7 +911,7 @@ struct OverviewMonthMapCard: View {
     private func dayDetail(_ day: OverviewStore.DayCount, focusSeconds: Int) -> some View {
         let c = OverviewColors(t: t)
         return VStack(alignment: .leading, spacing: 8) {
-            Text(OverviewDates.label(day.date, "M月d日 EEEE")).font(.headline)
+            Text(OverviewDates.label(day.date, String(localized: "M月d日 EEEE"))).font(.headline)
             Label("完成 \(day.completed) 项", systemImage: "checkmark.circle").foregroundStyle(c.completed)
             if day.overdue > 0 { Label("逾期 \(day.overdue) 项", systemImage: "exclamationmark.circle").foregroundStyle(c.overdue) }
             Label(focusSeconds > 0 ? "专注 \(FocusTexts.duration(focusSeconds))" : "没有专注", systemImage: "timer")
@@ -935,10 +935,10 @@ struct OverviewFocusBarsCard: View {
     var body: some View {
         let total = points.map(\.seconds).reduce(0, +)
         let average = FocusTexts.dailyAverage(points, byMonth: unit == .month)
-        OverviewCard(title: "专注时长", subtitle: total > 0
-                     ? "\(subtitle) · 合计 \(FocusTexts.duration(total)) · 日均 \(FocusTexts.duration(average))" : subtitle) {
+        OverviewCard(title: String(localized: "专注时长"), subtitle: total > 0
+                     ? String(localized: "\(subtitle) · 合计 \(FocusTexts.duration(total)) · 日均 \(FocusTexts.duration(average))") : subtitle) {
             if total == 0 {
-                EmptyChart(text: "这段时间没有专注")
+                EmptyChart(text: String(localized: "这段时间没有专注"))
             } else {
                 let stride = max(1, Int((Double(points.count) / 6).rounded(.up)))
                 Chart {
@@ -955,7 +955,7 @@ struct OverviewFocusBarsCard: View {
                             .foregroundStyle(.clear)
                             .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
                                 VStack(spacing: 1) {
-                                    Text(OverviewDates.label(hovered.start, unit == .day ? "M月d日" : "yyyy年M月"))
+                                    Text(OverviewDates.label(hovered.start, unit == .day ? String(localized: "M月d日") : String(localized: "yyyy年M月")))
                                         .font(.caption2).foregroundStyle(t.onSurfaceVariant)
                                     Text(FocusTexts.duration(hovered.seconds)).font(.caption.weight(.semibold))
                                 }
@@ -997,7 +997,7 @@ struct OverviewFocusBarsCard: View {
                                 let calendar = Calendar.current
                                 Text(verbatim: unit == .day
                                      ? "\(calendar.component(.month, from: date))/\(calendar.component(.day, from: date))"
-                                     : "\(calendar.component(.month, from: date))月")
+                                     : String(localized: "\(calendar.component(.month, from: date))月"))
                             }
                         }
                     }
@@ -1015,15 +1015,15 @@ struct OverviewFocusInvestmentCard: View {
 
     var body: some View {
         let c = OverviewColors(t: t)
-        OverviewCard(title: "时间投入", subtitle: "专注") {
+        OverviewCard(title: String(localized: "时间投入"), subtitle: String(localized: "专注")) {
             if focus.totalSeconds == 0 {
-                EmptyChart(text: "这段时间没有专注")
+                EmptyChart(text: String(localized: "这段时间没有专注"))
             } else {
                 HStack {
-                    BigNumber(title: "专注时长", value: FocusTexts.compact(focus.totalSeconds), tint: c.focus)
-                    BigNumber(title: "专注次数", value: "\(focus.sessions)", tint: c.focus)
-                    BigNumber(title: "有专注的天数", value: "\(focus.activeDays)", tint: c.focus)
-                    BigNumber(title: "日均专注", value: FocusTexts.compact(FocusTexts.dailyAverage(focus.daily)), tint: c.focus)
+                    BigNumber(title: String(localized: "专注时长"), value: FocusTexts.compact(focus.totalSeconds), tint: c.focus)
+                    BigNumber(title: String(localized: "专注次数"), value: "\(focus.sessions)", tint: c.focus)
+                    BigNumber(title: String(localized: "有专注的天数"), value: "\(focus.activeDays)", tint: c.focus)
+                    BigNumber(title: String(localized: "日均专注"), value: FocusTexts.compact(FocusTexts.dailyAverage(focus.daily)), tint: c.focus)
                 }
                 let peak = max(1, focus.categories.first?.seconds ?? 1)
                 VStack(spacing: 10) {
@@ -1054,8 +1054,8 @@ struct OverviewTitlesCard: View {
     @Environment(\.palette) private var t
 
     var body: some View {
-        let month = review.monthStart.map { OverviewDates.label($0, "M月") } ?? "所选区间"
-        OverviewCard(title: title ?? "\(month)完成的任务", subtitle: "\(review.completedTitles.count) 个") {
+        let month = review.monthStart.map { OverviewDates.label($0, String(localized: "M月")) } ?? String(localized: "所选区间")
+        OverviewCard(title: title ?? String(localized: "\(month)完成的任务"), subtitle: String(localized: "\(review.completedTitles.count) 个")) {
             FlowLayout(spacing: 6) {
                 ForEach(Array(review.completedTitles.enumerated()), id: \.offset) { _, title in
                     Text(verbatim: title)
@@ -1079,9 +1079,9 @@ struct OverviewCompletionTimingCard: View {
 
     var body: some View {
         let total = CompletionTiming.allCases.reduce(0) { $0 + (counts[$1] ?? 0) }
-        OverviewCard(title: "完成时机", subtitle: subtitle ?? "按开始、截止与完成时间推算") {
+        OverviewCard(title: String(localized: "完成时机"), subtitle: subtitle ?? String(localized: "按开始、截止与完成时间推算")) {
             if total == 0 {
-                EmptyChart(text: "这段时间没有可比较的已完成任务")
+                EmptyChart(text: String(localized: "这段时间没有可比较的已完成任务"))
             } else {
                 GeometryReader { proxy in
                     HStack(spacing: 2) {
@@ -1135,18 +1135,18 @@ struct OverviewRecentTimingChart: View {
         let segments = days.flatMap { day -> [Segment] in
             let ahead = min(day.completed, timings[day.date]?[.ahead] ?? 0)
             let early = min(day.completed - ahead, timings[day.date]?[.early] ?? 0)
-            return [Segment(date: day.date, kind: "已完成", count: day.completed - ahead - early),
-                    Segment(date: day.date, kind: "提前完成", count: early),
-                    Segment(date: day.date, kind: "超前完成", count: ahead)]
+            return [Segment(date: day.date, kind: String(localized: "已完成"), count: day.completed - ahead - early),
+                    Segment(date: day.date, kind: String(localized: "提前完成"), count: early),
+                    Segment(date: day.date, kind: String(localized: "超前完成"), count: ahead)]
         }
         Chart(segments) { segment in
             BarMark(x: .value("日期", OverviewDates.label(segment.date, "E")), y: .value("完成", segment.count))
                 .foregroundStyle(by: .value("类型", segment.kind))
                 .cornerRadius(3)
         }
-        .chartForegroundStyleScale(["已完成": OverviewColors(t: t).completed,
-                                    "提前完成": IndicatorStatus.completedEarly.solid(t),
-                                    "超前完成": IndicatorStatus.completedAhead.solid(t)])
+        .chartForegroundStyleScale([String(localized: "已完成"): OverviewColors(t: t).completed,
+                                    String(localized: "提前完成"): IndicatorStatus.completedEarly.solid(t),
+                                    String(localized: "超前完成"): IndicatorStatus.completedAhead.solid(t)])
         .chartLegend(position: .bottom, spacing: 6)
         .frame(height: 120)
     }

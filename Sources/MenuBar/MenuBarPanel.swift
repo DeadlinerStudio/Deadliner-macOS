@@ -128,19 +128,19 @@ struct MenuBarPanelContent: View {
         switch style {
         case .list:
             VStack(alignment: .leading, spacing: 0) {
-                MenuRow(title: "打开 Deadliner", systemImage: "macwindow", action: actions?.openMain)
-                MenuRow(title: "立即同步", systemImage: "arrow.triangle.2.circlepath", shortcut: "⌘R", action: actions?.syncNow)
-                MenuRow(title: "设置…", systemImage: "gearshape", shortcut: "⌘,", action: actions?.openSettings)
-                MenuRow(title: "退出 Deadliner", systemImage: "power", shortcut: "⌘Q", action: actions?.quit)
+                MenuRow(title: String(localized: "打开 Deadliner"), systemImage: "macwindow", action: actions?.openMain)
+                MenuRow(title: String(localized: "立即同步"), systemImage: "arrow.triangle.2.circlepath", shortcut: "⌘R", action: actions?.syncNow)
+                MenuRow(title: String(localized: "设置…"), systemImage: "gearshape", shortcut: "⌘,", action: actions?.openSettings)
+                MenuRow(title: String(localized: "退出 Deadliner"), systemImage: "power", shortcut: "⌘Q", action: actions?.quit)
             }
             .padding(6)
         case .dashboard:
             HStack(spacing: 6) {
-                footerButton("打开", "macwindow", actions?.openMain)
-                footerButton("同步", "arrow.triangle.2.circlepath", actions?.syncNow)
-                footerButton("设置", "gearshape", actions?.openSettings)
+                footerButton(String(localized: "打开"), "macwindow", actions?.openMain)
+                footerButton(String(localized: "同步"), "arrow.triangle.2.circlepath", actions?.syncNow)
+                footerButton(String(localized: "设置"), "gearshape", actions?.openSettings)
                 Spacer()
-                footerButton("退出", "power", actions?.quit)
+                footerButton(String(localized: "退出"), "power", actions?.quit)
             }
             .padding(10)
         }
@@ -212,10 +212,10 @@ struct MenuBarPanelContent: View {
     @ViewBuilder
     private var tasks: some View {
         let lines = summary.upcoming(in: upcomingRange, now: now, custom: upcomingCustomRange)
-        let rangeTitle = upcomingRange == .custom ? (upcomingCustomRange?.label ?? "自定义") : upcomingRange.title
+        let rangeTitle = upcomingRange == .custom ? (upcomingCustomRange?.label ?? String(localized: "自定义")) : upcomingRange.title
         let limit = style == .dashboard ? 4 : 6
         HStack {
-            sectionTitle(upcomingRange == .all ? "即将到期" : "即将到期 · \(rangeTitle)")
+            sectionTitle(upcomingRange == .all ? String(localized: "即将到期") : String(localized: "即将到期 · \(rangeTitle)"))
             Spacer()
             if lines.count > limit {
                 Text("还有 \(lines.count - limit) 个").font(.caption).foregroundStyle(.secondary).padding(.top, 2)
@@ -235,7 +235,7 @@ struct MenuBarPanelContent: View {
 
     @ViewBuilder
     private var habits: some View {
-        sectionTitle("今日习惯 \(summary.habitsDone)/\(summary.habitsTotal)")
+        sectionTitle(String(localized: "今日习惯 \(summary.habitsDone)/\(summary.habitsTotal)"))
         if summary.habits.isEmpty {
             Text("今天没有需要打卡的习惯").font(.callout).foregroundStyle(.secondary)
         } else {
@@ -252,7 +252,7 @@ struct MenuBarPanelContent: View {
         let peak = max(1, summary.focusDays.map(\.seconds).max() ?? 1)
         let total = summary.focusDays.map(\.seconds).reduce(0, +)
         HStack {
-            sectionTitle("最近 7 天专注")
+            sectionTitle(String(localized: "最近 7 天专注"))
             Spacer()
             // 悬停在某一天上时显示那天的时长，否则显示 7 天合计。
             Group {
@@ -344,13 +344,13 @@ struct MenuBarPanelContent: View {
 
     private var syncRow: some View {
         let (icon, text, tint): (String, String, Color) = switch syncStatus {
-        case .disabled: ("icloud.slash", "未启用同步", .secondary)
-        case .backingUp: ("arrow.down.doc", "正在备份云端…", t.primary)
-        case .awaitingConfirmation: ("questionmark.circle", "同步等待确认", .orange)
-        case .idle: ("icloud", "等待同步", .secondary)
-        case .syncing: ("arrow.triangle.2.circlepath", "正在同步…", t.primary)
-        case .succeeded(let date): ("checkmark.icloud", "已同步 \(date.formatted(date: .omitted, time: .shortened))", .green)
-        case .failed(let reason): ("exclamationmark.icloud", "同步失败：\(reason)", .red)
+        case .disabled: ("icloud.slash", String(localized: "未启用同步"), .secondary)
+        case .backingUp: ("arrow.down.doc", String(localized: "正在备份云端…"), t.primary)
+        case .awaitingConfirmation: ("questionmark.circle", String(localized: "同步等待确认"), .orange)
+        case .idle: ("icloud", String(localized: "等待同步"), .secondary)
+        case .syncing: ("arrow.triangle.2.circlepath", String(localized: "正在同步…"), t.primary)
+        case .succeeded(let date): ("checkmark.icloud", String(localized: "已同步 \(date.formatted(date: .omitted, time: .shortened))"), .green)
+        case .failed(let reason): ("exclamationmark.icloud", String(localized: "同步失败：\(reason)"), .red)
         }
         return Label(text, systemImage: icon)
             .font(.caption)

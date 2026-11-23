@@ -62,13 +62,13 @@ struct StatusLabelView: View {
 
     private var capsuleText: String {
         guard let next = summary.next, let due = summary.nextDueAt else {
-            return summary.overdue > 0 ? "逾期 \(summary.overdue)" : "无待办"
+            return summary.overdue > 0 ? String(localized: "逾期 \(summary.overdue)") : String(localized: "无待办")
         }
         return "\(next.title.prefix(10)) · \(TaskStatus.span(due.timeIntervalSince(now)))"
     }
 
     private var accessibilityText: String {
-        "Deadliner：今天到期 \(summary.dueToday) 个，已逾期 \(summary.overdue) 个，习惯 \(summary.habitsDone)/\(summary.habitsTotal)"
+        String(localized: "Deadliner：今天到期 \(summary.dueToday) 个，已逾期 \(summary.overdue) 个，习惯 \(summary.habitsDone)/\(summary.habitsTotal)")
     }
 }
 
