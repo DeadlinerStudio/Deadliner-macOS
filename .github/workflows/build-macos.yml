@@ -2,6 +2,11 @@ name: Build macOS app
 
 on:
   workflow_dispatch:
+    inputs:
+      cli_run_id:
+        description: Optional DeadlinerCli Actions run for native task round-trip testing
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -50,3 +55,15 @@ jobs:
             -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath "$RUNNER_TEMP/test-derived" \
             -only-testing:DeadlinerMacTests/TaskStatusTests
+
+      - name: Verify Swift and native CLI round trip
+        if: inputs.cli_run_id != ''
+        working-directory: client
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLI_RUN_ID: ${{ inputs.cli_run_id }}
+        run: |
+          gh run download "$CLI_RUN_ID" -R DeadlinerStudio/DeadlinerCli -n deadliner-cli-arm64 -D "$RUNNER_TEMP/cli-package"
+          tar -xzf "$RUNNER_TEMP"/cli-package/*.tgz -C "$RUNNER_TEMP/cli-package"
+          swiftc -swift-version 6 Sources/Features/CLI/*.swift scripts/tests/CLITaskRoundTrip.swift -o "$RUNNER_TEMP/probe"
+          python3 scripts/tests/cli-round-trip.py "$RUNNER_TEMP/cli-package/package/bin/deadliner" "$RUNNER_TEMP/probe"
