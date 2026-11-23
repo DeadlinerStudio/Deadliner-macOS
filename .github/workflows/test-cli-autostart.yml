@@ -1,0 +1,44 @@
+name: Test sandboxed CLI startup
+on:
+  pull_request:
+    paths:
+      - Sources/Features/CLI/**
+      - scripts/tests/CLIAutoStartProbe.swift
+      - .github/workflows/test-cli-autostart.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sandbox:
+    runs-on: macos-26
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify startup handshake and stop on disconnect
+        shell: bash
+        run: |
+          set -eu
+          app="$RUNNER_TEMP/probe.app"
+          identifier=com.deadliner.ci.autostart
+          scripts="$HOME/Library/Application Scripts/$identifier"
+          mkdir -p "$app/Contents/MacOS" "$scripts"
+          plutil -create xml1 "$app/Contents/Info.plist"
+          plutil -insert CFBundleIdentifier -string "$identifier" "$app/Contents/Info.plist"
+          plutil -insert CFBundleExecutable -string probe "$app/Contents/Info.plist"
+          swiftc -swift-version 6 Sources/Features/CLI/*.swift scripts/tests/CLIAutoStartProbe.swift \
+            -o "$app/Contents/MacOS/probe"
+          codesign -s - --entitlements Resources/DeadlinerMac.entitlements "$app"
+          cat > "$scripts/deadliner-readonly" <<'SH'
+          #!/bin/sh
+          set -eu
+          printf '{"ok":true,"version":1,"data":{"connectionCode":"54321.%064d"}}\n' 0
+          IFS= read -r line || :
+          touch "$(dirname "$0")/did-stop"
+          SH
+          chmod 700 "$scripts/deadliner-readonly"
+          "$app/Contents/MacOS/probe"
+          for i in {1..20}; do
+            [[ ! -f "$scripts/did-stop" ]] || exit 0
+            sleep 0.25
+          done
+          exit 1
