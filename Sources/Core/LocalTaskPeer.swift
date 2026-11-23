@@ -8,7 +8,7 @@ final class LocalTaskPeer {
     private let didImport: () -> Void
     private let launcher = CLIAutoLauncher()
     private var service: CLISession?
-    private var worker: Task<Void, Never>?
+    private var worker: _Concurrency.Task<Void, Never>?
     private var localGeneration = 0
     private var started = false
 
@@ -33,8 +33,8 @@ final class LocalTaskPeer {
             guard let self, self.started else { return }
             self.service = nil
             self.worker?.cancel()
-            self.worker = Task {
-                do { try await Task.sleep(for: .seconds(60)) } catch { return }
+            self.worker = _Concurrency.Task {
+                do { try await _Concurrency.Task.sleep(for: .seconds(60)) } catch { return }
                 self.connect()
             }
         }
@@ -44,7 +44,7 @@ final class LocalTaskPeer {
         worker?.cancel()
         started = true
         service = peer
-        worker = Task { await observe(peer) }
+        worker = _Concurrency.Task { await observe(peer) }
     }
 
     func stop() {
@@ -61,10 +61,10 @@ final class LocalTaskPeer {
         var generation: Int?
         var revision: String?
         var delay = 2
-        while !Task.isCancelled {
+        while !_Concurrency.Task.isCancelled {
             do {
                 let tag = try await peer.taskRevision(client, known: revision)
-                guard started, service == peer, !Task.isCancelled else { return }
+                guard started, service == peer, !_Concurrency.Task.isCancelled else { return }
                 let before = localGeneration
                 if before != generation || tag != revision {
                     let exported = database.sync.mergeRemotePayload(remotePayload: nil)
@@ -72,7 +72,7 @@ final class LocalTaskPeer {
                     let json = try JSONSerialization.jsonObject(with: Data(exported.payload.utf8))
                     let outgoing = try TaskPeerPayload.project(json)
                     let incoming = try await peer.exchangeTasks(outgoing, using: client)
-                    guard started, service == peer, !Task.isCancelled else { return }
+                    guard started, service == peer, !_Concurrency.Task.isCancelled else { return }
                     let merged = database.sync.mergeRemotePayload(remotePayload: incoming)
                     guard merged.failureMessage == nil else { throw URLError(.cannotDecodeContentData) }
                     if merged.remoteApplied > 0 { didImport() }
@@ -84,7 +84,7 @@ final class LocalTaskPeer {
             } catch {
                 delay = min(delay * 2, 60)
             }
-            do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+            do { try await _Concurrency.Task.sleep(for: .seconds(delay)) } catch { return }
         }
     }
 }

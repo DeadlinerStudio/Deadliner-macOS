@@ -19,7 +19,7 @@ struct CLITaskRoundTrip {
         func waitFor(_ predicate: () -> Bool) async throws {
             for _ in 0..<150 {
                 if predicate() { return }
-                try await Task.sleep(for: .milliseconds(150))
+                try await _Concurrency.Task.sleep(for: .milliseconds(150))
             }
             throw URLError(.timedOut)
         }
