@@ -43,3 +43,10 @@ jobs:
           name: Deadliner-macOS-arm64
           path: ${{ runner.temp }}/package/
           if-no-files-found: error
+      - name: Test task status and date parsing
+        working-directory: client
+        run: |
+          xcodebuild test -project DeadlinerMac.xcodeproj -scheme DeadlinerMac \
+            -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath "$RUNNER_TEMP/test-derived" \
+            -only-testing:DeadlinerMacTests/TaskStatusTests
