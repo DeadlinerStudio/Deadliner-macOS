@@ -15,16 +15,8 @@ enum TaskPeerPayload {
 }
 
 extension CLISession {
-    private func peerRequest(_ method: String) -> URLRequest {
-        var req = request(revision: nil)
-        req.url = endpoint.deletingLastPathComponent().appendingPathComponent("task-peer")
-        req.httpMethod = method
-        req.timeoutInterval = 30
-        return req
-    }
-
     func taskRevision(_ client: URLSession, known: String?) async throws -> String {
-        var req = peerRequest("HEAD")
+        var req = request(method: "HEAD")
         req.setValue(known, forHTTPHeaderField: "If-None-Match")
         let (_, response) = try await client.data(for: req)
         guard let http = response as? HTTPURLResponse, [200,304].contains(http.statusCode),
@@ -33,7 +25,7 @@ extension CLISession {
     }
 
     func exchangeTasks(_ local: Data, using client: URLSession) async throws -> String {
-        var req = peerRequest("POST")
+        var req = request(method: "POST")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = local
         let (data, response) = try await client.data(for: req)
