@@ -37,8 +37,6 @@ struct DeadlinerApp: App {
                 .keyboardShortcut("v", modifiers: [.command, .shift])
             }
             CommandMenu("前往") {
-                Button("CLI 任务（只读）") { openWindow(id: "cli-tasks") }
-                Divider()
                 ForEach(Array(AppModel.Page.allCases.enumerated()), id: \.element) { index, page in
                     Button(page.title) { appDelegate.model?.page = page }
                         .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: [.command])
@@ -52,9 +50,6 @@ struct DeadlinerApp: App {
                 .keyboardShortcut("r", modifiers: [.command])
             }
         }
-
-        Window("CLI 任务（只读）", id: "cli-tasks") { CLITaskWindow() }
-            .defaultSize(width: 620, height: 440)
 
         // 专注计时窗：可以置顶，关闭窗口不会结束计时。
         Window("专注", id: FocusTimerWindow.id) {
@@ -260,7 +255,6 @@ struct RootView: View {
 }
 
 struct MainView: View {
-    @AppStorage("tasks.useCLI") private var useCLI = false
     @Bindable var model: AppModel
     @State private var editingProfile = false
     @State private var timerConflictError: String?
@@ -271,22 +265,14 @@ struct MainView: View {
         NavigationSplitView {
             Sidebar(page: $model.page, syncStatus: model.sync.status, syncNow: { model.sync.syncNow() },
                     profile: model.profile, editProfile: { editingProfile = true },
-                    taskList: useCLI ? nil : model.taskList, habitList: model.habitList)
+                    taskList: model.taskList, habitList: model.habitList)
                 .displayScaled()
                 .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
         } detail: {
             Group {
                 switch model.page {
                 case .tasks:
-                    VStack(spacing: 0) {
-                        Picker("任务数据源", selection: $useCLI) {
-                            Text("Mac").tag(false)
-                            Text("CLI").tag(true)
-                        }.pickerStyle(.segmented).fixedSize().padding(8)
-                        if useCLI {
-                            CLITaskWindow(allowsEditing: true, pendingAdd: $model.pendingCLIAdd)
-                        } else {
-                            TaskListView(store: model.taskList, commands: model.taskCommands, categoryCommands: model.categoryCommands,
+                    TaskListView(store: model.taskList, commands: model.taskCommands, categoryCommands: model.categoryCommands,
                                  onQuickAdd: { model.showingQuickAdd = true },
                                  onLifi: LifiSettings.isAvailable ? { AppDelegate.current?.openLifiAction?() } : nil,
                                  onSetupSync: model.sync.status == .disabled ? { model.page = .settings } : nil,
@@ -295,8 +281,6 @@ struct MainView: View {
                                      model.archive.searchText = query
                                      model.page = .archive
                                  })
-                        }
-                    }
                 case .habits:
                     HabitsView(store: model.habitList, commands: model.habitCommands, categories: model.taskList.categories)
                 case .capture:
@@ -322,7 +306,6 @@ struct MainView: View {
                               model.showingQuickAdd = false
                               DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                                   model.page = .tasks
-                                  useCLI = false
                                   model.taskList.editor = .init(draft: draft)
                               }
                           },

@@ -67,7 +67,6 @@ final class AppModel {
     @ObservationIgnored private(set) var habitCommands: HabitCommands!
     @ObservationIgnored private(set) var lifi: LifiAssistantStore!
     /// 显示快速添加。
-    var pendingCLIAdd = false
     var showingQuickAdd = false
 
     init(container: MacCoreContainer) {
@@ -186,7 +185,6 @@ final class AppModel {
     func acceptShare(_ draft: TaskDraft) {
         pendingShare = nil
         page = .tasks
-        UserDefaults.standard.set(false, forKey: "tasks.useCLI")
         taskList.editor = .init(draft: draft)
     }
 
@@ -251,11 +249,7 @@ final class AppModel {
 
     func newTask() {
         page = .tasks
-        if UserDefaults.standard.bool(forKey: "tasks.useCLI") {
-            pendingCLIAdd = true
-        } else {
-            taskList.editor = .init(draft: TaskDraft())
-        }
+        taskList.editor = .init(draft: TaskDraft())
     }
 
     func stop() {
