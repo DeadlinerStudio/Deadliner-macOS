@@ -72,7 +72,7 @@ final class MenuBarController: NSObject {
         button.addSubview(label)
         NSLayoutConstraint.activate([
             label.centerXAnchor.constraint(equalTo: button.centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            label.centerYAnchor.constraint(equalTo: button.centerYAnchor, constant: StatusLabelLayout.verticalOffset),
         ])
         label.reportIntrinsicSize()
     }

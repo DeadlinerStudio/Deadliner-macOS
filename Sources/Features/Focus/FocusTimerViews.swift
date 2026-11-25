@@ -253,13 +253,13 @@ struct FocusStatusLabel: View {
     let running: FocusTimerStore.Running
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             Image(systemName: running.isRunning ? "timer" : "pause.circle")
                 .font(.system(size: 13, weight: .medium))
             Text(FocusTimerStore.clock(running.displaySeconds))
                 .font(.system(size: 13, weight: .semibold).monospacedDigit())
         }
-        .padding(.horizontal, 5)
+        .padding(.horizontal, StatusLabelLayout.sidePadding)
         .fixedSize()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("正在专注 \(running.title)，\(FocusTimerStore.clock(running.displaySeconds))")

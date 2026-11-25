@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// 菜单栏标签的排版参数（与系统图标对齐用）。
+enum StatusLabelLayout {
+    /// 内容两侧的留白。
+    static let sidePadding: CGFloat = 2
+    /// 内容在按钮中的竖直偏移（正数向下）。SF Symbol 与数字的墨迹比几何中心略高，
+    /// 下移 1pt 后与相邻系统图标的视觉中线一致。
+    static let verticalOffset: CGFloat = 1
+}
+
 /// 菜单栏上的内容。颜色使用 `.primary`，随菜单栏的深浅外观变化。
 struct StatusLabelView: View {
     let summary: MenuBarSummary
@@ -13,7 +22,7 @@ struct StatusLabelView: View {
             case .icon:
                 glyph
             case .iconCount:
-                HStack(spacing: 4) {
+                HStack(spacing: 3) {
                     glyph
                     if summary.pending > 0 {
                         Text("\(summary.pending)")
@@ -47,8 +56,8 @@ struct StatusLabelView: View {
                 .background(Color.primary.opacity(0.12), in: Capsule())
             }
         }
-        // 两侧留白与系统图标按钮一致，和相邻的菜单栏图标间距协调。
-        .padding(.horizontal, 5)
+        // 两侧只留很小的空白：菜单栏项目之间本身已有系统间距，再加宽会显得比相邻图标松散。
+        .padding(.horizontal, StatusLabelLayout.sidePadding)
         .fixedSize()
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityText)
