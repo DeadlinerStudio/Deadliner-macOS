@@ -40,4 +40,5 @@ jobs:
           xcodebuild test -project DeadlinerMac.xcodeproj -scheme DeadlinerMac \
             -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath "$RUNNER_TEMP/test-derived" \
+            -testLanguage zh-Hans -testRegion CN \
             -only-testing:DeadlinerMacTests/TaskStatusTests
