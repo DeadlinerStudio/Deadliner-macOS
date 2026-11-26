@@ -3,7 +3,7 @@
 #
 # 用法：scripts/package.sh [输出目录]
 # 产物：<输出目录>/Deadliner-for-macOS-<版本>-arm64.dmg 与 .zip（各附 SHA-256）
-# 以 DEADLINER_LIFI_MODE=private 构建时文件名带 -private：含闭源 Lifi，只能自用，不能公开分发。
+# 默认从组织 Core 包生成安装包。本地源码构建启用私有实现时沿用 -private 后缀。
 #
 # 构建放在 ~/Library/Caches 下：Documents 由文件提供程序管理，会给文件夹加上 FinderInfo 等扩展属性，
 # 导致签名校验失败（"resource fork, Finder information, or similar detritus not allowed"）。
@@ -37,7 +37,7 @@ fi
 
 mkdir -p "$out_dir"
 suffix=""
-[[ "${DEADLINER_LIFI_MODE:-private}" != "stub" ]] && suffix="-private"
+if [[ "${DEADLINER_CORE_SOURCE:-package}" == local && "${DEADLINER_LIFI_MODE:-private}" != stub ]]; then suffix="-private"; fi
 base="Deadliner-for-macOS-$version-arm64$suffix"
 zip="$out_dir/$base.zip"
 rm -f "$zip"

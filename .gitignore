@@ -33,3 +33,5 @@ DerivedData/
 .idea/
 .vscode/
 *.swp
+
+/.deadliner-core/

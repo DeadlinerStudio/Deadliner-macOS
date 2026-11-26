@@ -66,10 +66,10 @@ Liquid Glass 与侧栏下的顶部浮光需要 macOS 26；更早的系统使用�
 
 ## 从源码构建
 
-需要：Xcode 27.2（完成 `sudo xcodebuild -runFirstLaunch`）、JDK 21、XcodeGen（`brew install xcodegen`），以及一份 DeadlinerCore。
+需要：Xcode 27.2（完成 `sudo xcodebuild -runFirstLaunch`）、XcodeGen（`brew install xcodegen`）和 Python 3。首次构建会下载锁定的 macOS ARM64 framework。
 
 ```bash
-scripts/build-core.sh debug      # 构建 Core，部署到 Frameworks/Shared.framework
+scripts/build-core.sh debug      # 安装锁定的 Frameworks/Shared.framework
 xcodegen generate                # 由 project.yml 生成 DeadlinerMac.xcodeproj
 xcodebuild -project DeadlinerMac.xcodeproj -scheme DeadlinerMac \
   -destination 'platform=macOS,arch=arm64' -derivedDataPath build/DerivedData test
@@ -80,7 +80,13 @@ scripts/package.sh ../Deadliner-for-macOS-package   # 打包 DMG 与 ZIP（临�
 
 **Core 的接入方式**
 
-- Core 位置默认为 `../DeadlinerCore`，可以用 `DEADLINER_CORE_DIR` 指定。
+开发机首次构建前运行 `gh auth login -h github.com -s read:packages`。已登录时运行
+`gh auth refresh -h github.com -s read:packages`。账号需有组织 Core 包的 Read 权限。
+IDE 会读取 GitHub CLI 已保存的登录。也可通过环境变量 `GHCR_USERNAME` 和
+`GHCR_TOKEN` 提供本人具有 `read:packages` 的 classic PAT。
+
+- 默认构建校验 `core-package.lock.json` 中的版本和 SHA-256。
+- 本地调试 Core 可设置 `DEADLINER_CORE_SOURCE=local`，安装 JDK 21。此模式下 Core 位置默认为 `../DeadlinerCore`，可以用 `DEADLINER_CORE_DIR` 指定。
 - 需要包含以下改动的 Core（已向 DeadlinerCore 的 `byos` 分支提交 PR，合并前请使用包含它们的分支）：
   - [#1](https://github.com/DeadlinerStudio/DeadlinerCore/pull/1)：4 个 `Ios*StateBridge` 从 `iosMain` 移到 `appleMain`，供 macOS 使用
   - [#2](https://github.com/DeadlinerStudio/DeadlinerCore/pull/2)：`BackupService.restore` 声明 `@Throws`，导入无效备份时报错而不退出
@@ -88,10 +94,11 @@ scripts/package.sh ../Deadliner-for-macOS-package   # 打包 DMG 与 ZIP（临�
   - [#4](https://github.com/DeadlinerStudio/DeadlinerCore/pull/4)：按日期范围读取概览统计（`loadRange`），用于自定义时间段
   - [#6](https://github.com/DeadlinerStudio/DeadlinerCore/pull/6)：`IosLifiCore`、`IosQuickAddBridge` 从 `iosMain` 移到 `appleMain`，并允许传入完整的 `AIConfig`，供 macOS 使用 Lifi AI
   - [#7](https://github.com/DeadlinerStudio/DeadlinerCore/pull/7)：macOS 的 Core 日志写入诊断文件（原来输出到被丢弃的标准输出）；同步时云端已是最新就不再重复上传
-- Lifi 模式统一由 `DEADLINER_LIFI_MODE` 管理：默认 `private`（与 iOS / Android / HarmonyOS 相同），需要先运行 Core 的 `runscript/setupLifi.sh`；公开构建使用 `stub`（AI 不可用），`auto` 根据本地安装情况选择。
+- 私有包中的预编译 Framework 已包含 LiFi。在源码模式下，`DEADLINER_LIFI_MODE=private` 使用已安装的私有实现，`stub` 可在只有公共 Core 源码的工作区编译。
 - 构建前可统一设置：
 
   ```bash
+  export DEADLINER_CORE_SOURCE=local
   export DEADLINER_CORE_DIR="/Users/aritxonly/Codes/ProjectDeadliner/DeadlinerCore"
   export DEADLINER_LIFI_MODE=private
   ```

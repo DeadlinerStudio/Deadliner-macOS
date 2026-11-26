@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# 构建 DeadlinerCore 的 macOS framework，并部署到 Frameworks/Shared.framework。
+# 安装锁定的 macOS framework 到 Frameworks/Shared.framework。
 #
 # - 不修改 Core 仓库：framework 导出由 scripts/deadliner-mac.init.gradle 在构建时补上。
-# - Lifi 默认与 iOS 一致使用 private；公开构建请显式设置 DEADLINER_LIFI_MODE=stub。
+# - DEADLINER_CORE_SOURCE=local 从本地源码构建，可通过 DEADLINER_LIFI_MODE 选择实现。
 #
 # 用法：scripts/build-core.sh [debug|release]
 # 环境变量：
@@ -12,6 +12,11 @@
 set -euo pipefail
 
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+case "${DEADLINER_CORE_SOURCE:-package}" in
+  package) exec /usr/bin/env python3 "$project_dir/scripts/core_package.py" macos "$project_dir/Frameworks/Shared.framework" --lock "$project_dir/core-package.lock.json" ;;
+  local) ;;
+  *) echo "DEADLINER_CORE_SOURCE must be package or local" >&2; exit 2 ;;
+esac
 core_dir="${DEADLINER_CORE_DIR:-$project_dir/../DeadlinerCore}"
 lifi_mode="${DEADLINER_LIFI_MODE:-private}"
 

@@ -5,36 +5,27 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   package:
     runs-on: macos-26
     timeout-minutes: 90
-    env:
-      DEADLINER_LIFI_MODE: stub
-      DEADLINER_CORE_DIR: ${{ github.workspace }}/core
     steps:
       - uses: actions/checkout@v4
         with:
           path: client
           persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          repository: DeadlinerStudio/DeadlinerCore
-          ref: e5e6ea5d89df156b6cbeaba896c702477e124643
-          path: core
-          persist-credentials: false
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
       - name: Prepare build tools
         run: |
           xcodebuild -version
           brew list --versions xcodegen || brew install xcodegen
-      - name: Install Kotlin/Native distribution
-        working-directory: core
-        run: ./gradlew -PlifiMode=stub :shared:downloadKotlinNativeDistribution --console=plain
+      - name: Install the pinned Core framework
+        working-directory: client
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USERNAME: ${{ github.actor }}
+        run: scripts/build-core.sh release
       - name: Build and verify Release packages
         working-directory: client
         run: scripts/package.sh "$RUNNER_TEMP/package"
