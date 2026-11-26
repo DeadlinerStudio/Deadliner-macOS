@@ -37,8 +37,6 @@ struct DeadlinerApp: App {
                 .keyboardShortcut("v", modifiers: [.command, .shift])
             }
             CommandMenu("前往") {
-                Button("CLI 任务（只读）") { openWindow(id: "cli-tasks") }
-                Divider()
                 ForEach(Array(AppModel.Page.allCases.enumerated()), id: \.element) { index, page in
                     Button(page.title) { appDelegate.model?.page = page }
                         .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: [.command])
@@ -52,9 +50,6 @@ struct DeadlinerApp: App {
                 .keyboardShortcut("r", modifiers: [.command])
             }
         }
-
-        Window("CLI 任务（只读）", id: "cli-tasks") { CLITaskWindow() }
-            .defaultSize(width: 620, height: 440)
 
         // 专注计时窗：可以置顶，关闭窗口不会结束计时。
         Window("专注", id: FocusTimerWindow.id) {

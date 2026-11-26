@@ -10,6 +10,7 @@ struct TaskDraft: Equatable {
     }
 
     var id: String?
+    var expectedUpdatedAt: String?
     var title = ""
     var note = ""
     var startAt: Date?
@@ -25,6 +26,7 @@ struct TaskDraft: Equatable {
 
 enum TaskCommandError: LocalizedError, Equatable {
     case notFound
+    case changedWhileEditing
     case invalidTransition
     case focusTimerRunning
     case emptyTitle
@@ -32,6 +34,7 @@ enum TaskCommandError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
+        case .changedWhileEditing: "这条任务在编辑期间已更新，请核对最新内容后再保存。"
         case .notFound: "任务不存在，可能已在其他设备上删除"
         case .invalidTransition: "当前状态下不能执行这个操作"
         case .focusTimerRunning: "这个任务正在专注计时，请先结束计时"
@@ -72,7 +75,7 @@ final class TaskCommands {
     func draft(for uid: String) -> TaskDraft? {
         guard let task = database.tasks.find(uid: uid), !task.isDeleted else { return nil }
         return TaskDraft(
-            id: task.uid,
+            id: task.uid, expectedUpdatedAt: task.updatedAt,
             title: task.title,
             note: task.note,
             startAt: CoreDates.parseLocal(task.startAt),
@@ -101,6 +104,9 @@ final class TaskCommands {
 
         if let uid = draft.id {
             guard let existing = database.tasks.find(uid: uid), !existing.isDeleted else { throw TaskCommandError.notFound }
+            if let version = draft.expectedUpdatedAt, version != existing.updatedAt {
+                throw TaskCommandError.changedWhileEditing
+            }
             let updated = existing.doCopy(
                 uid: existing.uid, title: title, note: draft.note,
                 startAt: CoreClock.local(draft.startAt), dueAt: CoreClock.local(draft.dueAt),

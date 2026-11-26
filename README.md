@@ -129,8 +129,6 @@ scripts/package.sh ../Deadliner-for-macOS-package   # 打包 DMG 与 ZIP（临�
 
 依赖的 [DeadlinerCore](https://github.com/DeadlinerStudio/DeadlinerCore) 使用 MIT 许可证。
 
-### 连接本机 CLI（只读原型）
+### 本机任务整合
 
-在终端运行支持只读服务的 `deadliner serve`，从 Mac 的「前往 → CLI 任务（只读）」打开窗口并粘贴连接码。窗口每两秒检查同一 CLI profile 的任务更新，支持按标题或备注搜索。在另一个终端修改任务即可看到变化。关闭窗口或点「断开」结束读取，Ctrl+C 结束服务。常规任务页、菜单栏和提醒继续使用 Mac 自己的数据。
-
-自动启动可通过 CLI 包的 `scripts/enable-macos-autostart.sh` 一次性配置。此后打开只读窗口会启动当前用户授权的 CLI 并连接，在断开或关闭时结束该服务。未配置启动器时可照常使用连接码。
+任务卡片、编辑器、归档和菜单栏都通过原有 Core 仓库读写。为当前用户全局安装支持任务快照的 CLI 时，npm 会自动登记启动器。手动安装或跳过安装脚本时，可在终端运行一次 `sh "$(npm root -g)/@deadlinerstudio/cli/scripts/enable-macos-autostart.sh"` 授权沙盒启动器。客户端此后在后台自动连接，两端各自已有的任务保留，同一 UID 按 Core 版本合并，包括子任务、分类和删除标记。服务不可用时仍可本地编辑，恢复后自动合并。

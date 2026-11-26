@@ -16,7 +16,7 @@ final class CLIAutoLauncher {
         let data: Payload
     }
 
-    func start(ready: @escaping @MainActor (CLISession) -> Void, failed: @escaping @MainActor (String) -> Void) {
+    func start(writable: Bool = false, ready: @escaping @MainActor (CLISession) -> Void, failed: @escaping @MainActor (String) -> Void) {
         stop()
         let id = generation
         do {
@@ -33,7 +33,7 @@ final class CLIAutoLauncher {
             script = task
             task.standardInput = input.fileHandleForReading
             task.standardOutput = output.fileHandleForWriting
-            task.execute(withArguments: []) { [weak self] _ in
+            task.execute(withArguments: writable ? ["--allow-writes"] : []) { [weak self] _ in
                 Task { @MainActor in
                     guard let self, self.generation == id else { return }
                     self.stop()

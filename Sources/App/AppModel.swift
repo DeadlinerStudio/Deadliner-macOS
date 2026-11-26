@@ -62,6 +62,9 @@ final class AppModel {
     @ObservationIgnored private(set) var sync: SyncController!
     /// 系统通知（由 AppDelegate 在启动完成后创建）。
     @ObservationIgnored var notifications: NotificationController?
+    @ObservationIgnored private lazy var localTaskPeer = LocalTaskPeer(database: container.database) { [weak self] in
+        self?.refreshAll()
+    }
     @ObservationIgnored private(set) var taskCommands: TaskCommands!
     @ObservationIgnored private(set) var categoryCommands: CategoryCommands!
     @ObservationIgnored private(set) var habitCommands: HabitCommands!
@@ -211,9 +214,11 @@ final class AppModel {
         focus.refresh()
         focusTimer.start()
         sync.start()
+        if !AppDelegate.isRunningTests { localTaskPeer.start() }
     }
 
     func refreshAll(except skipped: Page? = nil) {
+        localTaskPeer.localDidChange()
         habitList.rollOverIfNeeded()
         if skipped != .tasks { taskList.refresh() }
         if skipped != .habits { habitList.refresh() }
@@ -253,6 +258,7 @@ final class AppModel {
     }
 
     func stop() {
+        localTaskPeer.stop()
         lifi.close()
         sync.stop()
         taskList.stop()
