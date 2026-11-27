@@ -16,6 +16,10 @@ final class MonthlyInsightStore {
     private(set) var result: MonthlyInsight?
     private(set) var loading = false
     private(set) var error: String?
+    /// 所选月份还没有洞察，等用户点「生成洞察」（`generate: false` 时不自动发起请求）。
+    private(set) var awaitingRequest = false
+    /// 所选月份还没结束，暂不生成洞察。
+    private(set) var monthInProgress = false
     @ObservationIgnored private var activeMonth: String?
     @ObservationIgnored private var pending: [String: AppleMonthlyInsightBridge] = [:]
     @ObservationIgnored private let directory: URL?
@@ -25,11 +29,15 @@ final class MonthlyInsightStore {
         self.directory = directory ?? (try? AppPaths.applicationSupportDirectory().appendingPathComponent("MonthlyReviews"))
     }
 
-    func resolve(review: OverviewStore.MonthReview, retry: Bool = false) {
-        guard let month = review.monthStart, month < OverviewPeriod.key(OverviewPeriod.month()) else { return }
+    /// 读取某月的洞察；没有保存过时，`generate` 为 true 才向 AI 服务发起生成（`retry` 表示用户主动要求）。
+    func resolve(review: OverviewStore.MonthReview, retry: Bool = false, generate: Bool = true) {
+        guard let month = review.monthStart else { return }
         activeMonth = month
         result = nil
         error = nil
+        awaitingRequest = false
+        monthInProgress = month >= OverviewPeriod.key(OverviewPeriod.month())
+        guard !monthInProgress else { loading = false; return }
         loading = pending[month] != nil
         guard let directory else { error = String(localized: "无法打开复盘存储目录"); return }
         let url = directory.appendingPathComponent(month + ".json")
@@ -42,6 +50,7 @@ final class MonthlyInsightStore {
                 if record.attempted && !retry && pending[month] == nil { error = String(localized: "上次分析未完成，请点击重试"); return }
             }
             if pending[month] != nil { return }
+            if !generate && !retry { awaitingRequest = true; return }
             guard LifiAvailability.shared.isAvailable else { error = String(localized: "当前构建未包含 AI 服务"); return }
             guard let config = MonthlyInsightSettings.configuration() else { error = String(localized: "配置 AI 服务后可生成月度洞察"); return }
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

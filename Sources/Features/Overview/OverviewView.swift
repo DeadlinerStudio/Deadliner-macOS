@@ -367,10 +367,38 @@ struct OverviewCard<Content: View>: View {
     }
 }
 
+/// 鼠标悬停时浮在图表上方的数值气泡（专注时长、热力图、每日完成、每月趋势共用）。
+struct OverviewHoverBubble: View {
+    let title: String
+    let lines: [String]
+    @Environment(\.palette) private var t
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Text(verbatim: title).font(.caption2).foregroundStyle(t.onSurfaceVariant)
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                Text(verbatim: line).font(.caption.weight(.semibold)).monospacedDigit()
+            }
+        }
+        .fixedSize()
+        .padding(.horizontal, 7).padding(.vertical, 4)
+        .background(t.groupBg, in: RoundedRectangle(cornerRadius: 7))
+        .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(t.onSurface.opacity(0.12), lineWidth: 1))
+        .shadow(color: .black.opacity(0.18), radius: 4, y: 1)
+        .allowsHitTesting(false)
+    }
+}
+
+/// 概览卡片的底色与描边。深色模式下系统的卡片底色与页面底色几乎相同，
+/// 加一层很淡的提亮和细描边，卡片的边界（以及同一行卡片等高）才看得清。
 struct OverviewCardBackground: ViewModifier {
     @Environment(\.palette) private var t
     func body(content: Content) -> some View {
-        content.background(t.groupBg, in: RoundedRectangle(cornerRadius: MiuixRadius.card, style: .continuous))
+        let shape = RoundedRectangle(cornerRadius: MiuixRadius.card, style: .continuous)
+        content
+            .background(t.groupBg, in: shape)
+            .background(t.onSurface.opacity(t.isDark ? 0.035 : 0), in: shape)
+            .overlay(shape.strokeBorder(t.onSurface.opacity(t.isDark ? 0.10 : 0.07), lineWidth: 1))
     }
 }
 
@@ -537,7 +565,15 @@ struct OverviewHeatmapCard: View {
     /// 每天的专注秒数（键为 `yyyy-MM-dd`），用于悬停提示。
     var focus: [String: Int] = [:]
     @State private var width: CGFloat = 400
+    @State private var hovered: String?
     @Environment(\.palette) private var t
+
+    /// 悬停气泡的内容：日期、完成数，有专注时加上专注时长。
+    static func hoverLines(_ day: OverviewStore.DayCount, focusSeconds: Int) -> (title: String, lines: [String]) {
+        var lines = [String(localized: "完成 \(day.completed) 项")]
+        if focusSeconds > 0 { lines.append(String(localized: "专注 \(FocusTexts.duration(focusSeconds))")) }
+        return (OverviewDates.label(day.date, String(localized: "M月d日 EEE")), lines)
+    }
 
     /// 每月第一周的列上方显示月份。
     static func monthLabel(_ weeks: [[OverviewStore.DayCount?]], _ index: Int) -> String {
@@ -577,16 +613,37 @@ struct OverviewHeatmapCard: View {
                                 .frame(width: labelWidth, height: cell, alignment: .leading)
                             ForEach(weeks.indices, id: \.self) { w in
                                 let day = weeks[w][d]
+                                let isHovered = day != nil && day?.date == hovered
                                 RoundedRectangle(cornerRadius: cell / 4, style: .continuous)
                                     .fill(color(day?.completed, peak: peak))
                                     .frame(width: cell, height: cell)
-                                    .help(day.map { OverviewDates.dayTooltip($0, focusSeconds: focus[$0.date] ?? 0) } ?? "")
+                                    .overlay {
+                                        if isHovered {
+                                            RoundedRectangle(cornerRadius: cell / 4, style: .continuous).stroke(t.onSurface.opacity(0.6), lineWidth: 1.2)
+                                        }
+                                    }
+                                    // 悬停的格子上方显示当天的完成数与专注时长（与专注时长图相同的气泡）。
+                                    .overlay(alignment: w < 3 ? .bottomLeading : w >= weeks.count - 3 ? .bottomTrailing : .bottom) {
+                                        if isHovered, let day {
+                                            let info = Self.hoverLines(day, focusSeconds: focus[day.date] ?? 0)
+                                            OverviewHoverBubble(title: info.title, lines: info.lines)
+                                                .offset(y: -(cell + 4))
+                                        }
+                                    }
+                                    .zIndex(isHovered ? 1 : 0)
+                                    .onHover { inside in
+                                        guard let day else { return }
+                                        if inside { hovered = day.date } else if hovered == day.date { hovered = nil }
+                                    }
+                                    .accessibilityLabel(day.map { OverviewDates.dayTooltip($0, focusSeconds: focus[$0.date] ?? 0) } ?? "")
                             }
                         }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                // 顶部两行的气泡会伸出网格上方，不要被滚动区域裁掉。
+                .scrollClipDisabled()
                 .background(GeometryReader { proxy in
                     Color.clear
                         .onAppear { width = proxy.size.width }
@@ -627,6 +684,7 @@ struct OverviewHeatmapCard: View {
 struct OverviewDailyCard: View {
     let days: [OverviewStore.DayCount]
     @AppStorage("overview.showOverdue") private var showOverdue = true
+    @State private var hovered: String?
     @Environment(\.palette) private var t
 
     var body: some View {
@@ -648,6 +706,30 @@ struct OverviewDailyCard: View {
                                 .foregroundStyle(by: .value("类型", String(localized: "逾期")))
                                 .cornerRadius(4)
                         }
+                    }
+                    // 鼠标悬停的那一天：上方显示具体数量（与专注时长相同）。
+                    if let hovered, let day = days.first(where: { OverviewDates.label($0.date, "EEE") == hovered }) {
+                        RuleMark(x: .value("日期", hovered))
+                            .foregroundStyle(.clear)
+                            .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
+                                OverviewHoverBubble(
+                                    title: OverviewDates.label(day.date, String(localized: "M月d日 EEE")),
+                                    lines: [String(localized: "完成 \(day.completed) 项")]
+                                        + (showOverdue ? [String(localized: "逾期 \(day.overdue) 项")] : []))
+                            }
+                    }
+                }
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        Rectangle().fill(.clear).contentShape(Rectangle())
+                            .onContinuousHover { phase in
+                                guard case .active(let location) = phase, let frame = proxy.plotFrame,
+                                      let label: String = proxy.value(atX: location.x - geometry[frame].origin.x) else {
+                                    hovered = nil
+                                    return
+                                }
+                                hovered = label
+                            }
                     }
                 }
                 .chartForegroundStyleScale([String(localized: "已完成"): c.completed, String(localized: "逾期"): c.overdue])
@@ -713,7 +795,15 @@ struct OverviewMonthlyCard: View {
     let months: [OverviewStore.MonthCount]
     /// 每月的超前、提前完成数（Mac 端推算，键为月初）。
     var timings: [String: [CompletionTiming: Int]] = [:]
+    @State private var hovered: String?
     @Environment(\.palette) private var t
+
+    /// 悬停气泡：这个月的各项数量。
+    static func hoverLines(_ month: OverviewStore.MonthCount, timings: [CompletionTiming: Int]) -> [String] {
+        [String(localized: "任务总数 \(month.total)"), String(localized: "已完成 \(month.completed)"),
+         String(localized: "逾期完成 \(month.overdueCompleted)"), String(localized: "超前完成 \(timings[.ahead] ?? 0)"),
+         String(localized: "提前完成 \(timings[.early] ?? 0)")]
+    }
 
     var body: some View {
         let c = OverviewColors(t: t)
@@ -739,6 +829,30 @@ struct OverviewMonthlyCard: View {
                         LineMark(x: .value("月份", label), y: .value("数量", timings[month.monthStart]?[.early] ?? 0))
                             .foregroundStyle(by: .value("类型", String(localized: "提前完成")))
                             .symbol(.circle)
+                    }
+                    // 鼠标悬停的月份：竖线标出，上方显示这个月的具体数量。
+                    if let hovered, let month = months.first(where: { OverviewDates.label($0.monthStart, String(localized: "M月")) == hovered }) {
+                        RuleMark(x: .value("月份", hovered))
+                            .foregroundStyle(t.onSurfaceVariant.opacity(0.35))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                            .annotation(position: .trailing, alignment: .center, spacing: 6,
+                                        overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
+                                OverviewHoverBubble(title: OverviewDates.label(month.monthStart, String(localized: "yyyy年M月")),
+                                                    lines: Self.hoverLines(month, timings: timings[month.monthStart] ?? [:]))
+                            }
+                    }
+                }
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        Rectangle().fill(.clear).contentShape(Rectangle())
+                            .onContinuousHover { phase in
+                                guard case .active(let location) = phase, let frame = proxy.plotFrame,
+                                      let label: String = proxy.value(atX: location.x - geometry[frame].origin.x) else {
+                                    hovered = nil
+                                    return
+                                }
+                                hovered = label
+                            }
                     }
                 }
                 .chartForegroundStyleScale([String(localized: "任务总数"): c.pending, String(localized: "已完成"): c.completed, String(localized: "逾期完成"): c.overdue,
@@ -954,14 +1068,9 @@ struct OverviewFocusBarsCard: View {
                         RuleMark(x: .value("日期", date, unit: unit == .day ? .day : .month))
                             .foregroundStyle(.clear)
                             .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                                VStack(spacing: 1) {
-                                    Text(OverviewDates.label(hovered.start, unit == .day ? String(localized: "M月d日") : String(localized: "yyyy年M月")))
-                                        .font(.caption2).foregroundStyle(t.onSurfaceVariant)
-                                    Text(FocusTexts.duration(hovered.seconds)).font(.caption.weight(.semibold))
-                                }
-                                .padding(.horizontal, 7).padding(.vertical, 4)
-                                .background(t.groupBg, in: RoundedRectangle(cornerRadius: 7))
-                                .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
+                                OverviewHoverBubble(
+                                    title: OverviewDates.label(hovered.start, unit == .day ? String(localized: "M月d日") : String(localized: "yyyy年M月")),
+                                    lines: [FocusTexts.duration(hovered.seconds)])
                             }
                     }
                 }

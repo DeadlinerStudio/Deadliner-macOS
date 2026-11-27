@@ -16,6 +16,14 @@ struct MonthlyInsightContent: View {
                         Text(keyword).font(.caption).padding(7).background(.purple.opacity(0.1), in: Capsule())
                     }
                 }
+            } else if store.monthInProgress {
+                Text("这个月还没结束，月底之后可以生成洞察").foregroundStyle(.secondary)
+            } else if store.awaitingRequest {
+                Text("这个月还没有生成洞察").foregroundStyle(.secondary)
+                HStack {
+                    Button("生成洞察") { store.resolve(review: review, retry: true) }.disabled(review.monthStart == nil)
+                    Button("AI 配置") { settings = true }
+                }
             } else {
                 Text(store.error ?? String(localized: "月度洞察尚未生成")).foregroundStyle(.secondary)
                 HStack {
@@ -94,39 +102,48 @@ struct MonthlyInsightSettingsView: View {
     }
 }
 
-struct OverviewReviewWorkspace: View {
+/// 月度复盘：与总览共用月份选择（上方的月份切换），可以查看任意月份。
+struct OverviewReviewWorkspace<Controls: View>: View {
     let store: OverviewStore
     let insight: MonthlyInsightStore
     let columns: Int
+    /// 所选月份（月初）。
+    let month: Date
+    @ViewBuilder var controls: Controls
     @State private var export = false
     @State private var settings = false
+
+    private var review: OverviewStore.MonthReview? { store.month?.review }
+    private var inProgress: Bool { month >= OverviewPeriod.month() }
+
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("月度复盘").font(.title2.bold())
-                Text(store.lastMonth.monthStart.map { OverviewDates.label($0, String(localized: "yyyy 年 M 月")) } ?? String(localized: "上月"))
-                    .foregroundStyle(.secondary)
-            }
+            Text("月度复盘").font(.title2.bold())
             Spacer()
             Button("AI 配置") { settings = true }
             Button("导出与分享", systemImage: "square.and.arrow.up") { export = true }
-                .disabled(store.isLoading || store.errorMessage != nil || store.lastMonth.monthStart == nil)
+                .disabled(review?.monthStart == nil || store.monthLoading)
         }
-        Text("最近一个完整月 · 指标按截止日期，活动按完成日期；逾期指标含放弃任务。")
+        controls
+        Text(inProgress ? "本月进行中，数据统计到今天 · 指标按截止日期，活动按完成日期；逾期指标含放弃任务。"
+                        : "指标按截止日期，活动按完成日期；逾期指标含放弃任务。")
             .font(.caption).foregroundStyle(.secondary)
-        if store.isLoading { ProgressView("加载复盘…") }
-        else if let error = store.errorMessage { OverviewError(message: error) { store.refresh() } }
-        else {
-            OverviewCard(title: String(localized: "AI 月度洞察")) { MonthlyInsightContent(store: insight, review: store.lastMonth) }
-            OverviewMetricsCard(review: store.lastMonth)
+        if let error = store.monthError { OverviewError(message: error) { store.loadMonth(OverviewPeriod.key(month)) } }
+        else if let review, !store.monthLoading {
+            OverviewCard(title: String(localized: "AI 月度洞察")) { MonthlyInsightContent(store: insight, review: review) }
+            OverviewMetricsCard(review: review)
             OverviewRow(columns: min(columns, 2)) {
-                OverviewActivityCalendar(review: store.lastMonth)
-                OverviewTitlesCard(review: store.lastMonth)
+                OverviewActivityCalendar(review: review).frame(maxWidth: .infinity)
+                OverviewTitlesCard(review: review).frame(maxWidth: .infinity)
             }
-        }
+        } else { ProgressView("加载复盘…").frame(maxWidth: .infinity, minHeight: 200) }
         Color.clear.frame(height: 0)
-            .sheet(isPresented: $export) { OverviewReviewExport(review: store.lastMonth, insight: insight.result) }
-            .sheet(isPresented: $settings) { MonthlyInsightSettingsView { insight.resolve(review: store.lastMonth, retry: true) } }
+            .sheet(isPresented: $export) {
+                if let review { OverviewReviewExport(review: review, insight: insight.result?.month == review.monthStart ? insight.result : nil) }
+            }
+            .sheet(isPresented: $settings) {
+                MonthlyInsightSettingsView { if let review { insight.resolve(review: review, retry: true) } }
+            }
     }
 }
 

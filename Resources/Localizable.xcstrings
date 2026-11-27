@@ -851,6 +851,16 @@
         }
       }
     },
+    "CLI 任务（只读）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI Tasks (Read-Only)"
+          }
+        }
+      }
+    },
     "Core": {},
     "Deadliner": {},
     "Deadliner · 月度复盘": {
@@ -2340,6 +2350,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Total tasks"
+          }
+        }
+      }
+    },
+    "任务总数 %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total tasks %lld"
           }
         }
       }
@@ -4046,6 +4066,16 @@
         }
       }
     },
+    "在终端运行 deadliner serve，粘贴连接码以查看 CLI 任务。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run deadliner serve in Terminal and paste the connection code to see CLI tasks."
+          }
+        }
+      }
+    },
     "在菜单栏显示 Deadliner": {
       "localizations": {
         "en": {
@@ -4742,6 +4772,16 @@
         }
       }
     },
+    "尝试自动启动": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try Auto-Start"
+          }
+        }
+      }
+    },
     "展开完整表单": {
       "localizations": {
         "en": {
@@ -4968,6 +5008,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Completed"
+          }
+        }
+      }
+    },
+    "已完成 %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completed %lld"
           }
         }
       }
@@ -5330,6 +5380,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Average time to complete"
+          }
+        }
+      }
+    },
+    "平均每次 %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Average per session %@"
+          }
+        }
+      }
+    },
+    "平均每次 —": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Average per session —"
           }
         }
       }
@@ -6067,6 +6137,16 @@
         }
       }
     },
+    "指标按截止日期，活动按完成日期；逾期指标含放弃任务。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metrics by deadline, activity by completion date; overdue metrics include abandoned tasks."
+          }
+        }
+      }
+    },
     "指标按截止月份统计，活动按完成日期统计；逾期指标含放弃。AI 洞察为该月已保存结果。": {
       "localizations": {
         "en": {
@@ -6217,6 +6297,16 @@
         }
       }
     },
+    "提前完成 %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Early %lld"
+          }
+        }
+      }
+    },
     "提示词已保存": {
       "localizations": {
         "en": {
@@ -6303,6 +6393,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Search archive"
+          }
+        }
+      }
+    },
+    "搜索标题或备注": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search titles or notes"
           }
         }
       }
@@ -6473,6 +6573,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Organize notes"
+          }
+        }
+      }
+    },
+    "断开": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disconnect"
           }
         }
       }
@@ -7691,6 +7801,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "In progress this month"
+          }
+        }
+      }
+    },
+    "本月进行中，数据统计到今天 · 指标按截止日期，活动按完成日期；逾期指标含放弃任务。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This month is in progress; counted up to today · metrics by deadline, activity by completion date; overdue metrics include abandoned tasks."
           }
         }
       }
@@ -8914,6 +9034,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Amber"
+          }
+        }
+      }
+    },
+    "生成洞察": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generate Insight"
           }
         }
       }
@@ -10164,6 +10294,16 @@
         }
       }
     },
+    "超前完成 %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahead %lld"
+          }
+        }
+      }
+    },
     "超前：开始前就完成；提前：比截止日早至少一天。没有截止时间的任务只计超前完成。": {
       "localizations": {
         "en": {
@@ -10648,6 +10788,26 @@
         }
       }
     },
+    "这个月还没有生成洞察": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No insight has been generated for this month yet"
+          }
+        }
+      }
+    },
+    "这个月还没结束，月底之后可以生成洞察": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This month isn't over yet; an insight can be generated after it ends"
+          }
+        }
+      }
+    },
     "这会清空用户画像和所有碎片记忆，且不可恢复。启用同步后也会同步到其他设备。": {
       "localizations": {
         "en": {
@@ -10788,6 +10948,16 @@
         }
       }
     },
+    "连接": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect"
+          }
+        }
+      }
+    },
     "连接与登录": {
       "localizations": {
         "en": {
@@ -10824,6 +10994,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Connection OK (HTTP %lld)"
+          }
+        }
+      }
+    },
+    "连接码": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection code"
           }
         }
       }
@@ -10984,6 +11164,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Late"
+          }
+        }
+      }
+    },
+    "逾期完成 %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Late %lld"
           }
         }
       }

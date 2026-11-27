@@ -120,7 +120,8 @@ struct FocusContent: View {
         .readableWidth(860)
     }
 
-    /// `days` 不为 nil 时显示日均（按这段时间到今天为止的天数）。
+    /// 四块的行数固定，高度一致：标题、总时长、专注次数一行、平均一行。
+    /// `days` 不为 nil 时第二行是日均（按这段时间到今天为止的天数）；今天与累计没有日均，显示平均每次的时长。
     private func tile(_ title: String, _ summary: FocusStore.Summary, tint: Color, days: Int? = nil) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
@@ -129,13 +130,19 @@ struct FocusContent: View {
             Text(FocusTexts.duration(summary.totalSeconds))
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(t.onSurface)
-            Text([ String(localized: "\(summary.sessionCount) 次专注"), days.map { String(localized: "日均 \(FocusTexts.duration(summary.totalSeconds / max(1, $0)))") } ]
-                    .compactMap { $0 }.joined(separator: " · "))
-                .font(.system(size: 12))
-                .foregroundStyle(t.onSurfaceVariant)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("\(summary.sessionCount) 次专注")
+                Text(FocusTexts.tileAverage(summary, days: days))
+            }
+            .font(.system(size: 12))
+            .foregroundStyle(t.onSurfaceVariant)
+            .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 18)
         .background(t.groupBg, in: RoundedRectangle(cornerRadius: MiuixRadius.group, style: .continuous))
     }
 
@@ -201,6 +208,13 @@ enum FocusTexts {
         calendar.firstWeekday = 2
         guard let start = calendar.dateInterval(of: component, for: now)?.start else { return 1 }
         return (calendar.dateComponents([.day], from: start, to: calendar.startOfDay(for: now)).day ?? 0) + 1
+    }
+
+    /// 专注汇总块的第二行：有天数时为日均，否则为平均每次（没有专注时为「—」）。
+    static func tileAverage(_ summary: FocusStore.Summary, days: Int?) -> String {
+        if let days { return String(localized: "日均 \(duration(summary.totalSeconds / max(1, days)))") }
+        guard summary.sessionCount > 0 else { return String(localized: "平均每次 —") }
+        return String(localized: "平均每次 \(duration(summary.totalSeconds / summary.sessionCount))")
     }
 
     /// 每日平均专注：总时长除以范围内到今天为止的天数（未来的日子不计入）。

@@ -33,7 +33,8 @@ struct OverviewWorkbench: View {
                         case .dashboard: dashboard(columns: columns)
                         case .tasks: tasks(columns: columns)
                         case .trends: OverviewTrendWorkspace(store: store, columns: columns)
-                        case .review: OverviewReviewWorkspace(store: store, insight: insight, columns: columns)
+                        case .review: OverviewReviewWorkspace(store: store, insight: insight, columns: columns,
+                                                              month: selectedMonth) { monthControls }
                         }
                     }
                     .frame(maxWidth: 1800)
@@ -66,8 +67,8 @@ struct OverviewWorkbench: View {
         .onChange(of: scenePhase) { if scenePhase == .active { refresh() } }
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in refresh() }
         .onReceive(NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)) { _ in refresh() }
+        .onChange(of: store.month) { loadInsight() }
         .onChange(of: store.lastMonth) { loadInsight() }
-        .onChange(of: store.isLoading) { if !store.isLoading { loadInsight() } }
     }
 
     private var monthControls: some View {
@@ -93,18 +94,21 @@ struct OverviewWorkbench: View {
         if let error = store.monthError {
             OverviewError(message: error) { store.loadMonth(OverviewPeriod.key(selectedMonth)) }
         } else if let detail = store.month, !store.monthLoading {
+            // 同一行的卡片等高：较矮的卡片向下拉伸到最高的那张，边界对齐。
             if columns == 3 {
-                HStack(alignment: .top, spacing: 18) {
+                OverviewRow(columns: 3) {
                     OverviewActivityCalendar(review: detail.review, focus: monthFocus).frame(maxWidth: .infinity)
-                    VStack(spacing: 18) { result(detail); preview }.frame(maxWidth: .infinity)
-                    reviewPreview.frame(maxWidth: .infinity)
+                    VStack(spacing: MiuixCard.gap) { result(detail); preview }.frame(maxWidth: .infinity)
+                    reviewPreview(detail.review).frame(maxWidth: .infinity)
                 }
             } else {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .top), count: columns), alignment: .leading, spacing: 18) {
-                    OverviewActivityCalendar(review: detail.review, focus: monthFocus)
-                    result(detail)
-                    preview
-                    reviewPreview
+                OverviewRow(columns: columns) {
+                    OverviewActivityCalendar(review: detail.review, focus: monthFocus).frame(maxWidth: .infinity)
+                    result(detail).frame(maxWidth: .infinity)
+                }
+                OverviewRow(columns: columns) {
+                    preview.frame(maxWidth: .infinity)
+                    reviewPreview(detail.review).frame(maxWidth: .infinity)
                 }
             }
             if let focus = store.focusMonth { OverviewFocusInvestmentCard(focus: focus) }
@@ -131,7 +135,9 @@ struct OverviewWorkbench: View {
             OverviewHistoryCard(history: detail.distribution, title: String(localized: "所选月成果"), subtitle: String(localized: "完成活动与当前状态"),
                                 completedTiming: store.monthTiming)
         }
-        .padding(18).background(t.groupBg, in: RoundedRectangle(cornerRadius: MiuixRadius.card))
+        .padding(18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .modifier(OverviewCardBackground())
     }
 
     private func comparisonColor(_ current: OverviewStore.MonthReview, _ previous: OverviewStore.MonthReview) -> Color {
@@ -150,9 +156,10 @@ struct OverviewWorkbench: View {
         }
     }
 
-    private var reviewPreview: some View {
-        OverviewCard(title: String(localized: "月度复盘"), subtitle: store.lastMonth.monthStart.map { OverviewDates.label($0, String(localized: "yyyy 年 M 月")) }) {
-            MonthlyInsightContent(store: insight, review: store.lastMonth)
+    /// 所选月份的复盘（随上方的月份切换）。
+    private func reviewPreview(_ review: OverviewStore.MonthReview) -> some View {
+        OverviewCard(title: String(localized: "月度复盘"), subtitle: review.monthStart.map { OverviewDates.label($0, String(localized: "yyyy 年 M 月")) }) {
+            MonthlyInsightContent(store: insight, review: review)
             Button("查看完整复盘与分享") { tab = .review }
         }
     }
@@ -256,9 +263,11 @@ struct OverviewWorkbench: View {
         if scope == "所选月" { loadRange() }
     }
     private func refresh() { store.refresh(); loadRange(); loadInsight() }
+    /// 读取所选月份已保存的洞察。只有最近一个完整月会自动生成（与之前相同）；
+    /// 其他月份需要在卡片里点「生成洞察」，翻看月份不会自动发起 AI 请求。
     private func loadInsight() {
-        guard store.errorMessage == nil, !store.isLoading else { return }
-        insight.resolve(review: store.lastMonth)
+        guard let review = store.month?.review, review.monthStart != nil else { return }
+        insight.resolve(review: review, generate: review.monthStart == store.lastMonth.monthStart)
     }
     private func loadRange() {
         let calendar = OverviewPeriod.calendar
