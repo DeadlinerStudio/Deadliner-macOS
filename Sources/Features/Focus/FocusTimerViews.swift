@@ -6,6 +6,8 @@ import SwiftUI
 struct FocusStartSection: View {
     let targetId: String
     let isHabit: Bool
+    /// 开始专注后执行（例如关闭任务详情）。为 nil 时按设置「开始专注后关闭编辑窗口」决定是否关闭所在窗口。
+    var onStarted: (() -> Void)? = nil
     @Environment(\.focusTimer) private var timer
     @Environment(\.openWindow) private var openWindow
     @AppStorage(FocusTimerWindow.countdownKey) private var countdown = true
@@ -45,7 +47,7 @@ struct FocusStartSection: View {
                         if isHabit { timer.startHabit(targetId, minutes: countdown ? minutes : nil) }
                         else { timer.startTask(targetId, minutes: countdown ? minutes : nil) }
                         openWindow(id: FocusTimerWindow.id)
-                        if closeEditor { dismiss() }
+                        if let onStarted { onStarted() } else if closeEditor { dismiss() }
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(timer.isBusy)

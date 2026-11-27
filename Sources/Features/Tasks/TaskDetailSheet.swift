@@ -157,7 +157,8 @@ struct TaskDetailSheet: View {
                 }
                 .disabled(isLocked)
                 if item.state == .active {
-                    FocusStartSection(targetId: item.id, isHabit: false)
+                    // 详情里没有未保存的修改，开始专注后直接关闭，只留下计时窗。
+                    FocusStartSection(targetId: item.id, isHabit: false, onStarted: onClose)
                 }
             }
             .formStyle(.grouped)

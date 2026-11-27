@@ -4036,6 +4036,17 @@
         }
       }
     },
+    "在任务或习惯的编辑窗口中点「开始专注」后自动关闭编辑窗口，只留下计时窗。编辑窗口中未保存的修改不会保存。任务详情在开始专注后总是自动关闭。": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "After clicking “Start Focus” in a task or habit editor, close the editor and keep only the timer window. Unsaved changes in the editor are not saved. Task details always close after starting focus."
+          }
+        }
+      }
+    },
     "在任务页只看这个分类": {
       "localizations": {
         "en": {

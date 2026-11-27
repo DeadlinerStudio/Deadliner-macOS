@@ -427,7 +427,7 @@ struct SettingsView: View {
         }
         Section("专注") {
             Toggle("开始专注后关闭编辑窗口", isOn: $closeEditorOnFocus)
-            Text("在任务或习惯的编辑窗口中点「开始专注」后自动关闭编辑窗口，只留下计时窗。编辑窗口中未保存的修改不会保存。")
+            Text("在任务或习惯的编辑窗口中点「开始专注」后自动关闭编辑窗口，只留下计时窗。编辑窗口中未保存的修改不会保存。任务详情在开始专注后总是自动关闭。")
                 .font(.caption).foregroundStyle(.secondary)
         }
         Section {
